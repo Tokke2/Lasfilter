@@ -9,11 +9,11 @@ class Engine {
   this.busy=false;this.hold=false;this.fault='';this.epoch=0;
   this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;
  }
- log(name,count=0){this.hooks.log?.(name,count);}
+ log(name,count=0,detail=''){this.hooks.log?.(name,count,detail);}
  debug(t){this.hooks.debug?.(t);}
  change(){this.hooks.change?.();}
  async persist(){try{await this.hooks.persist?.();}catch{this.stop('storage_error');throw new C.RuleError('storage_error');}}
- stop(code){this.fault=code;this.epoch++;this.log('error');this.debug('motorn stoppad: '+code);this.change();}
+ stop(code){this.fault=code;this.epoch++;this.log('error',0,'motor_stoppad code='+code);this.debug('motorn stoppad: '+code);this.change();}
  enabled(){return !this.config.paused&&!this.fault&&!this.hold;}
  recordList(){return [...this.records.values()].map(r=>({...r}));}
  blocked(){const active=new Set([...this.pending.values()].map(j=>j.record.key));return [...this.records.values()].filter(r=>r.stage==='attempted'&&!active.has(r.key)).length;}
@@ -33,15 +33,32 @@ class Engine {
    }
   }return ids;
  }
- async pair(rule){
-  const [source,target]=await Promise.all([this.api.folders.get(rule.source,false),this.api.folders.get(rule.target,false)]);
-  const [sc,tc]=await Promise.all([this.api.folders.getFolderCapabilities(rule.source),this.api.folders.getFolderCapabilities(rule.target)]);
+ async pair(rule){return this.pairFolders(rule.source,rule.target);}
+ async pairFolders(sourceId,targetId){
+  const [source,target]=await Promise.all([this.api.folders.get(sourceId,false),this.api.folders.get(targetId,false)]);
+  const [sc,tc]=await Promise.all([this.api.folders.getFolderCapabilities(sourceId),this.api.folders.getFolderCapabilities(targetId)]);
   C.validatePair(source,target,sc,tc);return {source,target};
+ }
+ async validateRuleFolders(rule){
+  if(rule.scope!=='account')return this.pair(rule);
+  const [accounts,target,tc]=await Promise.all([this.api.accounts.list(true),this.api.folders.get(rule.target,false),this.api.folders.getFolderCapabilities(rule.target)]);
+  if(!accounts.some(a=>a.id===rule.sourceAccount)||!C.usableFolder(target))throw new C.RuleError('unsafe_folder');
+  if(tc.canAddMessages!==true)throw new C.RuleError('read_only');
+  return {target};
  }
  makeRecord(m,rule,target,source=null,notify=false){
   const key=C.fingerprint(m);if(!key||!Number.isFinite(+new Date(m.date))||!Number.isSafeInteger(m.size))return null;
   return {key,headerMessageId:m.headerMessageId,date:+new Date(m.date),size:m.size,source:source||rule.source,target,ruleId:rule.id,notify:notify===true,
-   rulesVersion:this.config.rulesVersion,stage:'pending',created:this.now()};
+   unread:m.read!==true,rulesVersion:this.config.rulesVersion,stage:'pending',created:this.now()};
+ }
+ async newInboxMessages(messages){
+  if(!this.enabled()||!this.config.newInboxDirect)return 0;
+  let queued=0;
+  for(const m of messages||[]){
+   const rule=C.firstMatch(this.config.rules,m);if(!rule)continue;
+   if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:true,notify:true}))queued++;
+  }
+  this.debug('nyinkommet inkorg antal='+(messages?.length||0)+' koade='+queued);return queued;
  }
  async readChanged(m,changed,old={}){
   if(changed.read===false){await this.dropId(m.id);return false;}
@@ -55,11 +72,11 @@ class Engine {
   const record=this.makeRecord(message,rule,forced?forced.target:C.targetFor(rule,message),forced?message.folder.id:null,forced?.notify);
   if(!record){this.log('skipped',1);this.debug('kö avvisad id='+message.id+' saknar fingeravtryck (Message-ID/datum/storlek)');return false;}
   if(this.done.has(record.key)||this.records.has(record.key)||this.pending.has(message.id)){this.debug('kö avvisad id='+message.id+' redan hanterad eller köad');return false;}
-  if(this.records.size>=C.LIMITS.queue){this.log('queue_full');this.stop('queue_full');return false;}
+  if(this.records.size>=C.LIMITS.queue){this.debug('kö full: meddelandet lämnas till nästa automatiska svep');return false;}
   const job={id:message.id,record,hiddenSince:null,persisted:false};
   this.records.set(record.key,record);this.pending.set(message.id,job);
   await this.persist();if(this.pending.get(message.id)!==job)return false;
-  job.persisted=true;this.stats.matched++;this.log('queued',1);this.change();return true;
+  job.persisted=true;this.stats.matched++;this.log('queued',1);this.change();this.hooks.kick?.();return true;
  }
  async dropId(id){
   const job=this.pending.get(id);if(!job||job.record.stage==='attempted')return;
@@ -84,7 +101,7 @@ class Engine {
      !Number.isFinite(raw.date)||!Number.isSafeInteger(raw.size)||typeof raw.source!=='string'||typeof raw.target!=='string'||
      !['pending','attempted'].includes(raw.stage)||typeof raw.ruleId!=='string'||!Number.isFinite(raw.created))continue;
    const r={key:raw.key,headerMessageId:raw.headerMessageId,date:raw.date,size:raw.size,source:raw.source,target:raw.target,
-    ruleId:raw.ruleId,rulesVersion:raw.rulesVersion,stage:raw.stage,created:raw.created};
+    ruleId:raw.ruleId,rulesVersion:raw.rulesVersion,stage:raw.stage,created:raw.created,unread:raw.unread===true||raw.notify===true};
    if(r.key!==JSON.stringify([r.headerMessageId,r.date,r.size]))continue;
    if(r.stage==='attempted'){this.records.set(r.key,r);continue;}
    if(r.rulesVersion!==this.config.rulesVersion||this.now()-r.created>7*86400000)continue;
@@ -108,45 +125,54 @@ class Engine {
   if(!this.enabled())throw new C.RuleError('paused');
   if(!rule||!rule.enabled)throw new C.RuleError('disabled');
   const direct=this.config.moveMode==='direct';
-  const src=await this.api.folders.get(rule.source,false);
   const accounts=await this.api.accounts.list(true);
-  const account=accounts.find(a=>a.id===src?.accountId);
-  if(!src||!account)throw new C.RuleError('unsafe_folder');
+  let account;
+  if(rule.scope==='account')account=accounts.find(a=>a.id===rule.sourceAccount);
+  else{const src=await this.api.folders.get(rule.source,false);account=accounts.find(a=>a.id===src?.accountId);}
+  if(!account)throw new C.RuleError('unsafe_folder');
   const excluded=new Set([rule.target,...(rule.branches||[]).map(b=>b.target)]);
   const folders=[];
   const walk=f=>{if(!f)return;if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
   walk(account.rootFolder);for(const f of account.folders||[])walk(f);
-  let scanned=0,queued=0;
+  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0;
   for(const folder of folders){
-   if(scanned>=C.LIMITS.queue)break;
-   const q={folderId:folder.id};if(!direct)q.read=true;
-   let page=await this.api.messages.query(q);
-   for(;;){
-    for(const m of page.messages||[]){
-     if(scanned>=C.LIMITS.queue)break;
-     scanned++;
-     if(!m.folder?.id||excluded.has(m.folder.id))continue;
-     if(!direct&&m.read!==true)continue;
-     if(!C.match(rule,m,false,true))continue;
-     if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:direct,notify:direct&&m.read!==true}))queued++;
+   // Manifest V2 använder `unread: false` för lästa mejl. `read: true`
+   // är MV3-syntax och gör att Thunderbird 140 avvisar hela frågan.
+   const q={folderId:folder.id};if(!direct)q.unread=false;
+   let page=null;
+   try{
+    page=await this.api.messages.query(q);searchedFolders++;
+    for(;;){
+     for(const m of page.messages||[]){
+      scanned++;
+      if(!m.folder?.id||excluded.has(m.folder.id))continue;
+      if(!direct&&m.read!==true)continue;
+      if(!C.match(rule,m,false,true))continue;
+      if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
+      if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:direct,notify:direct&&m.read!==true}))queued++;
+     }
+     if(!page.id)break;
+     page=await this.api.messages.continueList(page.id);
     }
-    if(!page.id||scanned>=C.LIMITS.queue)break;
-    page=await this.api.messages.continueList(page.id);
-   }
-   if(page&&page.id)await this.api.messages.abortList(page.id).catch(()=>{});
+   }catch(error){
+    // En enskild IMAP-/nyhetsmapp kan vara frånkopplad eller sakna lokal
+    // databas. Hoppa över just den mappen i stället för att stoppa kontot.
+    skippedFolders++;this.debug('svep_query_failed folder_index='+(searchedFolders+skippedFolders)+' error_type='+(error?.name||'Error'));
+   }finally{if(page?.id)await this.api.messages.abortList(page.id).catch(()=>{});}
   }
-  this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' skannade='+scanned+' koade='+queued+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
+  if(folders.length&&searchedFolders===0)throw new C.RuleError('sweep_error');
+  this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' skannade='+scanned+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
   this.log('catchup',queued);this.change();
-  return {scanned,queued};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders};
  }
  async sweepAll(){
-  let scanned=0,queued=0;
+  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0;
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
-   try{const r=await this.sweepRule(rule);scanned+=r.scanned;queued+=r.queued;}
-   catch{this.stop('sweep_error');break;}
+   try{const r=await this.sweepRule(rule);scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;}
+   catch(error){this.debug('svep_regel_misslyckades error_code='+(error?.code||error?.name||'Error'));this.log('error',0,'svep_misslyckades code='+(error?.code||error?.name||'Error'));throw new C.RuleError('sweep_error');}
   }
-  return {scanned,queued};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders};
  }
  async catchUp(ruleId){
   return this.sweepRule(this.config.rules.find(r=>r.id===ruleId));
@@ -158,7 +184,7 @@ class Engine {
     if(!moved?.id&&(moved?.messages||[]).length===1&&moved.messages[0].folder?.id===op.record.target&&C.fingerprint(moved.messages[0])===op.record.key){
      op.confirmed=true;this.records.delete(op.record.key);this.pending.delete(before.id);this.inflight.delete(before.id);
      this.stats.moved++;this.log('moved',1);
-     if(op.record.notify&&this.config.openWindow)this.hooks.notify?.(moved.messages[0].id);
+     if(op.record.unread)this.hooks.notify?.(moved.messages[0].id);
      op.resolve(true);await this.persist();this.change();
     }else{op.resolve(false);this.stop('uncertain_move');}
    }else{await this.dropId(before.id);}
@@ -168,15 +194,17 @@ class Engine {
   if(this.busy||!this.enabled()||!this.pending.size)return;
   this.busy=true;const epoch=this.epoch;this.lastCheck=this.now();
   try{
-   const shown=await this.displayed();
+   const allDirect=this.config.moveMode==='direct',shown=allDirect?new Set():await this.displayed();
    if(!this.enabled()||epoch!==this.epoch)return;
+   this.debug('tick pending='+this.pending.size+' direct='+(allDirect?'ja':'blandat')+' displayed='+shown.size);
    for(const job of [...this.pending.values()]){
     if(!this.enabled()||epoch!==this.epoch)break;
     if(!job.persisted||job.record.stage!=='pending')continue;
     if(job.record.rulesVersion!==this.config.rulesVersion){await this.dropId(job.id);continue;}
-    if(shown.has(job.id)){job.hiddenSince=null;continue;}
-    if(job.hiddenSince===null){job.hiddenSince=this.now();continue;}
-    if(this.now()-job.hiddenSince<2000)continue;
+    const direct=allDirect||job.record.notify===true;
+    if(!direct&&shown.has(job.id)){job.hiddenSince=null;continue;}
+    if(!direct&&job.hiddenSince===null){job.hiddenSince=this.now();continue;}
+    if(!direct&&this.now()-job.hiddenSince<2000)continue;
     await this.process(job,epoch);
    }
   }catch{this.stop('display_error');}
@@ -187,9 +215,12 @@ class Engine {
   try{
    const m=await this.api.messages.get(job.id),rule=this.config.rules.find(r=>r.id===job.record.ruleId);
    if((m.read!==true&&!job.record.notify)||m.folder?.id!==job.record.source||C.fingerprint(m)!==job.record.key||!rule||!C.match(rule,m,false,true)||C.targetFor(rule,m)!==job.record.target){this.debug('jobb '+job.id+' slappt: villkor/kalla/ fingeravtryck stammer inte langre');await this.dropId(job.id);return;}
-   await this.pair(rule);
+   // Kontrollera den faktiska källan och det faktiska målet. Detta är viktigt
+   // för svep från undermappar, fördelningsmål och flyttar mellan konton.
+   await this.pairFolders(job.record.source,job.record.target);
    if(!this.enabled()||epoch!==this.epoch)return;
-   if((await this.displayed()).has(job.id)){this.debug('jobb '+job.id+' vantar: visas fortfarande i nagon flik');job.hiddenSince=null;return;}
+   const direct=this.config.moveMode==='direct'||job.record.notify===true;
+   if(!direct&&(await this.displayed()).has(job.id)){this.debug('jobb '+job.id+' vantar: visas fortfarande i nagon flik');job.hiddenSince=null;return;}
    if(!this.enabled()||epoch!==this.epoch)return;
    if(this.config.dryRun){
     this.pending.delete(job.id);this.records.delete(job.record.key);this.done.add(job.record.key);this.trimDone();
@@ -197,9 +228,9 @@ class Engine {
    }
    // Journalen skrivs FÖRE flytt. Ett osäkert försök återupptas aldrig automatiskt.
    job.record.stage='attempted';await this.persist();
-   const latest=await this.api.messages.get(job.id),visible=await this.displayed();
+   const latest=await this.api.messages.get(job.id),visible=direct?new Set():await this.displayed();
    if(!this.enabled()||epoch!==this.epoch||(latest.read!==true&&!job.record.notify)||latest.folder?.id!==job.record.source||
-      C.fingerprint(latest)!==job.record.key||visible.has(job.id)||!C.match(rule,latest,false,true)||C.targetFor(rule,latest)!==job.record.target){
+      C.fingerprint(latest)!==job.record.key||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||C.targetFor(rule,latest)!==job.record.target){
     if(job.record.rulesVersion===this.config.rulesVersion){this.debug('jobb '+job.id+' vantar: last/visas/utanfor kalla just nu');job.record.stage='pending';job.hiddenSince=null;}
     else{this.records.delete(job.record.key);this.pending.delete(job.id);}
     await this.persist();return;

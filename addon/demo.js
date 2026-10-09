@@ -4,12 +4,12 @@ globalThis.LasDemo=(()=>{
   {id:'demo-fin',accountId:'demo',label:'Exempelkonto · Ekonomi / Fakturor',name:'Fakturor'},
   {id:'demo-web',accountId:'demo',label:'Exempelkonto · Webb',name:'Webb'},
   {id:'demo-buy',accountId:'demo',label:'Exempelkonto · Inköp',name:'Inköp'}];
- let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,openWindow:true,verbose:false,rules:[
+ let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
   {id:'demo-3',name:'Inköp & kvitton',enabled:false,source:'demo-in',target:'demo-buy',match:'all',conditions:[{field:'subject',op:'contains',value:'Kvitto'}]}]},
-  prefs:{theme:'light',fontSize:14,lastRule:'demo-1'},moveMode:'read',hourly:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
- const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',email:'faktura@fortnox.se',domain:'fortnox.se'};
+  prefs:{theme:'light',fontSize:14,lastRule:'demo-1'},moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
+ const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];
  function saveRules(rules){snapshots.unshift(structuredClone(state.config));snapshots.splice(5);state.backups=snapshots.map((c,i)=>({index:i,time:new Date().toISOString(),count:c.rules.length}));state.config.rules=LasCore.validateRules(rules);state.config.revision++;}
  async function request(m){try{let data;
@@ -27,7 +27,7 @@ globalThis.LasDemo=(()=>{
    case 'restoreBackup':if(!snapshots[m.index])throw new LasCore.RuleError('bad_request');saveRules(snapshots[m.index].rules);state.config.paused=true;state.config.dryRun=true;data=state;break;
    case 'clearBlocked':data=state;break;
    case 'sweepNow':data={scanned:6,queued:2};state.queued+=2;break;
-   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.revision++;data=state;break;
+   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.revision++;data=state;break;
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};
  }catch(e){return {success:false,error:e.code||'internal_error'};}}

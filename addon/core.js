@@ -1,7 +1,7 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:500,logs:500});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:500,logs:5000});
 class RuleError extends Error { constructor(code){super(code);this.code=code;} }
 const fail=code=>{throw new RuleError(code);};
 const norm=s=>String(s??'').normalize('NFKC').toLocaleLowerCase('sv-SE');
@@ -22,16 +22,18 @@ function email(author){
 }
 function validateRule(raw){
  if(!raw||typeof raw!=='object')fail('bad_rule');
+ const scope=raw.scope===undefined?'folder':raw.scope;if(!['folder','account'].includes(scope))fail('bad_rule');
  const r={id:text(raw.id,80,'bad_id'),name:text(raw.name,100,'bad_name'),enabled:raw.enabled===true,
-  source:text(raw.source,2048,'choose_source'),target:text(raw.target,2048,'choose_target'),match:raw.match};
+  source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(raw.sourceAccount,2048,'choose_source'):'',scope,
+  target:text(raw.target,2048,'choose_target'),match:raw.match};
  if(!/^[a-zA-Z0-9_-]+$/.test(r.id))fail('bad_id');
- if(r.source===r.target)fail('same_folder');
+ if(r.scope==='folder'&&r.source===r.target)fail('same_folder');
  if(!['all','any'].includes(r.match))fail('bad_match');
  if(!Array.isArray(raw.conditions)||!raw.conditions.length||raw.conditions.length>LIMITS.conditions)fail('bad_conditions');
  r.conditions=raw.conditions.map(validateCondition);
  r.branches=(Array.isArray(raw.branches)?raw.branches:[]).map(b=>{
   if(!b||typeof b!=='object')fail('bad_branch');
-  const target=text(b.target,2048,'choose_target');if(target===r.source)fail('same_folder');
+  const target=text(b.target,2048,'choose_target');if(r.scope==='folder'&&target===r.source)fail('same_folder');
   return {condition:validateCondition(b.condition),target};
  });
  if(r.branches.length>LIMITS.conditions)fail('bad_branch');
@@ -47,7 +49,7 @@ function validateRules(raw){
  if(!Array.isArray(raw)||raw.length>LIMITS.rules)fail('too_many_rules');
  const rules=raw.map(validateRule),ids=new Set();
  for(const r of rules){if(ids.has(r.id))fail('duplicate_id');ids.add(r.id);}
- const edges=new Map();for(const r of rules.filter(r=>r.enabled)){if(!edges.has(r.source))edges.set(r.source,[]);edges.get(r.source).push(r.target,...(r.branches||[]).map(b=>b.target));}
+ const edges=new Map();for(const r of rules.filter(r=>r.enabled&&r.scope!=='account')){if(!edges.has(r.source))edges.set(r.source,[]);edges.get(r.source).push(r.target,...(r.branches||[]).map(b=>b.target));}
  const visiting=new Set(),visited=new Set();
  function visit(id){if(visiting.has(id))fail('rule_cycle');if(visited.has(id))return;visiting.add(id);for(const next of edges.get(id)||[])visit(next);visiting.delete(id);visited.add(id);}
  for(const id of edges.keys())visit(id);
@@ -60,7 +62,11 @@ function condHit(c,values){
  if(c.op==='starts')return hay.startsWith(needle);return hay.endsWith(needle);
 }
 function match(rule,message,includeDisabled=false,ignoreSource=false){
- if((!rule.enabled&&!includeDisabled)||(!ignoreSource&&message.folder?.id!==rule.source))return false;
+ if(!rule.enabled&&!includeDisabled)return false;
+ if(!ignoreSource){
+  const inSource=rule.scope==='account'?message.folder?.accountId===rule.sourceAccount:message.folder?.id===rule.source;
+  if(!inSource)return false;
+ }
  const values=valuesFor(message);const hits=rule.conditions.map(c=>condHit(c,values));
  return rule.match==='all'?hits.every(Boolean):hits.some(Boolean);
 }
@@ -69,32 +75,35 @@ function targetFor(rule,message){
  for(const b of rule.branches||[])if(condHit(b.condition,values))return b.target;
  return rule.target;
 }
-function firstMatch(rules,message){return rules.find(r=>match(r,message))||null;}
+function firstMatch(rules,message){return rules.find(r=>match(r,message)&&message.folder?.id!==targetFor(r,message))||null;}
 function usableFolder(f){return !!(f&&f.id&&f.accountId&&!f.isRoot&&!f.isVirtual&&!f.isUnified&&!f.isTag&&![...(f.specialUse||[]),f.type].some(t=>['trash','junk','drafts','sent','templates','outbox'].includes(t)));}
 function validatePair(source,target,sourceCaps,targetCaps){
  if(!usableFolder(source)||!usableFolder(target))fail('unsafe_folder');
  if(source.id===target.id)fail('same_folder');
  if(sourceCaps.canDeleteMessages!==true||targetCaps.canAddMessages!==true)fail('read_only');
 }
-function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,openWindow:true,verbose:false,rules:[]};}
+function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[]};}
 function config(raw){
  if(!raw||raw.schema!==1)fail('bad_schema');
  if(!Number.isSafeInteger(raw.revision)||raw.revision<0||!Number.isSafeInteger(raw.rulesVersion)||raw.rulesVersion<0)fail('bad_schema');
  if(typeof raw.paused!=='boolean'||typeof raw.dryRun!=='boolean')fail('bad_schema');
  if(!['read','direct'].includes(raw.moveMode))fail('bad_schema');
  if(typeof raw.hourly!=='boolean'||typeof raw.openWindow!=='boolean'||typeof raw.verbose!=='boolean')fail('bad_schema');
- return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,openWindow:raw.openWindow,verbose:raw.verbose,rules:validateRules(raw.rules)};
+ const fileLog=raw.fileLog===undefined?true:raw.fileLog;if(typeof fileLog!=='boolean')fail('bad_schema');
+ const sweepMinutes=raw.sweepMinutes===undefined?60:raw.sweepMinutes;if(!Number.isInteger(sweepMinutes)||sweepMinutes<15||sweepMinutes>1440||sweepMinutes%15)fail('bad_schema');
+ const newInboxDirect=raw.newInboxDirect===undefined?true:raw.newInboxDirect;if(typeof newInboxDirect!=='boolean')fail('bad_schema');
+ return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,rules:validateRules(raw.rules)};
 }
 function fingerprint(m){return typeof m.headerMessageId==='string'&&m.headerMessageId.length<=4096&&m.headerMessageId?JSON.stringify([m.headerMessageId,+new Date(m.date),m.size]):'';}
 const EVENTS=new Set(['start','settings_saved','rules_saved','restored','queued','simulated','moved','skipped','error','queue_full','backup_restored','catchup','debug']);
 function event(name,count=0,now=Date.now(),detail=''){
  if(!EVENTS.has(name))return null;
  const data={count:Number.isSafeInteger(count)&&count>=0?count:0};
- if(name==='debug'&&typeof detail==='string'&&detail.trim())data.detail=detail.trim().slice(0,240);
+ if(['debug','error'].includes(name)&&typeof detail==='string'&&detail.trim())data.detail=detail.trim().replace(/[^a-zA-Z0-9åäöÅÄÖ _:=,.;+()/-]/g,'?').slice(0,500);
  return {time:new Date(now).toISOString(),app:'lasfilter',level:['error','queue_full'].includes(name)?'ERROR':'INFO',event:name,data};
 }
 function cleanLogs(rows,now=Date.now()){
- return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-10*86400000&&Date.parse(r.time)<=now+60000)
+ return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
 const api={LIMITS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs};

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Läsfilter – sortera efter läsning",
-  "version": "1.3.2",
+  "version": "2.0.1",
   "description": "Egna regler som väntar tills ett läst mejl inte längre visas. Startar i testläge utan flyttar.",
   "applications": {
     "gecko": {
@@ -13,6 +13,7 @@
     "accountsRead",
     "messagesRead",
     "messagesMove",
+    "messagesUpdate",
     "storage",
     "downloads"
   ],
@@ -42,6 +43,12 @@
       "description": "Kör flyttsvep nu",
       "suggested_key": {
         "default": "Ctrl+Shift+L"
+      }
+    },
+    "open_ui": {
+      "description": "Öppna Läsfilter",
+      "suggested_key": {
+        "default": "Alt+Shift+L"
       }
     }
   }

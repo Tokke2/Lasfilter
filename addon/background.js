@@ -1,13 +1,26 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:''},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,logTimer:null,changeTimer:null};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:''},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map()};
 App.write=fn=>{const p=App.writeChain.then(fn);App.writeChain=p.catch(()=>{});return p;};
 App.persistWork=()=>App.write(()=>B.storage.local.set({work:App.engine.recordList()}));
+App.writeTextLog=async()=>{
+ if(!App.engine?.config.fileLog)return;
+ const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
+ for(const x of App.logs)lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
+ const url=URL.createObjectURL(new Blob([lines.join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'}));
+ try{await B.downloads.download({url,filename:'Lasfilter/lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+};
+App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTimeout(()=>App.writeTextLog().catch(()=>{}),1200);};
 App.log=(name,count=0,detail='')=>{
  const entry=C.event(name,count,Date.now(),detail);if(!entry)return;
  App.logs=C.cleanLogs([...App.logs,entry]);
- clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs})).catch(()=>{}),500);
+ clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs})).catch(()=>{}),500);App.scheduleTextLog();
 };
+// Behåll alltid det första, mest specifika felet. Händelselyssnare ska inte
+// skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
+App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
+App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},50);};
+App.scheduleSweep=()=>{clearInterval(App.sweepTimer);if(!App.engine?.config.hourly)return;App.sweepTimer=setInterval(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'intervall_svep_misslyckades')),App.engine.config.sweepMinutes*60000);};
 App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
   const e=App.engine;if(!e)return;
@@ -27,6 +40,18 @@ App.folderList=async()=>{
  return items;
 };
 App.captureTab=async tab=>{if(tab?.type==='mail')App.mailTab=tab.id;};
+App.openUnread=async id=>{
+ App.keepUnread.set(id,Date.now()+30000);
+ try{await B.messageDisplay.open({messageId:id,location:'window'});}catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
+ for(const delay of [250,1000,3000])setTimeout(()=>B.messages.update(id,{read:false}).catch(()=>App.log('error',0,'aterstall_olast_misslyckades')),delay);
+ setTimeout(()=>App.keepUnread.delete(id),30000);
+};
+App.onNewMail=async(folder,list)=>{
+ await App.ready;if(![...(folder?.specialUse||[]),folder?.type].includes('inbox')||!App.engine.config.newInboxDirect)return;
+ let page=list,all=[];
+ for(;;){all.push(...(page?.messages||[]));if(!page?.id)break;page=await B.messages.continueList(page.id);}
+ await App.engine.newInboxMessages(all);App.kick();
+};
 App.selected=async()=>{
  let id=App.mailTab;
  if(id!==null){try{const t=await B.tabs.get(id);if(t.type!=='mail')id=null;}catch{id=null;}}
@@ -40,7 +65,7 @@ App.selected=async()=>{
 App.snapshot=()=>{
  const e=App.engine;
  return {config:e.config,prefs:App.prefs,stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
-   fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,openWindow:e.config.openWindow,
+   fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),logs:App.logs};
 };
 App.mutate=fn=>{
@@ -58,7 +83,7 @@ App.save=async(next,{backup=false,discard=false}={})=>{
  App.backups=backups;App.changed();
 };
 App.checkRevision=rev=>{if(rev!==App.engine.config.revision)throw new C.RuleError('stale_config');};
-App.checkRules=async rules=>{for(const r of rules){await App.engine.pair(r);for(const b of r.branches||[])await App.engine.pair({...r,target:b.target});}};
+App.checkRules=async rules=>{for(const r of rules){await App.engine.validateRuleFolders(r);for(const b of r.branches||[])await App.engine.validateRuleFolders({...r,target:b.target});}};
 App.handle=async msg=>{
  await App.ready;
  if(!msg||typeof msg.type!=='string')throw new C.RuleError('bad_request');
@@ -67,7 +92,7 @@ App.handle=async msg=>{
   case 'status':return App.snapshot();
   case 'folders':return App.folderList();
   case 'selected':{
-   const m=await App.selected();return {author:m.author,subject:m.subject,read:m.read,source:m.folder?.id,email:C.email(m.author),domain:C.email(m.author).split('@')[1]||''};
+   const m=await App.selected();return {author:m.author,subject:m.subject,read:m.read,source:m.folder?.id,sourceAccount:m.folder?.accountId||'',email:C.email(m.author),domain:C.email(m.author).split('@')[1]||''};
   }
   case 'testRule':{
    const r=C.validateRule(msg.rule),m=await App.selected();const matches=C.match(r,m,true,true);
@@ -82,10 +107,10 @@ App.handle=async msg=>{
   case 'sweepNow':return App.engine.sweepAll();
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
-   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean')throw new C.RuleError('bad_schema');
+   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean')throw new C.RuleError('bad_schema');
    const modeChanged=msg.moveMode!==e.config.moveMode;
    const verboseChanged=msg.verbose!==e.config.verbose;
-   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,openWindow:msg.openWindow,verbose:msg.verbose,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});
+   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});App.scheduleSweep();
    if(msg.verbose&&verboseChanged)App.log('debug',0,'detaljlogg aktiverad: svep, trafik och avvisningar visas utan mejlinnehall');
    App.log('settings_saved');return App.snapshot();
   });
@@ -149,15 +174,14 @@ App.ready=(async()=>{
  if(['system','light','dark'].includes(p.theme))App.prefs.theme=p.theme;
  if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)App.prefs.fontSize=p.fontSize;
  if(typeof p.lastRule==='string'&&p.lastRule.length<=80)App.prefs.lastRule=p.lastRule;
- App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,debug:t=>{if(App.engine.config.verbose)App.log('debug',0,t);},
-  notify:id=>B.messageDisplay.open({messageId:id,location:'window'}).catch(()=>App.log('error'))});
+ App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
+  notify:App.openUnread});
  if(fault){App.engine.fault=fault;App.log('error');}
  else await App.engine.restore(data.work||[]);
  App.log('start');App.changed();
- App.timer=setInterval(()=>App.engine.tick().catch(()=>App.engine.stop('internal_error')),2000);
- App.sweepTimer=setInterval(()=>{if(App.engine.config.hourly)App.engine.sweepAll().catch(()=>App.engine.stop('sweep_error'));},3600000);
+ App.timer=setInterval(()=>App.engine.tick().catch(()=>App.fail('internal_error')),2000);App.scheduleSweep();
 })().catch(()=>{
- if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,debug:t=>{if(App.engine.config.verbose)App.log('debug',0,t);}});
+ if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});
  App.engine.stop('storage_error');
 });
 B.browserAction.onClicked.addListener(tab=>App.open(tab).catch(()=>App.log('error')));
@@ -169,15 +193,24 @@ B.runtime.onMessage.addListener((msg,sender)=>{
   return {success:false,error:code};
  });
 });
-B.messages.onUpdated.addListener((m,props,old)=>App.ready.then(()=>App.engine.readChanged(m,props,old)).catch(()=>App.engine.stop('internal_error')));
-B.messages.onMoved.addListener((old,moved)=>App.ready.then(()=>App.engine.onMoved(old,moved)).catch(()=>App.engine.stop('internal_error')));
-B.messageDisplay.onMessagesDisplayed.addListener(()=>App.ready.then(()=>App.engine.tick()).catch(()=>App.engine.stop('display_error')));
+B.messages.onUpdated.addListener((m,props,old)=>App.ready.then(async()=>{
+ const until=App.keepUnread.get(m.id)||0;
+ if(until>Date.now()&&props.read===true){await B.messages.update(m.id,{read:false});App.log('debug',0,'olast_status_aterstalld');return;}
+ if(until)App.keepUnread.delete(m.id);
+ await App.engine.readChanged(m,props,old);
+}).catch(()=>App.fail('internal_error')));
+B.messages.onNewMailReceived.addListener((folder,list)=>App.onNewMail(folder,list).catch(()=>App.log('error',0,'nyinkommet_misslyckades')));
+B.messages.onMoved.addListener((old,moved)=>App.ready.then(()=>App.engine.onMoved(old,moved)).catch(()=>App.fail('internal_error')));
+B.messageDisplay.onMessagesDisplayed.addListener(()=>App.ready.then(()=>App.engine.tick()).catch(()=>App.fail('display_error')));
 B.tabs.onRemoved.addListener(id=>{if(App.uiTab===id)App.uiTab=null;if(App.mailTab===id)App.mailTab=null;App.ready.then(()=>App.engine.tick()).catch(()=>{});});
 B.tabs.onActivated.addListener(({tabId})=>B.tabs.get(tabId).then(App.captureTab).catch(()=>{}));
 B.mailTabs.onSelectedMessagesChanged.addListener(tab=>App.captureTab(tab));
-B.commands.onCommand.addListener(cmd=>{if(cmd==='sweep')App.ready.then(()=>App.engine.sweepAll()).catch(()=>App.engine.stop('sweep_error'));});
+B.commands.onCommand.addListener(cmd=>{
+ if(cmd==='sweep')App.ready.then(()=>App.engine.sweepAll()).catch(()=>App.log('error',0,'snabbkommando_svep_misslyckades'));
+ if(cmd==='open_ui')B.tabs.query({active:true,currentWindow:true}).then(tabs=>App.open(tabs[0])).catch(()=>App.log('error',0,'oppna_granssnitt_misslyckades'));
+});
 B.folders.onFolderInfoChanged.addListener(()=>{
  if(!App.engine||App.engine.config.moveMode!=='direct')return;
  clearTimeout(App.sweepDebounce);
- App.sweepDebounce=setTimeout(()=>App.engine.sweepAll().catch(()=>App.engine.stop('sweep_error')),3000);
+ App.sweepDebounce=setTimeout(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'direkt_svep_misslyckades')),3000);
 });

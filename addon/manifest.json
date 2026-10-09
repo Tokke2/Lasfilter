@@ -1,0 +1,48 @@
+{
+  "manifest_version": 2,
+  "name": "Läsfilter – sortera efter läsning",
+  "version": "1.3.2",
+  "description": "Egna regler som väntar tills ett läst mejl inte längre visas. Startar i testläge utan flyttar.",
+  "applications": {
+    "gecko": {
+      "id": "lasfilter@lokala-verktyg.invalid",
+      "strict_min_version": "140.0"
+    }
+  },
+  "permissions": [
+    "accountsRead",
+    "messagesRead",
+    "messagesMove",
+    "storage",
+    "downloads"
+  ],
+  "background": {
+    "scripts": [
+      "core.js",
+      "engine.js",
+      "background.js"
+    ],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_title": "Öppna Läsfilter",
+    "default_icon": "icon.svg"
+  },
+  "icons": {
+    "32": "icon.svg",
+    "64": "icon.svg"
+  },
+  "options_ui": {
+    "page": "ui.html",
+    "open_in_tab": true
+  },
+  "content_security_policy": "script-src 'self'; object-src 'self'; connect-src 'none'",
+  "commands": {
+    "sweep": {
+      "description": "Kör flyttsvep nu",
+      "suggested_key": {
+        "default": "Ctrl+Shift+L"
+      }
+    }
+  }
+}

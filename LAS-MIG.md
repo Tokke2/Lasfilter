@@ -80,6 +80,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
   - samt upp till fem exempelrader med ämne och avsändardomän.
   Avslutningsvis påminner panelen om regeln står i Testläge, om tillägget är pausat/stoppat eller om motorn har en fellåsning.
 - **✔ Tillåt olästa mejl och flytta dem nu:** knappen i diagnospanelen (syns när det finns olästa mejl som matchar) kryssar i *Flytta även olästa mejl direkt*, sparar regeln och kör alla regler – ett klick i stället för att leta i inställningarna.
+  - **Villkor för villkor:** panelen listar varje villkor med antal träffar (`0 träffar` i rött). Står regeln på **Alla måste stämma** och ett villkor har 0 träffar säger panelen rakt ut att ingenting kan matcha och att du ska ta bort villkoret eller byta till **Minst ett av villkoren**.
   - **Matchar ingenting visas i stället vad som ligger i mapparna:** panelen listar då upp till fem av de mejl som granskades (Inkorgen först) med ämne och avsändardomän, så att du kan jämföra med villkoren. Det är snabbaste sättet att se varför en regel inte nappar – t.ex. att ämnet är *"Wordfence activity for 12 oct, 2026…"* medan regeln letar efter texten *WordPress Alert*, och avsändaren är webbplatsens egen domän i stället för wordpress.com.
 
 ### Loggen: tyst när inget är fel, läsbar när något är det

@@ -48,6 +48,10 @@ globalThis.LasDemo=(()=>{
      near:nearMiss?[{subject:'Wordfence activity for 12 oct, 2026 on limoeurope.com',domain:'limoeurope.com',inbox:true},
       {subject:'Veckorapport för webbplatsen',domain:'limoeurope.com',inbox:true},
       {subject:'Ny kommentar väntar på granskning',domain:'wordpress.org',inbox:false}]:[],
+     matchMode:rule.match==='any'?'any':'all',
+     /* Fiktiva siffror per villkor: första villkoret har 0 träffar och stoppar allt. */
+     conditions:(rule.conditions||[]).map((c,i)=>({field:c.field,op:c.op,value:String(c.value??'').slice(0,40),hits:nearMiss?(i===0?0:12):(9-i*2)}))
+     ,
      examples:nearMiss?[]:[{reason:'move',subject:'Faktura 1042 – fiktivt testmeddelande',domain:'fortnox.se'},
       {reason:'unread',subject:'Orderbekräftelse',domain:'klarna.se'},
       {reason:'target',subject:'Arkiv/2025',domain:'example.invalid'}]};break;

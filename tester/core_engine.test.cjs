@@ -683,6 +683,24 @@ test('diagnose explains why matching mail is not moved yet',async()=>{
  assert.deepEqual(r.examples.map(e=>e.reason).sort(),['move','target','unread']);
 });
 
+test('diagnosen visar träffar per villkor så att ett dött villkor syns',async()=>{
+ const f=fixture();
+ const rule=C.validateRule({...base(),match:'all',conditions:[
+  {field:'subject',op:'starts',value:'WordPress Alert'},
+  {field:'subject',op:'contains',value:'Wordfence activity'},
+  {field:'sender',op:'contains',value:'wordpress@limoeurope.com'}]});
+ f.e.config.rules=[rule];
+ f.messages.clear();
+ f.messages.set(1,{...msg(1),author:'WordPress <wordpress@limoeurope.com>',subject:'Wordfence activity for 12 oct, 2026 on limoeurope.com'});
+ const r=await f.e.diagnose(rule);
+ assert.equal(r.matched,0,'alla villkor måste stämma och det första gör det aldrig');
+ assert.equal(r.matchMode,'all');
+ assert.deepEqual(r.conditions.map(c=>c.hits),[0,1,1]);
+ assert.equal(r.conditions[0].field,'subject');
+ assert.equal(f.e.fault,'');
+ assert.deepEqual(f.api.calls,[]);
+});
+
 test('diagnosen visar vad som ligger i mapparna när inget matchar regeln',async()=>{
  const f=fixture();
  const rule=C.validateRule(base());

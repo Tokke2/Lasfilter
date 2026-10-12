@@ -2154,3 +2154,41 @@ hr {
   font-weight: 650;
   color: #a4602a;
 }
+
+/* Diagnos: villkor för villkor */
+.diagnose-conditions {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+.diagnose-cond-row {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.diagnose-cond-row.diagnose-cond-empty .diagnose-cond-text {
+  font-weight: 700;
+}
+
+.diagnose-cond-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.diagnose-cond-hits {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnose-cond-empty .diagnose-cond-hits {
+  color: #ac3434;
+  font-weight: 700;
+}

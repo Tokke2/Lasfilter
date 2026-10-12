@@ -304,13 +304,17 @@ class Engine {
  async diagnose(rule){
   const out={ruleId:rule.id,ruleName:rule.name,readFilter:this.ruleMode(rule),yearFolders:rule.yearFolders===true,
    folders:0,scanned:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,matched:0,wouldMove:0,waitingUnread:0,
-   alreadyInTarget:0,alreadyQueued:0,unmatched:0,examples:[],near:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
+   alreadyInTarget:0,alreadyQueued:0,unmatched:0,examples:[],near:[],conditions:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
    moveMode:this.config.moveMode,paused:this.config.paused,fault:this.fault};
   const {folders}=await this.ruleFolders(rule,{excludeTargets:false});
   out.folders=folders.length;
   const example=(m,reason)=>{if(out.examples.length<C.LIMITS.examples)out.examples.push({reason,subject:(m.subject||'').slice(0,120),domain:C.email(m.author).split('@')[1]||''});};
   /* När inget matchar är det mest användbara att visa vad som faktiskt ligger i mapparna.
      Inkorgen först, eftersom det är där användaren tittar. */
+  /* Varje villkor testas för sig: då syns det direkt om ett enskilt villkor aldrig kan stämma. */
+  const conds=(rule.conditions||[]).slice(0,8);
+  const condHits=new Array(conds.length).fill(0);
+  const hitsFor=m=>{for(let i=0;i<conds.length;i++)if(C.match({...rule,enabled:true,conditions:[conds[i]],match:'all'},m,false,true))condHits[i]++;};
   const nearInbox=[],nearOther=[];
   const near=(m,isInbox)=>{const bucket=isInbox?nearInbox:nearOther;if(bucket.length<C.LIMITS.examples)bucket.push({subject:(m.subject||'').slice(0,120),domain:C.email(m.author).split('@')[1]||'',inbox:isInbox});};
   for(const folder of folders){
@@ -325,6 +329,7 @@ class Engine {
      for(const m of page.messages||[]){
       if(out.scanned>=C.LIMITS.diagnose)break;
       out.scanned++;
+      hitsFor(m);
       if(!C.match(rule,m,false,true)){out.unmatched++;near(m,isInbox);continue;}
       out.matched++;
       const fk=C.fingerprint(m);
@@ -342,6 +347,8 @@ class Engine {
    }finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
   }
   out.near=[...nearInbox,...nearOther].slice(0,C.LIMITS.examples);
+  out.conditions=conds.map((c,i)=>({field:c.field,op:c.op,value:String(c.value??'').slice(0,40),hits:condHits[i]}));
+  out.matchMode=rule.match==='any'?'any':'all';
   this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' utan_traff='+out.unmatched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
   return out;
  }

@@ -375,6 +375,12 @@ const I18N={
   diagnoseNoMatch:'Inga mejl matchar villkoren. Kontrollera fält, värde och konto – eller använd Kontrollera på ett markerat mejl.',
   diagnoseExamples:'Exempel på matchande mejl',
   diagnoseNearTitle:'Så här ser mejlen i mapparna ut',
+  diagnoseCondTitle:'Villkor för villkor – antal mejl som stämmer',
+  diagnoseCondHits:'{n} träffar',
+  diagnoseCondZero:'0 träffar',
+  diagnoseCondNoValue:'inget värde',
+  diagnoseCondDeadAll:'Regeln kräver att alla villkor stämmer, men {n} av dem har 0 träffar – därför flyttas ingenting. Ta bort villkoret eller byt till "minst ett av villkoren".',
+  diagnoseCondDeadAny:'{n} villkor har 0 träffar. Med "minst ett av villkoren" räcker det att något av de andra stämmer.',
   diagnoseNearNote:'Inget av dem matchar regelns villkor. Jämför ämne och avsändare med villkoren i steg 2 – ett kortare ämne, eller Avsändare (innehåller), fångar oftast fler mejl.',
   diagnoseFixUnread:'✔ Tillåt olästa mejl och flytta dem nu',
   diagnoseReasonMove:'flyttas',
@@ -857,6 +863,12 @@ const I18N={
   diagnoseNoMatch:'No emails match the conditions. Check field, value and account – or use Check on a selected email.',
   diagnoseExamples:'Examples of matching emails',
   diagnoseNearTitle:'What the emails in your folders look like',
+  diagnoseCondTitle:'Condition by condition – how many emails match',
+  diagnoseCondHits:'{n} matches',
+  diagnoseCondZero:'0 matches',
+  diagnoseCondNoValue:'no value',
+  diagnoseCondDeadAll:'The rule requires every condition to match, but {n} of them have 0 matches – that is why nothing moves. Remove that condition or switch to "at least one of the conditions".',
+  diagnoseCondDeadAny:'{n} conditions have 0 matches. With "at least one of the conditions" it is enough that one of the others matches.',
   diagnoseNearNote:'None of them match the rule conditions. Compare subject and sender with the conditions in step 2 – a shorter subject, or Sender (contains), usually catches more emails.',
   diagnoseFixUnread:'✔ Allow unread emails and move them now',
   diagnoseReasonMove:'will move',
@@ -1277,6 +1289,7 @@ function renderStatus(next){
  updateDonationView();
  renderRules();renderActivity();renderBackups();renderSuggestions();
 }
+function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
  if(!rule.enabled)return T('tagDisabled');
  const scopeText=rule.scope==='account'?T('scopeAccount'):T('scopeFolder');
@@ -1299,7 +1312,7 @@ function renderRules(){
   const main=el('div','rule-main');
   const btn=el('button','rule-open');btn.type='button';btn.append(el('strong','',rule.name));
   const c=rule.conditions[0];
-  const fieldName={sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[c.field]||T('fieldSubjectShort');
+  const fieldName=fieldShortText(c.field);
   const valueText=String(c.value??'').trim()||T(c.op==='beforeThisYear'?'opBeforeThisYear':c.op==='afterThisYear'?'opAfterThisYear':'condPlaceholderThisYear');
   btn.append(el('small','',fieldName+' · '+valueText+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+T('moreConditionsSuffix'):'')));
   const f=folders.find(f=>f.id===rule.target);btn.append(el('small','','↳ '+(f?.label||T('missingFolderShort'))));
@@ -1792,6 +1805,22 @@ async function diagnoseCurrentRule(){
  const list=el('ul','diagnose-list');
  for(const [text,kind] of lines)list.append(el('li','diagnose-'+kind,text));
  panel.append(list);
+ /* Villkor för villkor: ett villkor med noll träffar kan aldrig bli sant. */
+ if(r.conditions?.length){
+  const box=el('div','diagnose-conditions');
+  box.append(el('strong','',T('diagnoseCondTitle')));
+  const list=el('div','diagnose-cond-list');
+  for(const c of r.conditions){
+   const row=el('div','diagnose-cond-row'+(c.hits?'':' diagnose-cond-empty'));
+   row.append(el('span','diagnose-cond-text',fieldShortText(c.field)+' · '+(OPERATOR_LABELS[c.op]?T(OPERATOR_LABELS[c.op]):c.op)+' · '+(String(c.value||'').trim()||T('diagnoseCondNoValue'))));
+   row.append(el('span','diagnose-cond-hits',(c.hits?T('diagnoseCondHits').replace('{n}',c.hits):T('diagnoseCondZero'))));
+   list.append(row);
+  }
+  box.append(list);
+  const dead=r.conditions.filter(c=>!c.hits).length;
+  if(r.matched===0&&dead)box.append(el('p','diagnose-warn',r.matchMode==='any'?T('diagnoseCondDeadAny').replace('{n}',dead):T('diagnoseCondDeadAll').replace('{n}',dead)));
+  panel.append(box);
+ }
  if(r.matched===0&&r.near?.length){
   const nearBox=el('div','diagnose-examples');
   nearBox.append(el('strong','',T('diagnoseNearTitle')));

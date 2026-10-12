@@ -355,6 +355,10 @@ const I18N={
   runAllCached:'{n} oförändrade mappar hoppades över.',
   runAllSkipped:'{n} otillgängliga mappar hoppades över.',
   runAllTestMode:'Testläge: inga mejl flyttades.',
+  runAllPaused:'Bevakningen är pausad – inga regler kördes. Tryck Pausa igen för att återuppta.',
+  runAllStopped:'Motorn är stoppad av ett fel – inga regler kördes. Meddelande: {code}',
+  runAllBusy:'En körning pågår redan – vänta några sekunder och tryck igen.',
+  runAllWaited:'En körning pågick redan, så siffrorna gäller hela körningen.',
   autoRunOn:'Automatiskt: {n} regler körs var {min}:e minut, nästa gång {time}. Inkommande mejl bevakas hela tiden.',
   autoRunOff:'Automatisk körning är av – slå på den under Avancerat. Inkommande mejl bevakas ändå hela tiden.',
   diagnoseBtn:'🔎 Varför flyttas inte mejlen?',
@@ -828,6 +832,10 @@ const I18N={
   runAllCached:'{n} unchanged folders were skipped.',
   runAllSkipped:'{n} unavailable folders were skipped.',
   runAllTestMode:'Test mode: no emails were moved.',
+  runAllPaused:'Monitoring is paused – no rules were run. Press Pause again to resume.',
+  runAllStopped:'The engine is stopped by an error – no rules were run. Message: {code}',
+  runAllBusy:'A run is already in progress – wait a few seconds and try again.',
+  runAllWaited:'A run was already in progress, so the figures cover the whole run.',
   autoRunOn:'Automatic: {n} rules run every {min} minutes, next at {time}. Incoming mail is monitored continuously.',
   autoRunOff:'Automatic runs are off – enable them under Advanced. Incoming mail is still monitored continuously.',
   diagnoseBtn:'🔎 Why are the emails not moving?',
@@ -1726,14 +1734,20 @@ async function runAllRules(){
  if(button)button.disabled=true;if(guide)guide.disabled=true;
  try{
   const r=await rpc('sweepNow');renderStatus(await rpc('status'));
+  /* Svara ärligt i stället för att visa nollor: pausat, stoppat eller redan pågående. */
+  if(r.skipped==='paused'){toast(T('runAllPaused'));return;}
+  if(r.skipped==='stopped'){toast(T('runAllStopped').replace('{code}',Terr(r.fault)||r.fault||'-'));return;}
+  if(r.busy){toast(T('runAllBusy'));return;}
   const parts=[T('runAllScanned').replace('{n}',r.scanned).replace('{f}',r.searchedFolders??0),
    T('runAllQueued').replace('{n}',r.queued)];
   if(r.deferred)parts.push(T('runAllDeferred').replace('{n}',r.deferred));
   if(r.cachedFolders)parts.push(T('runAllCached').replace('{n}',r.cachedFolders));
   if(r.skippedFolders)parts.push(T('runAllSkipped').replace('{n}',r.skippedFolders));
   if(state.config.dryRun)parts.push(T('runAllTestMode'));
+  if(r.waited)parts.push(T('runAllWaited'));
   toast(parts.join(' '));
- }finally{
+ }catch(err){alertError(err);}
+ finally{
   if(button)button.disabled=false;
   if(guide)guide.disabled=!!state?.fault||state?.config.paused||!(state?.config.rules||[]).some(x=>x.enabled);
  }

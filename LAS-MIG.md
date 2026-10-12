@@ -81,6 +81,12 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
   Avslutningsvis påminner panelen om regeln står i Testläge, om tillägget är pausat/stoppat eller om motorn har en fellåsning.
 - **✔ Tillåt olästa mejl och flytta dem nu:** knappen i diagnospanelen (syns när det finns olästa mejl som matchar) kryssar i *Flytta även olästa mejl direkt*, sparar regeln och kör alla regler – ett klick i stället för att leta i inställningarna.
 
+### Loggen: tyst när inget är fel, läsbar när något är det
+
+- **Pausad eller stoppad bevakning larmar inte.** Automatiska svep (timintervallet och svepet vid start) hoppar över i tysthet när bevakningen är pausad eller stoppad – du får ingen "Tekniskt fel"-rad för att du själv har tryckt Pausa. Är motorn stoppad av ett fel skrivs **en** tydlig notis i stället för en rad per försök.
+- **Övergående startfel försöks om i tysthet.** Direkt efter att Thunderbird har startat kan kontona svara "inte redo" ännu. Svepet gör då ett tyst andra försök efter 15 sekunder och skriver först därefter, om det fortfarande misslyckas: *Tekniskt fel – Automatiskt svep misslyckades (sweep_error) – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i.*
+- **▶ Kör alla regler nu väntar in en pågående körning** i stället för att rapportera noll: pågår redan ett svep (t.ex. startsvepet) väntar knappen in det och visar hela körningens siffror. Är bevakningen pausad eller stoppad säger knappen det rakt ut, och om ett svep verkligen fallerar visas felmeddelandet som en toast i stället för att tigas ihjäl.
+
 ### Automatiskt varje timme – med bevakning kvar
 
 **Kör alla regler automatiskt (rekommenderas)** under **Inställningar → Avancerat** kör samma svep automatiskt med valfritt intervall (steg om 15 minuter, standard **60 minuter = en gång i timmen**). Detta är *utöver* den händelsestyrda bevakningen: nya mejl som kommer in till Inkorgen hanteras direkt när de anländer, och olästa mejl som du just har läst flyttas så snart de har lämnat visningen. Intervallsvepet fångar upp allt övrigt – till exempel mejl som legat i andra mappar, mejl som blev lästa i ett annat program och regler som följer kalendern vid årsskiftet. Statusraden under **Flyttstatus** visar när nästa automatiska körning sker och att inkommande mejl bevakas hela tiden.

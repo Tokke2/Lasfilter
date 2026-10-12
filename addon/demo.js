@@ -61,7 +61,11 @@ globalThis.LasDemo=(()=>{
    }
    case 'restoreBackup':if(!snapshots[m.index])throw new LasCore.RuleError('bad_request');saveRules(snapshots[m.index].rules);state.config.paused=true;state.config.dryRun=true;data=state;break;
    case 'clearBlocked':data=state;break;
-   case 'sweepNow':data={scanned:6,queued:2};state.queued+=2;break;
+   case 'sweepNow':
+    /* Samma svar som den riktiga bakgrunden: pausat läge kör ingenting, annars en liten fiktiv körning. */
+    if(state.config.paused)data={scanned:0,queued:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,deferred:0,skipped:'paused',fault:state.fault||''};
+    else{data={scanned:6,queued:2,searchedFolders:4,skippedFolders:0,emptyFolders:1,cachedFolders:12,deferred:0};state.queued+=2;}
+    break;
    case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.revision++;data=state;break;
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};

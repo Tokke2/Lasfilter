@@ -38,9 +38,19 @@ App.log=(name,count=0,detail='')=>{
 // skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
 App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
+App.emptySweep={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};
 App.runAllRules=async()=>{
  const e=App.engine;if(!e)throw new C.RuleError('internal_error');
- if(e.sweeping>0)return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,busy:true};
+ /* Pausad eller stoppad motor är ett normalt läge – inget fel och inga nollor utan förklaring. */
+ if(!e.enabled())return {...App.emptySweep,skipped:e.fault?'stopped':'paused',fault:e.fault||''};
+ /* Pågår redan ett svep (t.ex. startsvepet) väntar vi in det i stället för att rapportera noll. */
+ let waited=false;
+ if(e.sweeping>0){
+  waited=true;
+  const start=Date.now();
+  while(e.sweeping>0&&e.enabled()&&Date.now()-start<20000)await new Promise(r=>setTimeout(r,200));
+  if(e.sweeping>0)return {...App.emptySweep,busy:true};
+ }
  for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
  if(e.pending.size)App.kick();
  const result=await e.sweepAll();
@@ -49,13 +59,37 @@ App.runAllRules=async()=>{
  await Promise.race([e.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
  App.lastAutoSweep=Date.now();
  App.changed();
- return result;
+ return {...result,waited};
+};
+/* Automatiskt svep (intervall och start):
+   – tyst när bevakningen är pausad eller stoppad,
+   – ett tyst andra försök när kontona inte svarar ännu (vanligt precis vid start),
+   – och först därefter en läsbar felrad i loggen. */
+App.autoSweep=async()=>{
+ const attempt=async()=>{
+  try{return {result:await App.runAllRules()};}
+  catch(error){return {code:error instanceof C.RuleError?error.code:(error?.name||'Error')};}
+ };
+ let {result,code}=await attempt();
+ if(code&&!['paused','disabled','internal_error'].includes(code)){
+  await new Promise(res=>setTimeout(res,15000));
+  if(App.engine?.enabled())({result,code}=await attempt());
+ }
+ if(result){
+  if(result.skipped==='stopped'&&App.reportedStop!==App.engine?.fault){
+   App.reportedStop=App.engine?.fault;
+   App.log('debug',0,'automatiskt svep hoppades över: motorn är stoppad ('+(App.engine?.fault||'-')+') – rensa spärren under Avancerat');
+  }
+  return result;
+ }
+ if(code&&!['paused','disabled','internal_error'].includes(code))App.log('error',0,'Automatiskt svep misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');
+ return {...App.emptySweep,skipped:code&&!['paused','disabled','internal_error'].includes(code)?'error':'paused',code:code||''};
 };
 App.scheduleSweep=()=>{
  clearInterval(App.sweepTimer);
  const e=App.engine;
  if(!e?.config.hourly)return;
- App.sweepTimer=setInterval(()=>{App.runAllRules().catch(()=>App.log('error',0,'intervall_svep_misslyckades'));},e.config.sweepMinutes*60000);
+ App.sweepTimer=setInterval(()=>{App.autoSweep();},e.config.sweepMinutes*60000);
 };
 App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
@@ -395,7 +429,7 @@ App.ready=(async()=>{
  App.timer=setInterval(()=>App.engine.tick().catch(()=>App.fail('internal_error')),2000);App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
  if(App.engine.enabled()&&App.engine.config.rules.some(r=>r.enabled)&&(needResweep||App.engine.config.hourly)){
-  setTimeout(()=>{if(App.engine?.enabled()&&App.engine.config.rules.some(r=>r.enabled))App.runAllRules().catch(()=>App.log('error',0,'startsvep_misslyckades'));},needResweep?500:3000);
+  setTimeout(()=>{if(App.engine?.enabled()&&App.engine.config.rules.some(r=>r.enabled))App.autoSweep();},needResweep?500:3000);
  }
 })().catch(()=>{
  if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});
@@ -426,7 +460,7 @@ B.tabs.onRemoved.addListener(id=>{if(App.uiTab===id)App.uiTab=null;if(App.mailTa
 B.tabs.onActivated.addListener(({tabId})=>B.tabs.get(tabId).then(App.captureTab).catch(()=>{}));
 B.mailTabs.onSelectedMessagesChanged.addListener(tab=>App.captureTab(tab));
 B.commands.onCommand.addListener(cmd=>{
- if(cmd==='sweep')App.ready.then(()=>App.engine.sweepAll()).catch(()=>App.log('error',0,'snabbkommando_svep_misslyckades'));
+ if(cmd==='sweep')App.ready.then(()=>App.autoSweep()).catch(()=>App.log('error',0,'snabbkommando_svep_misslyckades'));
  if(cmd==='open_ui')B.tabs.query({active:true,currentWindow:true}).then(tabs=>App.open(tabs[0])).catch(()=>App.log('error',0,'oppna_granssnitt_misslyckades'));
 });
 /* Högerklicksmeny på mejl i Thunderbird: förifyller en ny regel i SortBro. */

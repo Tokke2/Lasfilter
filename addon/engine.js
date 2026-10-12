@@ -420,7 +420,7 @@ class Engine {
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
    try{const r=await this.sweepRule(rule,{includeInboxUnread:true});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;}
-   catch(error){this.debug('svep_regel_misslyckades error_code='+(error?.code||error?.name||'Error'));this.log('error',0,'svep_misslyckades code='+(error?.code||error?.name||'Error'));throw new C.RuleError('sweep_error');}
+   catch(error){const code=error?.code||error?.name||'Error';this.debug('svep_regel_misslyckades error_code='+code);this.log('error',0,'svep av regel misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');throw new C.RuleError('sweep_error');}
   }
   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders};
  }

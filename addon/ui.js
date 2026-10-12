@@ -2,24 +2,723 @@
 const $=id=>document.getElementById(id),C=LasCore;
 const DEMO=!!globalThis.LAS_DEMO||new URLSearchParams(location.search).get('demo')==='1';
 const live=!!globalThis.browser?.runtime?.id;
-let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',activeView='rules',toastTimer;
-const errors={bad_branch:'Ogiltig fördelning. Varje fördelning behöver ett villkor och en målmapp.',disabled:'Regeln är avstängd. Aktivera den först.',bad_domain:'Ange en fullständig domän, exempelvis fortnox.se.',bad_rule:'Ogiltig regel.',bad_id:'Ogiltigt regel-id.',bad_name:'Ange ett regelnamn, högst 100 tecken.',choose_source:'Välj en källmapp.',choose_target:'Välj en målmapp.',same_folder:'Källa och mål får inte vara samma mapp.',bad_match:'Välj hur villkoren ska kombineras.',bad_conditions:'En regel behöver 1–8 villkor.',bad_field:'Ogiltigt fält.',bad_operator:'Ogiltigt villkor för det valda fältet.',bad_value:'Varje villkor behöver ett värde med högst 256 tecken.',too_many_rules:'Högst 200 regler stöds.',duplicate_id:'Filen innehåller upprepade regel-id:n.',rule_cycle:'Reglerna skulle skapa en flyttloop. Ändra käll- eller målmapp.',unsafe_folder:'Välj en vanlig mapp, inte en specialmapp eller sökmapp.',same_account:'Välj källa och mål i samma konto i denna version.',read_only:'Mappen tillåter inte en riktig flytt. Ingen kopiering görs som reserv.',bad_schema:'Regelfilen har ett okänt eller ogiltigt format.',no_selection:'Öppna en mejlflik och markera ett meddelande där först.',one_message:'Markera exakt ett meddelande i den senaste mejlfliken.',stale_config:'Reglerna har ändrats. Öppna den sparade regeln igen innan du sparar.',paused:'Bevakningen är pausad eller spärrad.',unread:'Meddelandet är oläst och får inte flyttas.',no_match:'Ingen aktiv regel matchar det markerade meddelandet.',operation_running:'En flytt pågår. Vänta tills Thunderbird har svarat.',uncertain_move:'Ett flyttförsök har osäkert resultat. Kontrollera mapparna och rensa sedan spärren under Inställningar.',storage_error:'Inställningarna kunde inte sparas. Motorn är stoppad i denna session.',invalid_storage:'Lagrade inställningar kunde inte läsas. Bevakningen är stoppad.',display_error:'Visningsstatus kunde inte läsas säkert. Bevakningen är stoppad.',move_error:'Mapp eller meddelande kunde inte kontrolleras för flytt. Kontrollera regel och mappar.',sweep_error:'Kontrollen av befintliga mejl misslyckades. Kontrollera att regelns käll- och målmappar finns kvar och är skrivbara.',queue_full:'Kön nådde säkerhetsgränsen. Bevakningen är stoppad.',internal_error:'Ett tekniskt fel inträffade. Ingen automatisk omkörning görs.',not_installed:'Öppna denna app som installerat Thunderbird-tillägg.',bad_request:'Åtgärden kunde inte utföras.'};
-const eventNames={start:'Bevakningen startad',debug:'Detalj',catchup:'Befintliga lästa sorterade',settings_saved:'Inställningar sparade',rules_saved:'Regler sparade',restored:'Väntande jobb återställda',queued:'Meddelande köat',simulated:'Test utfört – ingen flytt',moved:'Flytt bekräftad av Thunderbird',skipped:'Meddelande överhoppat',error:'Tekniskt fel',queue_full:'Kön full',backup_restored:'Regelkopia återställd'};
+let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',activeView='rules',currentLang='sv',toastTimer;
+
+const I18N={
+ sv:{
+  pageTitle:'Läsfilter · Thunderbird',
+  demoBanner:'FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.',
+  brandName:'Läsfilter',
+  brandSub:'FÖR THUNDERBIRD',
+  navMenu:'MENY',
+  navRules:'Start',
+  navActivity:'Vad har hänt?',
+  navSettings:'Avancerat',
+  navHelp:'Hjälp',
+  sidebarNoteTitle:'Du läser i lugn och ro.',
+  sidebarNoteBody:'Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.',
+  versionText:'Lokal behandling · v1.0.0 · Inga molntjänster',
+  topbarTitle:'THUNDERBIRD / LÄSFILTER',
+  themeQuickTitle:'Växla ljust/mörkt tema',
+  introEyebrow:'ENKEL AUTOMATISK SORTERING',
+  introTitle:'Flytta mejl automatiskt',
+  introSub:'Skapa en eller flera regler, välj olästa/lästa och målmapp. Klart.',
+  setup1Title:'Välj exempelmejl',
+  setup1Sub:'Markera ett mejl i Thunderbird',
+  setup2Title:'Spara regeln',
+  setup2Sub:'Välj lästa/olästa och målmapp',
+  setup3Title:'Slå på flytt',
+  setup3Sub:'Tillägget sköter resten',
+  runLabel:'FLYTTSTATUS',
+  clearFaultBtn:'Rensa spärr och fortsätt',
+  showActivityBtn:'Visa aktivitet',
+  statRules:'aktiva regler',
+  statQueue:'väntar på flytt / test',
+  statMoved:'flyttade sedan start',
+  statMatched:'matchade sedan start',
+  rulesTitle:'Dina automatiska flyttar',
+  rulesSub:'Lägg upp hur många regler du vill. Varje regel visar villkor, oläst/läst-val och målmapp.',
+  newRuleBtn:'＋ Lägg till',
+  ruleSearchPlaceholder:'Sök bland dina regler…',
+  exportBtn:'↓ Exportera regler',
+  importBtn:'↑ Importera',
+  priorityNote:'Reglerna körs uppifrån och ned (första träff gäller). Ändra ordning med Prioritet-knapparna.',
+  editorEyebrow:'REGELREDIGERING',
+  editorNew:'Ny regel',
+  editorEdit:'Redigera regel',
+  enabledLabel:'Aktiv',
+  ruleNameLabel:'Regelnamn',
+  ruleNamePlaceholder:'Exempel: Fortnox fakturor',
+  step1Title:'Markera ett exempelmejl',
+  step1Help:'Gå till Thunderbird, klicka på ett mejl som ska sorteras och kom tillbaka hit.',
+  fromSelectedBtn:'✉ Hämta konto från markerat mejl',
+  accountLabel:'Konto',
+  chooseAccount:'Välj ett konto…',
+  accountScopeTitle:'Alla mappar i kontot ingår',
+  accountScopeBody:'Inkorg, arkiv och vanliga undermappar bevakas automatiskt. Skickat, Utkast, Skräppost och Papperskorg undantas.',
+  step2Title:'Vilka liknande mejl?',
+  matchAll:'Alla ska stämma',
+  matchAny:'Minst ett ska stämma',
+  step2Help:'Avsändaren fylls i automatiskt från exempelmejlet. Du kan lägga till upp till 8 villkor per regel.',
+  colField:'Fält',
+  colOp:'Villkor',
+  colValue:'Värde',
+  addConditionBtn:'＋ Lägg till villkor',
+  step3Title:'Vart och när ska mejlen flyttas?',
+  targetLabel:'Välj målmapp',
+  chooseTarget:'Välj en målmapp…',
+  ruleMoveUnreadLabel:'Flytta olästa mejl i detta filter',
+  ruleOpenWindowLabel:'Öppna flyttade olästa mejl i nytt fönster',
+  inlineMoveUnread:'Flytta olästa mejl',
+  inlineOpenWindow:'Öppna i nytt fönster',
+  readFilterLabel:'Flytta olästa / lästa mejl för denna regel',
+  rfPillDefault:'✓ Standard (lästa + nya i Inkorg)',
+  rfPillBoth:'⚡ Både olästa & lästa direkt',
+  rfPillRead:'📖 Endast lästa (efter läsning)',
+  rfPillUnread:'✉ Endast olästa direkt',
+  rfDefault:'Enligt standardinställning (lästa + nya i Inkorgen)',
+  rfRead:'Endast lästa mejl (vänta tills mejlet är läst och lämnat)',
+  rfBoth:'Både olästa och lästa mejl (flytta direkt)',
+  rfUnread:'Endast olästa mejl (flytta direkt)',
+  unreadActionLabel:'När olästa mejl flyttas av denna regel',
+  uaDefault:'Enligt standardinställning (Avancerat)',
+  uaKeep:'Behåll som oläst i målmappen (utan popup-fönster)',
+  uaWindow:'Öppna i nytt fönster och behåll som oläst',
+  uaRead:'Markera som läst vid flytt',
+  branchSummary:'Avancerat: olika mål beroende på ämne',
+  branchNote:'Första fördelningen som matchar styr målmappen. Övriga mejl går till målmappen ovan.',
+  addBranchBtn:'＋ Lägg till fördelning',
+  testBtn:'▷ Kontrollera',
+  saveBtn:'Spara automatisk flytt',
+  saveAndNewBtn:'＋ Spara & ny regel',
+  upBtn:'↑ Prioritet',
+  downBtn:'↓ Prioritet',
+  duplicateBtn:'⧉ Duplicera regel',
+  deleteBtn:'Ta bort regel',
+  safetyTitle:'Testläge är en trygg start.',
+  safetyBody:'Testa dina regler innan du aktiverar riktiga flyttar. Testknappen flyttar aldrig något.',
+  queueSelectedBtn:'Bevaka markerat →',
+  catchUpBtn:'Sortera befintliga enligt regeln →',
+  activityTitle:'Teknisk aktivitet',
+  activitySub:'Inga ämnesrader, avsändaradresser eller mejltexter sparas här.',
+  exportLogBtn:'Exportera logg',
+  thTime:'Tid',
+  thEvent:'Händelse',
+  thLevel:'Nivå',
+  thCount:'Antal',
+  settingsTitle:'Utseende & grundläge',
+  langLabel:'Språk / Language',
+  themeLabel:'Tema',
+  themeSystem:'Följ systemet',
+  themeLight:'Ljust',
+  themeDark:'Mörkt',
+  moveModeLabel:'Standardläge för regler (när regeln står på Standard)',
+  moveModeRead:'Flytta när läst och lämnat',
+  moveModeDirect:'Flytta direkt, även olästa',
+  openWindowLabel:'Öppna flyttade olästa mejl i ett eget fönster som standard',
+  unreadNote:'Du kan även styra per regel om olästa mejl ska behållas olästa utan fönster, öppnas i fönster eller markeras som lästa.',
+  hourlyLabel:'Skanna hela kontot automatiskt',
+  sweepMinutesLabel:'Intervall i minuter (steg om 15)',
+  newInboxDirectLabel:'Flytta nya matchande mejl direkt när de kommer till Inkorgen',
+  verboseLabel:'Visa detaljerad felsökning i Aktivitet',
+  fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/lasfilter-logg.txt',
+  fileLogNote:'Loggfilen skrivs om automatiskt efter nya händelser och innehåller inte ämnesrader, adresser eller mejltexter.',
+  shortcutsNote:'Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns. Ctrl+Shift+L kör ett svep direkt.',
+  fontSizeLabel:'Textstorlek',
+  refreshFoldersBtn:'Uppdatera mapplistan',
+  windowNote:'Thunderbird hanterar fönstrets storlek och placering. Tillägget minns språk, tema, textstorlek och senast valda regel.',
+  backupsTitle:'Regelkopior & säkerhet',
+  backupsSub:'De fem senaste regelversionerna sparas automatiskt. Återställning startar pausad i testläge.',
+  clearBlockedBtn:'Rensa spärrar efter egen kontroll',
+  clearBlockedNote:'Detta ångrar ingen flytt och startar inget nytt försök. Kontrollera mapparna i Thunderbird först.',
+  helpTitle:'En lugnare inkorg, på dina villkor',
+  helpStep1:'Välj kontot som ska bevakas, ett eller flera villkor, läst/oläst-läge och en målmapp. Du kan skapa hur många regler du vill.',
+  helpStep2:'Använd Hämta konto från markerat mejl för att välja rätt konto och avsändare automatiskt. Markera exakt ett mejl i Thunderbird först.',
+  helpStep3:'Kontrollera-knappen testar den redigerade regeln (även osparade ändringar) utan att flytta mejlet.',
+  helpStep4:'För varje regel kan du välja om den ska flytta Endast lästa, Både olästa och lästa, Endast olästa, eller följa standardinställningen – samt hur flyttade olästa mejl ska hanteras.',
+  helpStep5:'Använd Spara & ny regel eller Duplicera regel för att snabbt bygga upp flera regler för olika avsändare, domäner eller ämnen.',
+  helpImportantTitle:'Det här är viktigt',
+  helpP1:'”Läst” är Thunderbirds läst-markering. När en regel väntar på läsning flyttas mejlet först när det är läst och inte längre visas i någon öppen mejlflik eller något meddelandefönster.',
+  helpP2:'Med Kör kontroll nu eller ▶-knappen på en regel skannas kontots mappar (utom regelns målmappar) efter matchande mejl enligt regelns inställning för olästa/lästa.',
+  helpP3:'En regel kan även ha underfördelningar (Avancerat: olika mål beroende på ämne), t.ex. domän fortnox.se som grundvillkor och sedan Ämne innehåller Faktura → Fakturor och Ämne innehåller Order → Order.',
+  helpP4:'Tillägget ändrar aldrig Thunderbirds inbyggda filterfiler (msgFilterRules.dat) och använder inga molntjänster.',
+  footerRight:'Egna regler · Inga ändringar i msgFilterRules.dat',
+  policyDefaultTitle:'Först läst (eller direkt vid nyinkommet i Inkorgen).',
+  policyDefaultBody:'Följer standardinställningen: lästa mejl flyttas när de lämnats i 2 sekunder, och nya mejl i Inkorgen kan flyttas direkt.',
+  policyReadTitle:'Först läst. Sedan lämnat.',
+  policyReadBody:'Flyttar endast lästa mejl och väntar minst två sekunder utan visning i någon mejlflik eller något fönster.',
+  policyBothTitle:'Både olästa och lästa flyttas direkt.',
+  policyBothBody:'Den här regeln flyttar både olästa och lästa matchande mejl direkt utan att vänta på att mejlet stängs.',
+  policyUnreadTitle:'Endast olästa mejl flyttas direkt.',
+  policyUnreadBody:'Den här regeln flyttar endast olästa matchande mejl direkt. Redan lästa mejl lämnas kvar.',
+  pillStopped:'STOPPAD',
+  pillPaused:'PAUSAD',
+  pillTest:'TEST · FLYTTAR INGET',
+  pillActive:'AKTIV · FLYTTAR MEJL',
+  pillDisconnected:'Inte ansluten',
+  pauseResume:'Starta bevakning',
+  pauseBtn:'Pausa',
+  modeEnable:'Slå på riktiga flyttar',
+  modeTest:'Byt till testläge',
+  guideActiveTitle:'Riktiga flyttar är aktiva',
+  guideActiveReady:'Nya matchande mejl bevakas. Kör kontroll nu för att även skanna befintliga mejl.',
+  guideActiveNoRules:'Skapa och aktivera minst en regel för att börja.',
+  guideFaultTitle:'Flyttmotorn är stoppad',
+  guideFaultTail:' Öppna Aktivitet och kontrollera den senaste raden.',
+  guidePausedTitle:'Bevakningen är pausad',
+  guidePausedBody:'Inga nya mejl köas eller flyttas. Klicka Starta bevakning när du vill fortsätta.',
+  guideTestTitle:'Testläge – inga mejl flyttas',
+  guideTestReady:'Reglerna kan matcha och räknas som test, men mapparna ändras inte. Slå på riktiga flyttar när resultatet ser rätt ut.',
+  guideTestNoRules:'Skapa en regel. Testläget är säkert och flyttar ingenting.',
+  sweepQueueNow:'Kontrollera kön nu',
+  sweepRunNow:'Kör kontroll nu',
+  sweepChecking:'Kontrollerar…',
+  noticeStoppedPrefix:'STOPPAD: ',
+  noticeStoppedSuffix:' Inga fler automatiska försök görs innan problemet är åtgärdat.',
+  lastCheckPrefix:'Senaste kontroll: ',
+  lastCheckCountSuffix:' mejl kontrollerade sedan start',
+  lastCheckWaiting:'Bevakningen väntar på ett matchande mejl',
+  emptyNoMatch:'Ingen regel matchar sökningen.',
+  emptyNoRules:'Börja med en ny regel. Inga exempelregler aktiveras på dina mejl.',
+  missingFolder:'Mapp saknas – välj igen',
+  missingFolderShort:'Mapp saknas',
+  confirmDiscard:'Lämna osparade ändringar?',
+  confirmDiscardEditor:'Lämna osparade ändringar i redigeraren?',
+  fieldSenderShort:'Från',
+  fieldDomainShort:'Domän',
+  fieldSubjectShort:'Ämne',
+  moreConditionsSuffix:' villkor',
+  scopeAccount:'Hela kontot',
+  scopeFolder:'Vald mapp',
+  tagDisabled:'Avstängd',
+  tagDefault:'efter läsning',
+  tagRead:'endast lästa',
+  tagBoth:'olästa & lästa direkt',
+  tagUnread:'endast olästa direkt',
+  runRuleNowTitle:'Kör denna regel nu',
+  dupRuleTitle:'Duplicera denna regel',
+  maxBranches:'Högst åtta fördelningar per regel.',
+  maxConditions:'Högst åtta villkor per regel.',
+  minConditions:'Behåll minst ett villkor.',
+  optSubject:'Ämne',
+  optSender:'Från (adress)',
+  optDomain:'Avsändardomän',
+  opContains:'innehåller',
+  opEquals:'är exakt',
+  opStarts:'börjar med',
+  opEnds:'slutar med',
+  branchPlaceholder:'Exempel: Faktura',
+  condPlaceholder:'Exempel: fortnox.se',
+  noLogsYet:'Inga händelser ännu.',
+  rulesCountSuffix:' regler',
+  restoreBtn:'Återställ',
+  confirmRestore:'Återställ denna regelversion? Nuvarande regler säkerhetskopieras. Bevakningen blir pausad i testläge.',
+  toastRestored:'Regelversion återställd. Testa innan du aktiverar.',
+  backupHint:'En kopia skapas när du sparar din första regeländring.',
+  blockedSome:' spärrade/osäkra försök. Kontrollera mapparna i Thunderbird innan spärrarna rensas.',
+  blockedNone:'Inga osäkra flyttförsök.',
+  toastRuleSaved:'Regeln sparad. Testa den på ett markerat mejl.',
+  toastSavedAndNew:'Regeln sparad! Fyll i nästa regel nedan.',
+  toastDuplicated:'Regeln duplicerad som ny regel – anpassa och tryck Spara.',
+  defaultRulePrefix:'Mejl från ',
+  defaultSenderFallback:'avsändaren',
+  copySuffix:' (kopia)',
+  toastFromSelected:'Klart! Exempelmejlet är hämtat. Välj nu målmappen och tryck Spara.',
+  testReasonNoMatch:'Villkoren matchar inte det markerade mejlet.',
+  testReasonDisabled:'Villkoren matchar, men regeln är avstängd.',
+  testReasonUnread:'Villkoren matchar, men mejlet är oläst. Ingen flytt får ske.',
+  testReasonAlreadyRead:'Villkoren matchar, men mejlet är redan läst och regeln gäller endast olästa mejl.',
+  testReasonDisplayed:'Villkoren matchar. Mejlet är läst men fortfarande öppet i en mejlflik eller ett fönster.',
+  testReasonEligible:'Villkoren matchar. Mejlet uppfyller regelns krav och är redo att flyttas.',
+  testNoMove:' Testet flyttar ingenting. ',
+  testTargetPrefix:'Mål: ',
+  testTail:'Testet gäller bara regeln i redigeraren och bortser från vilken mapp mejlet ligger i.',
+  testOutside:' Mejlet ligger just nu utanför källmappen: bevakningen flyttar nya mejl som kommer till källmappen, och "Sortera befintliga" flyttar redan befintliga mejl oavsett mapp.',
+  confirmDelete:'Ta bort regeln? En regelkopia sparas. Inga mejl tas bort.',
+  saveBeforePriority:'Spara regeln innan du ändrar prioritet.',
+  confirmEnableLive:'Aktivera riktiga mejlflyttar enligt dina aktiva regler?\n\nBörja med en provmapp och granska Testa-resultaten. Väntande testjobb rensas.',
+  toastLiveOn:'Flyttläge aktiverat enligt dina aktiva regler.',
+  toastTestOn:'Testläge aktiverat. Inga nya flyttar startas.',
+  toastQueued:'Mejlet är nu köat enligt regeln.',
+  toastAlreadyQueued:'Redan hanterat eller köat i denna session.',
+  saveFirst:'Spara regeln först.',
+  openRuleFirst:'Öppna eller skapa en regel först.',
+  confirmCatchUp:'Skanna kontots mappar, inklusive undermappar men utan regelns målmappar, efter befintliga mejl som matchar den sparade regeln?\n\nI testläge räknas träffar som prov utan flytt.',
+  confirmImport:'Ersätt reglerna med denna fil? Nuvarande regler kopieras. Efter import blir bevakningen pausad i testläge.',
+  toastImported:'Regler importerade. Granska mappar och villkor.',
+  toastCleared:'Spärren är rensad och bevakningen är igång igen.',
+  toastModeDirect:'Direktläge: nya matchande mejl flyttas även olästa.',
+  toastModeRead:'Nya mejl flyttas när de är lästa och lämnade.',
+  toastOpenWindowOn:'Olästa flyttade mejl öppnas i eget fönster som standard.',
+  toastOpenWindowOff:'Olästa flyttade mejl stannar i målmappen utan popup-fönster.',
+  toastVerboseOn:'Detaljlogg på: händelser syns under Aktivitet och i exporten.',
+  toastVerboseOff:'Detaljlogg av.',
+  toastFileLogOn:'Loggfil på: Hämtade filer/Lasfilter/lasfilter-logg.txt uppdateras automatiskt.',
+  toastFileLogOff:'Automatisk loggfil av.',
+  toastSweepIntervalPrefix:'Kontosvep körs var ',
+  toastSweepIntervalSuffix:':e minut.',
+  toastInboxDirectOn:'Nya matchande mejl i Inkorgen flyttas direkt.',
+  toastInboxDirectOff:'Direktflytt av nyinkomna mejl är avstängd.',
+  toastFoldersRefreshed:'Konton och mappar uppdaterade.',
+  toastLangChanged:'Språk ändrat till svenska.',
+  errors:{
+   bad_branch:'Ogiltig fördelning. Varje fördelning behöver ett villkor och en målmapp.',
+   disabled:'Regeln är avstängd. Aktivera den först.',
+   bad_domain:'Ange en fullständig domän, exempelvis fortnox.se.',
+   bad_rule:'Ogiltig regel.',
+   bad_id:'Ogiltigt regel-id.',
+   bad_name:'Ange ett regelnamn, högst 100 tecken.',
+   choose_source:'Välj en källmapp.',
+   choose_target:'Välj en målmapp.',
+   same_folder:'Källa och mål får inte vara samma mapp.',
+   bad_match:'Välj hur villkoren ska kombineras.',
+   bad_conditions:'En regel behöver 1–8 villkor.',
+   bad_field:'Ogiltigt fält.',
+   bad_operator:'Ogiltigt villkor för det valda fältet.',
+   bad_value:'Varje villkor behöver ett värde med högst 256 tecken.',
+   too_many_rules:'Högst 200 regler stöds.',
+   duplicate_id:'Filen innehåller upprepade regel-id:n.',
+   rule_cycle:'Reglerna skulle skapa en flyttloop. Ändra käll- eller målmapp.',
+   unsafe_folder:'Välj en vanlig mapp, inte en specialmapp eller sökmapp.',
+   same_account:'Välj källa och mål i samma konto i denna version.',
+   read_only:'Mappen tillåter inte en riktig flytt. Ingen kopiering görs som reserv.',
+   bad_schema:'Regelfilen har ett okänt eller ogiltigt format.',
+   no_selection:'Öppna en mejlflik och markera ett meddelande där först.',
+   one_message:'Markera exakt ett meddelande i den senaste mejlfliken.',
+   stale_config:'Reglerna har ändrats. Öppna den sparade regeln igen innan du sparar.',
+   paused:'Bevakningen är pausad eller spärrad.',
+   unread:'Meddelandet är oläst och regeln tillåter endast lästa mejl.',
+   already_read:'Meddelandet är redan läst och regeln gäller endast olästa mejl.',
+   no_match:'Ingen aktiv regel matchar det markerade meddelandet.',
+   operation_running:'En flytt pågår. Vänta tills Thunderbird har svarat.',
+   uncertain_move:'Ett flyttförsök fick osäkert svar. Klicka på "Rensa spärr och fortsätt" (eller under Avancerat) för att återuppta bevakningen.',
+   storage_error:'Inställningarna kunde inte sparas. Motorn är stoppad i denna session.',
+   invalid_storage:'Lagrade inställningar kunde inte läsas. Bevakningen är stoppad.',
+   display_error:'Visningsstatus kunde inte läsas säkert. Bevakningen är stoppad.',
+   move_error:'Mapp eller meddelande kunde inte kontrolleras för flytt. Kontrollera regel och mappar.',
+   sweep_error:'Kontrollen av befintliga mejl misslyckades. Kontrollera att regelns käll- och målmappar finns kvar och är skrivbara.',
+   queue_full:'Kön nådde säkerhetsgränsen. Bevakningen är stoppad.',
+   internal_error:'Ett tekniskt fel inträffade. Ingen automatisk omkörning görs.',
+   not_installed:'Öppna denna app som installerat Thunderbird-tillägg.',
+   bad_request:'Åtgärden kunde inte utföras.'
+  },
+  events:{
+   start:'Bevakningen startad',
+   debug:'Detalj',
+   catchup:'Befintliga mejl sorterade',
+   settings_saved:'Inställningar sparade',
+   rules_saved:'Regler sparade',
+   restored:'Väntande jobb återställda',
+   queued:'Meddelande köat',
+   simulated:'Test utfört – ingen flytt',
+   moved:'Flytt bekräftad av Thunderbird',
+   skipped:'Meddelande överhoppat',
+   error:'Tekniskt fel',
+   queue_full:'Kön full',
+   backup_restored:'Regelkopia återställd',
+   fallback:'Teknisk händelse'
+  }
+ },
+ en:{
+  pageTitle:'Läsfilter · Thunderbird',
+  demoBanner:'PREVIEW · Sample data only. No emails are read or moved.',
+  brandName:'Läsfilter',
+  brandSub:'FOR THUNDERBIRD',
+  navMenu:'MENU',
+  navRules:'Rules',
+  navActivity:'Activity Log',
+  navSettings:'Advanced',
+  navHelp:'Help',
+  sidebarNoteTitle:'Read at your own pace.',
+  sidebarNoteBody:'Read messages stay put while open in any mail tab or message window.',
+  versionText:'Local processing · v1.0.0 · No cloud services',
+  topbarTitle:'THUNDERBIRD / LÄSFILTER',
+  themeQuickTitle:'Toggle light/dark theme',
+  introEyebrow:'AUTOMATIC EMAIL SORTING',
+  introTitle:'Move emails automatically',
+  introSub:'Create one or multiple rules, choose unread/read mode and target folder. Done.',
+  setup1Title:'Pick sample email',
+  setup1Sub:'Select an email in Thunderbird',
+  setup2Title:'Save the rule',
+  setup2Sub:'Choose unread/read & target folder',
+  setup3Title:'Enable moves',
+  setup3Sub:'The add-on handles the rest',
+  runLabel:'ENGINE STATUS',
+  clearFaultBtn:'Clear lock & resume',
+  showActivityBtn:'View activity',
+  statRules:'active rules',
+  statQueue:'queued for move / test',
+  statMoved:'moved since start',
+  statMatched:'matched since start',
+  rulesTitle:'Your automatic rules',
+  rulesSub:'Create as many rules as you like. Each row shows conditions, read/unread mode and target folder.',
+  newRuleBtn:'＋ Add rule',
+  ruleSearchPlaceholder:'Search your rules…',
+  exportBtn:'↓ Export rules',
+  importBtn:'↑ Import',
+  priorityNote:'Rules are evaluated top to bottom (first match wins). Reorder with the Priority buttons.',
+  editorEyebrow:'RULE EDITOR',
+  editorNew:'New rule',
+  editorEdit:'Edit rule',
+  enabledLabel:'Active',
+  ruleNameLabel:'Rule name',
+  ruleNamePlaceholder:'Example: Fortnox invoices',
+  step1Title:'Select a sample email',
+  step1Help:'In Thunderbird, click an email you want to sort, then return here.',
+  fromSelectedBtn:'✉ Fetch account & sender from selected email',
+  accountLabel:'Account',
+  chooseAccount:'Select an account…',
+  accountScopeTitle:'All folders in the account are included',
+  accountScopeBody:'Inbox, archives and normal subfolders are monitored automatically. Sent, Drafts, Junk and Trash are excluded.',
+  step2Title:'Which matching emails?',
+  matchAll:'Match all conditions',
+  matchAny:'Match any condition',
+  step2Help:'The sender is filled in automatically from the sample email. You can add up to 8 conditions per rule.',
+  colField:'Field',
+  colOp:'Operator',
+  colValue:'Value',
+  addConditionBtn:'＋ Add condition',
+  step3Title:'Where and when should emails move?',
+  targetLabel:'Target folder',
+  chooseTarget:'Select a target folder…',
+  ruleMoveUnreadLabel:'Move unread emails in this filter',
+  ruleOpenWindowLabel:'Open moved unread emails in a new window',
+  inlineMoveUnread:'Move unread mail',
+  inlineOpenWindow:'Open in new window',
+  readFilterLabel:'Move unread / read emails for this rule',
+  rfPillDefault:'✓ Default (read + new in Inbox)',
+  rfPillBoth:'⚡ Both unread & read immediately',
+  rfPillRead:'📖 Read only (after reading)',
+  rfPillUnread:'✉ Unread only immediately',
+  rfDefault:'Use global default (read + new in Inbox)',
+  rfRead:'Read emails only (wait until read and closed)',
+  rfBoth:'Both unread and read emails (move immediately)',
+  rfUnread:'Unread emails only (move immediately)',
+  unreadActionLabel:'When unread emails are moved by this rule',
+  uaDefault:'Use global default (Advanced)',
+  uaKeep:'Keep unread in target folder (no popup window)',
+  uaWindow:'Open in new window and keep unread',
+  uaRead:'Mark as read when moved',
+  branchSummary:'Advanced: route to different folders by subject',
+  branchNote:'The first matching branch sets the target folder. Other matching emails go to the main target folder above.',
+  addBranchBtn:'＋ Add branch',
+  testBtn:'▷ Test rule',
+  saveBtn:'Save automatic move',
+  saveAndNewBtn:'＋ Save & new rule',
+  upBtn:'↑ Priority',
+  downBtn:'↓ Priority',
+  duplicateBtn:'⧉ Duplicate rule',
+  deleteBtn:'Delete rule',
+  safetyTitle:'Test mode is a safe start.',
+  safetyBody:'Test your rules before enabling live moves. The Test button never moves any emails.',
+  queueSelectedBtn:'Queue selected email →',
+  catchUpBtn:'Sort existing emails for rule →',
+  activityTitle:'Technical activity',
+  activitySub:'No subject lines, sender addresses or message bodies are stored here.',
+  exportLogBtn:'Export log',
+  thTime:'Time',
+  thEvent:'Event',
+  thLevel:'Level',
+  thCount:'Count',
+  settingsTitle:'Appearance & defaults',
+  langLabel:'Language / Språk',
+  themeLabel:'Theme',
+  themeSystem:'Follow system',
+  themeLight:'Light',
+  themeDark:'Dark',
+  moveModeLabel:'Default mode for rules (when rule is set to Default)',
+  moveModeRead:'Move when read and closed',
+  moveModeDirect:'Move immediately, including unread',
+  openWindowLabel:'Open moved unread emails in a separate window by default',
+  unreadNote:'You can also choose per rule whether moved unread emails stay unread without a popup window, open in a window, or are marked as read.',
+  hourlyLabel:'Scan entire account automatically',
+  sweepMinutesLabel:'Interval in minutes (steps of 15)',
+  newInboxDirectLabel:'Move new matching emails immediately when they arrive in Inbox',
+  verboseLabel:'Show detailed diagnostics in Activity Log',
+  fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/lasfilter-logg.txt',
+  fileLogNote:'The log file is updated automatically after new events and never contains subjects, addresses or message bodies.',
+  shortcutsNote:'Alt+Shift+L opens Läsfilter even if the toolbar button is hidden. Ctrl+Shift+L runs a scan immediately.',
+  fontSizeLabel:'Font size',
+  refreshFoldersBtn:'Refresh folder list',
+  windowNote:'Thunderbird manages window size and position. The add-on remembers language, theme, font size and last selected rule.',
+  backupsTitle:'Rule backups & safety',
+  backupsSub:'The five most recent rule versions are saved automatically. Restoring starts paused in test mode.',
+  clearBlockedBtn:'Clear locks after manual check',
+  clearBlockedNote:'This does not undo any move or retry failed moves. Check your folders in Thunderbird first.',
+  helpTitle:'A calmer inbox, on your terms',
+  helpStep1:'Choose the account to monitor, one or more conditions, unread/read mode and a target folder. You can create as many rules as you need.',
+  helpStep2:'Use Fetch account & sender from selected email to fill in the account and sender automatically. Select one email in Thunderbird first.',
+  helpStep3:'The Test rule button checks the rule currently in the editor (including unsaved edits) without moving the email.',
+  helpStep4:'For each rule you can choose Read emails only, Both unread and read, Unread emails only, or Use global default – plus how moved unread emails are handled.',
+  helpStep5:'Use Save & new rule or Duplicate rule to quickly set up multiple rules for different senders, domains or subjects.',
+  helpImportantTitle:'Good to know',
+  helpP1:'"Read" uses Thunderbird\'s read status. When a rule waits for reading, the email is moved only after it is marked read and is no longer open in any mail tab or message window.',
+  helpP2:'Run scan now and the ▶ button on each rule scan the account\'s folders (excluding the rule\'s target folders) according to each rule\'s unread/read setting.',
+  helpP3:'A rule can also route to sub-targets (Advanced: route to different folders by subject), e.g. domain fortnox.se as the main condition, then Subject contains Invoice → Invoices and Subject contains Order → Orders.',
+  helpP4:'This add-on never modifies Thunderbird\'s built-in msgFilterRules.dat and uses no cloud services.',
+  footerRight:'Custom rules · No changes to msgFilterRules.dat',
+  policyDefaultTitle:'Read first (or immediately on Inbox arrival).',
+  policyDefaultBody:'Follows global default: read emails move after being closed for 2 seconds, and new Inbox arrivals can move immediately.',
+  policyReadTitle:'Read first. Then closed.',
+  policyReadBody:'Moves read emails only, waiting at least two seconds after the email is no longer displayed in any tab or window.',
+  policyBothTitle:'Moves both unread and read emails immediately.',
+  policyBothBody:'This rule moves matching unread and read emails right away without waiting for the message to be closed.',
+  policyUnreadTitle:'Moves unread emails only (immediately).',
+  policyUnreadBody:'This rule moves matching unread emails immediately. Already read emails are left untouched.',
+  pillStopped:'STOPPED',
+  pillPaused:'PAUSED',
+  pillTest:'TEST · NO MOVES',
+  pillActive:'ACTIVE · MOVING MAIL',
+  pillDisconnected:'Disconnected',
+  pauseResume:'Resume monitoring',
+  pauseBtn:'Pause',
+  modeEnable:'Enable live moves',
+  modeTest:'Switch to test mode',
+  guideActiveTitle:'Live moves are active',
+  guideActiveReady:'New matching emails are monitored. Click Run scan now to also scan existing emails.',
+  guideActiveNoRules:'Create and enable at least one rule to start.',
+  guideFaultTitle:'Move engine is stopped',
+  guideFaultTail:' Open Activity Log to inspect the latest entry.',
+  guidePausedTitle:'Monitoring is paused',
+  guidePausedBody:'No new emails are queued or moved. Click Resume monitoring when you are ready to continue.',
+  guideTestTitle:'Test mode – no emails are moved',
+  guideTestReady:'Rules match and count as tests, but folders are not modified. Enable live moves when everything looks right.',
+  guideTestNoRules:'Create a rule. Test mode is safe and never moves any emails.',
+  sweepQueueNow:'Process queue now',
+  sweepRunNow:'Run scan now',
+  sweepChecking:'Scanning…',
+  noticeStoppedPrefix:'STOPPED: ',
+  noticeStoppedSuffix:' No further automatic attempts will run until the issue is resolved.',
+  lastCheckPrefix:'Last check: ',
+  lastCheckCountSuffix:' emails checked since start',
+  lastCheckWaiting:'Waiting for a matching email',
+  emptyNoMatch:'No rule matches your search.',
+  emptyNoRules:'Start by creating a rule. No sample rules are active on your emails.',
+  missingFolder:'Folder missing – select again',
+  missingFolderShort:'Folder missing',
+  confirmDiscard:'Discard unsaved changes?',
+  confirmDiscardEditor:'Discard unsaved changes in the editor?',
+  fieldSenderShort:'From',
+  fieldDomainShort:'Domain',
+  fieldSubjectShort:'Subject',
+  moreConditionsSuffix:' conditions',
+  scopeAccount:'All folders',
+  scopeFolder:'Selected folder',
+  tagDisabled:'Disabled',
+  tagDefault:'after reading',
+  tagRead:'read only',
+  tagBoth:'unread & read immediately',
+  tagUnread:'unread only immediately',
+  runRuleNowTitle:'Run this rule now',
+  dupRuleTitle:'Duplicate this rule',
+  maxBranches:'Up to eight branches per rule.',
+  maxConditions:'Up to eight conditions per rule.',
+  minConditions:'Keep at least one condition.',
+  optSubject:'Subject',
+  optSender:'From (address)',
+  optDomain:'Sender domain',
+  opContains:'contains',
+  opEquals:'equals',
+  opStarts:'starts with',
+  opEnds:'ends with',
+  branchPlaceholder:'Example: Invoice',
+  condPlaceholder:'Example: fortnox.se',
+  noLogsYet:'No events yet.',
+  rulesCountSuffix:' rules',
+  restoreBtn:'Restore',
+  confirmRestore:'Restore this rule version? Current rules will be backed up. Monitoring will start paused in test mode.',
+  toastRestored:'Rule backup restored. Test before enabling live moves.',
+  backupHint:'A backup is created when you save your first rule change.',
+  blockedSome:' locked/uncertain attempts. Check your folders in Thunderbird before clearing locks.',
+  blockedNone:'No uncertain move attempts.',
+  toastRuleSaved:'Rule saved. You can test it on a selected email.',
+  toastSavedAndNew:'Rule saved! Fill in your next rule below.',
+  toastDuplicated:'Rule duplicated as a new draft – adjust and click Save.',
+  defaultRulePrefix:'Mail from ',
+  defaultSenderFallback:'sender',
+  copySuffix:' (copy)',
+  toastFromSelected:'Done! Sample email fetched. Now choose a target folder and click Save.',
+  testReasonNoMatch:'Conditions do not match the selected email.',
+  testReasonDisabled:'Conditions match, but this rule is disabled.',
+  testReasonUnread:'Conditions match, but the email is unread and this rule only moves read emails.',
+  testReasonAlreadyRead:'Conditions match, but the email is already read and this rule only moves unread emails.',
+  testReasonDisplayed:'Conditions match. The email is read but still open in a mail tab or window.',
+  testReasonEligible:'Conditions match. The email meets this rule\'s requirements and is ready to move.',
+  testNoMove:' The test does not move anything. ',
+  testTargetPrefix:'Target: ',
+  testTail:'This test only checks the rule in the editor and ignores which folder the email is currently in.',
+  testOutside:' The email is currently outside the source folder: live monitoring moves new emails arriving in the source folder, and "Sort existing emails" scans existing emails across folders.',
+  confirmDelete:'Delete this rule? A backup copy is saved automatically. No emails are deleted.',
+  saveBeforePriority:'Save the rule before changing priority.',
+  confirmEnableLive:'Enable live email moves according to your active rules?\n\nStart with a test folder and review Test results first. Pending test jobs will be cleared.',
+  toastLiveOn:'Live move mode enabled for your active rules.',
+  toastTestOn:'Test mode enabled. No live moves will run.',
+  toastQueued:'Selected email queued according to rule.',
+  toastAlreadyQueued:'Already processed or queued in this session.',
+  saveFirst:'Save the rule first.',
+  openRuleFirst:'Open or create a rule first.',
+  confirmCatchUp:'Scan the account\'s folders (including subfolders, excluding the rule\'s target folders) for existing emails matching the saved rule?\n\nIn test mode, matches are counted as tests without moving.',
+  confirmImport:'Replace current rules with this file? Current rules will be backed up. After import, monitoring starts paused in test mode.',
+  toastImported:'Rules imported. Review folders and conditions.',
+  toastCleared:'Lock cleared and monitoring resumed.',
+  toastModeDirect:'Immediate mode: new matching emails move even when unread.',
+  toastModeRead:'New emails move after they are read and closed.',
+  toastOpenWindowOn:'Moved unread emails open in a separate window by default.',
+  toastOpenWindowOff:'Moved unread emails stay in target folder without a popup window.',
+  toastVerboseOn:'Detailed logging enabled: diagnostics appear in Activity Log and exports.',
+  toastVerboseOff:'Detailed logging disabled.',
+  toastFileLogOn:'File log enabled: Downloads/Lasfilter/lasfilter-logg.txt updates automatically.',
+  toastFileLogOff:'Automatic file log disabled.',
+  toastSweepIntervalPrefix:'Account scan runs every ',
+  toastSweepIntervalSuffix:' minutes.',
+  toastInboxDirectOn:'New matching emails in Inbox move immediately.',
+  toastInboxDirectOff:'Immediate move for new Inbox arrivals disabled.',
+  toastFoldersRefreshed:'Accounts and folders refreshed.',
+  toastLangChanged:'Language switched to English.',
+  errors:{
+   bad_branch:'Invalid branch. Each branch needs a condition and a target folder.',
+   disabled:'This rule is disabled. Enable it first.',
+   bad_domain:'Enter a complete domain, for example fortnox.se.',
+   bad_rule:'Invalid rule.',
+   bad_id:'Invalid rule ID.',
+   bad_name:'Enter a rule name (up to 100 characters).',
+   choose_source:'Select a source folder or account.',
+   choose_target:'Select a target folder.',
+   same_folder:'Source and target cannot be the same folder.',
+   bad_match:'Choose how conditions should be combined.',
+   bad_conditions:'A rule requires 1–8 conditions.',
+   bad_field:'Invalid field.',
+   bad_operator:'Invalid operator for the selected field.',
+   bad_value:'Each condition needs a value up to 256 characters.',
+   too_many_rules:'Up to 200 rules are supported.',
+   duplicate_id:'The file contains duplicate rule IDs.',
+   rule_cycle:'These rules would create a move loop. Change source or target folder.',
+   unsafe_folder:'Choose a normal folder, not a special or virtual search folder.',
+   same_account:'Choose source and target in the same account in this version.',
+   read_only:'Target folder does not allow moving messages.',
+   bad_schema:'The rule file has an unknown or invalid format.',
+   no_selection:'Open a mail tab and select a message first.',
+   one_message:'Select exactly one message in the active mail tab.',
+   stale_config:'Rules were updated elsewhere. Reopen the saved rule before saving.',
+   paused:'Monitoring is paused or locked.',
+   unread:'The message is unread and this rule only moves read mail.',
+   already_read:'The message is already read and this rule only moves unread mail.',
+   no_match:'No active rule matches the selected message.',
+   operation_running:'A move is currently in progress. Wait for Thunderbird to finish.',
+   uncertain_move:'A move attempt returned an uncertain status. Click "Clear lock & resume" (or under Advanced) to resume monitoring.',
+   storage_error:'Settings could not be saved. Engine is stopped for this session.',
+   invalid_storage:'Stored settings could not be read. Monitoring is stopped.',
+   display_error:'Message display state could not be verified safely. Monitoring is stopped.',
+   move_error:'Folder or message could not be verified for moving. Check rule and folders.',
+   sweep_error:'Scanning existing messages failed. Verify that the rule\'s folders exist and are writable.',
+   queue_full:'Queue reached safety limit. Monitoring is stopped.',
+   internal_error:'A technical error occurred. Automatic retry is disabled.',
+   not_installed:'Open this page as an installed Thunderbird add-on.',
+   bad_request:'The action could not be completed.'
+  },
+  events:{
+   start:'Monitoring started',
+   debug:'Diagnostic',
+   catchup:'Existing messages scanned',
+   settings_saved:'Settings saved',
+   rules_saved:'Rules saved',
+   restored:'Pending jobs restored',
+   queued:'Message queued',
+   simulated:'Test completed – no move',
+   moved:'Move confirmed by Thunderbird',
+   skipped:'Message skipped',
+   error:'Technical error',
+   queue_full:'Queue full',
+   backup_restored:'Rule backup restored',
+   fallback:'Technical event'
+  }
+ }
+};
+
+const T=key=>I18N[currentLang]?.[key]??I18N.sv[key]??key;
+const Terr=code=>I18N[currentLang]?.errors?.[code]??I18N.sv.errors[code]??I18N[currentLang]?.errors?.internal_error;
+const Tevent=ev=>I18N[currentLang]?.events?.[ev]??I18N.sv.events[ev]??T('events').fallback;
+const locale=()=>currentLang==='en'?'en-GB':'sv-SE';
+
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function toast(text,error=false){const n=$('toast');n.textContent=text;n.style.background=error?'#8e3731':'';n.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>n.hidden=true,6500);}
-function alertError(err){toast(errors[err.code||err.message]||errors.internal_error,true);}
+function alertError(err){toast(Terr(err.code||err.message),true);}
 async function rpc(type,data={}){
  if(!live&&!DEMO)throw new C.RuleError('not_installed');
  const reply=DEMO?await LasDemo.request({type,...data}):await browser.runtime.sendMessage({type,...data});
  if(!reply?.success)throw new C.RuleError(reply?.error||'internal_error');return reply.data;
 }
-function handle(id,event,fn){$(id).addEventListener(event,async e=>{try{await fn(e);}catch(err){alertError(err);}});}
-const label=id=>folders.find(f=>f.id===id)?.label||'Mapp saknas – välj igen';
+function handle(id,event,fn){const n=$(id);if(n)n.addEventListener(event,async e=>{try{await fn(e);}catch(err){alertError(err);}});}
+const label=id=>folders.find(f=>f.id===id)?.label||T('missingFolder');
+
+function updateReadPolicy(){
+ const rf=$('ruleReadFilter')?.value||'default';
+ const ua=$('ruleUnreadAction')?.value||'default';
+ if($('ruleMoveUnread'))$('ruleMoveUnread').checked=(rf==='both'||rf==='unread'||(rf==='default'&&(state?.moveMode==='direct'||state?.newInboxDirect!==false)));
+ if($('ruleOpenWindow'))$('ruleOpenWindow').checked=(ua==='window'||(ua==='default'&&state?.openWindow!==false));
+ for(const pill of document.querySelectorAll('#rfPills .rf-pill')){
+  pill.classList.toggle('active',pill.dataset.rf===rf);
+ }
+ const map={
+  default:['policyDefaultTitle','policyDefaultBody'],
+  read:['policyReadTitle','policyReadBody'],
+  both:['policyBothTitle','policyBothBody'],
+  unread:['policyUnreadTitle','policyUnreadBody']
+ }[rf]||['policyDefaultTitle','policyDefaultBody'];
+ if($('readPolicyTitle'))$('readPolicyTitle').textContent=T(map[0]);
+ if($('readPolicyBody'))$('readPolicyBody').textContent=T(map[1]);
+}
+
+function applyLanguage(lang){
+ currentLang=lang==='en'?'en':'sv';
+ document.documentElement.lang=currentLang;
+ document.title=T('pageTitle');
+ for(const node of document.querySelectorAll('[data-i18n]')){
+  const key=node.dataset.i18n;
+  if(key)node.textContent=T(key);
+ }
+ if($('langSv'))$('langSv').classList.toggle('active',currentLang==='sv');
+ if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');
+ if($('lang'))$('lang').value=currentLang;
+ if($('themeQuick')){$('themeQuick').title=T('themeQuickTitle');$('themeQuick').setAttribute('aria-label',T('themeQuickTitle'));}
+ if($('ruleSearch'))$('ruleSearch').placeholder=T('ruleSearchPlaceholder');
+ if($('ruleName'))$('ruleName').placeholder=T('ruleNamePlaceholder');
+ const srcVal=$('source')?.value||'',trgVal=$('target')?.value||'';
+ if(folders.length){accountOptions(srcVal);targetOptions(trgVal);}
+ for(const row of $('conditions')?.children||[]){
+  const f=row.children[0],op=row.children[1],val=row.children[2];
+  const fVal=f.value,opVal=op.value;
+  for(const o of f.options){if(o.value==='domain')o.textContent=T('optDomain');if(o.value==='sender')o.textContent=T('optSender');if(o.value==='subject')o.textContent=T('optSubject');}
+  f.value=fVal;
+  for(const o of op.options){if(o.value==='equals')o.textContent=T('opEquals');if(o.value==='contains')o.textContent=T('opContains');if(o.value==='starts')o.textContent=T('opStarts');if(o.value==='ends')o.textContent=T('opEnds');}
+  op.value=opVal;val.placeholder=T('condPlaceholder');
+ }
+ for(const row of $('branches')?.children||[]){
+  const f=row.children[0],op=row.children[1],val=row.children[2],trg=row.children[3];
+  const fVal=f.value,opVal=op.value,tVal=trg.value;
+  for(const o of f.options){if(o.value==='domain')o.textContent=T('optDomain');if(o.value==='sender')o.textContent=T('optSender');if(o.value==='subject')o.textContent=T('optSubject');}
+  f.value=fVal;
+  for(const o of op.options){if(o.value==='equals')o.textContent=T('opEquals');if(o.value==='contains')o.textContent=T('opContains');if(o.value==='starts')o.textContent=T('opStarts');if(o.value==='ends')o.textContent=T('opEnds');}
+  op.value=opVal;val.placeholder=T('branchPlaceholder');
+  if(trg.options[0])trg.options[0].textContent=T('chooseTarget');
+  trg.value=tVal;
+ }
+ updateReadPolicy();
+ if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
+}
+
 function applyTheme(prefs){
  let theme=prefs.theme;if(theme==='system')theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
  document.documentElement.dataset.theme=theme;document.documentElement.style.setProperty('--base',(prefs.fontSize||14)+'px');
  $('theme').value=prefs.theme;$('fontSize').value=String(prefs.fontSize);
- if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=true;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;}
+ const nextLang=prefs.lang==='en'?'en':'sv';
+ if(nextLang!==currentLang||document.documentElement.lang!==nextLang)applyLanguage(nextLang);
+ else{
+  if($('lang'))$('lang').value=currentLang;
+  if($('langSv'))$('langSv').classList.toggle('active',currentLang==='sv');
+  if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');
+ }
+ if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;}
 }
 function currentToken(){return JSON.stringify(state.config.rules);}
 function renderStatus(next){
@@ -27,41 +726,104 @@ function renderStatus(next){
  const cfg=state.config,active=cfg.rules.filter(r=>r.enabled).length;
  $('navCount').textContent=cfg.rules.length;$('countRules').textContent=active;$('countQueue').textContent=state.queued;
  $('countMoved').textContent=state.stats.moved;$('countMatched').textContent=state.stats.matched;$('simulated').textContent=state.stats.simulated+' test';
- $('statusPill').textContent=state.fault?'STOPPAD':cfg.paused?'PAUSAD':cfg.dryRun?'TEST · FLYTTAR INGET':'AKTIV · FLYTTAR MEJL';
+ $('statusPill').textContent=state.fault?T('pillStopped'):cfg.paused?T('pillPaused'):cfg.dryRun?T('pillTest'):T('pillActive');
  $('statusPill').className='pill '+(state.fault?'red':cfg.dryRun||cfg.paused?'amber':'green');
- $('pause').textContent=cfg.paused?'Starta bevakning':'Pausa';$('mode').textContent=cfg.dryRun?'Slå på riktiga flyttar':'Byt till testläge';
+ $('pause').textContent=cfg.paused?T('pauseResume'):T('pauseBtn');$('mode').textContent=cfg.dryRun?T('modeEnable'):T('modeTest');
  const guide=$('runGuide'),rulesReady=active>0;
- let guideClass='',icon='✓',title='Riktiga flyttar är aktiva',text=rulesReady?'Nya matchande mejl bevakas. Kör kontroll nu för att även skanna befintliga mejl.':'Skapa och aktivera minst en regel för att börja.';
- if(state.fault){guideClass='fault';icon='!';title='Flyttmotorn är stoppad';text=(errors[state.fault]||errors.internal_error)+' Öppna Aktivitet och kontrollera den senaste raden.';}
- else if(cfg.paused){guideClass='paused';icon='Ⅱ';title='Bevakningen är pausad';text='Inga nya mejl köas eller flyttas. Klicka Starta bevakning när du vill fortsätta.';}
- else if(cfg.dryRun){guideClass='test';icon='T';title='Testläge – inga mejl flyttas';text=rulesReady?'Reglerna kan matcha och räknas som test, men mapparna ändras inte. Slå på riktiga flyttar när resultatet ser rätt ut.':'Skapa en regel. Testläget är säkert och flyttar ingenting.';}
+ let guideClass='',icon='✓',title=T('guideActiveTitle'),text=rulesReady?T('guideActiveReady'):T('guideActiveNoRules');
+ if(state.fault){guideClass='fault';icon='!';title=T('guideFaultTitle');text=Terr(state.fault)+T('guideFaultTail');}
+ else if(cfg.paused){guideClass='paused';icon='Ⅱ';title=T('guidePausedTitle');text=T('guidePausedBody');}
+ else if(cfg.dryRun){guideClass='test';icon='T';title=T('guideTestTitle');text=rulesReady?T('guideTestReady'):T('guideTestNoRules');}
  $('runIcon').textContent=icon;$('runTitle').textContent=title;$('runText').textContent=text;guide.className='run-guide '+guideClass;
  const setup=[cfg.rules.length>0,active>0,!cfg.dryRun&&!cfg.paused&&!state.fault];
  for(let i=0;i<3;i++){$('setup'+(i+1)).className='setup-step'+(setup[i]?' done':'')+(!setup[i]&&(i===0||setup[i-1])?' current':'');$('setup'+(i+1)).querySelector('b').textContent=setup[i]?'✓':String(i+1);}
- $('sweepNow').disabled=!!state.fault||cfg.paused||!rulesReady;$('sweepNow').textContent=state.queued?'Kontrollera kön nu':'Kör kontroll nu';
- $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?'STOPPAD: '+(errors[state.fault]||errors.internal_error)+' Inga fler automatiska försök görs innan problemet är åtgärdat.':'';
- $('lastCheck').textContent=state.lastCheck?'Senaste kontroll: '+new Date(state.lastCheck).toLocaleTimeString('sv-SE')+' · '+state.stats.checks+' mejl kontrollerade sedan start':'Bevakningen väntar på ett matchande mejl';
+ $('sweepNow').disabled=!!state.fault||cfg.paused||!rulesReady;$('sweepNow').textContent=state.queued?T('sweepQueueNow'):T('sweepRunNow');
+ if($('clearFault'))$('clearFault').hidden=!state.fault&&!state.blocked;
+ $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?T('noticeStoppedPrefix')+Terr(state.fault)+T('noticeStoppedSuffix'):'';
+ $('lastCheck').textContent=state.lastCheck?T('lastCheckPrefix')+new Date(state.lastCheck).toLocaleTimeString(locale())+' · '+state.stats.checks+T('lastCheckCountSuffix'):T('lastCheckWaiting');
  if(editToken===currentToken())editRevision=cfg.revision;
  renderRules();renderActivity();renderBackups();
+}
+function ruleTagText(rule){
+ if(!rule.enabled)return T('tagDisabled');
+ const scopeText=rule.scope==='account'?T('scopeAccount'):T('scopeFolder');
+ const rf=rule.readFilter||'default';
+ const modeText=rf==='read'?T('tagRead'):rf==='both'?T('tagBoth'):rf==='unread'?T('tagUnread'):T('tagDefault');
+ return scopeText+' · '+modeText;
 }
 function renderRules(){
  const list=$('ruleList');list.replaceChildren();const search=C.norm($('ruleSearch').value);
  const shown=state.config.rules.filter(r=>C.norm(r.name).includes(search));
- if(!shown.length){list.append(el('p','empty',state.config.rules.length?'Ingen regel matchar sökningen.':'Börja med en ny regel. Inga exempelregler aktiveras på dina mejl.'));return;}
+ if(!shown.length){list.append(el('p','empty',state.config.rules.length?T('emptyNoMatch'):T('emptyNoRules')));return;}
  for(const rule of shown){
   const row=el('div','rule-row'+(selectedId===rule.id?' selected':''));
-  const check=el('input');check.type='checkbox';check.checked=rule.enabled;check.setAttribute('aria-label','Aktivera '+rule.name);
+  const check=el('input');check.type='checkbox';check.checked=rule.enabled;check.setAttribute('aria-label',(currentLang==='en'?'Enable ':'Aktivera ')+rule.name);
   check.addEventListener('change',async()=>{try{
-   if(dirty&&!confirm('Lämna osparade ändringar i redigeraren?')){check.checked=!check.checked;return;}
+   if(dirty&&!confirm(T('confirmDiscardEditor'))){check.checked=!check.checked;return;}
    const rules=state.config.rules.map(r=>r.id===rule.id?{...r,enabled:check.checked}:r);
    const next=await rpc('saveRules',{rules,revision:state.config.revision});dirty=false;renderStatus(next);loadRule(rule.id);
   }catch(e){check.checked=!check.checked;alertError(e);}});
+  const main=el('div','rule-main');
   const btn=el('button','rule-open');btn.type='button';btn.append(el('strong','',rule.name));
-  const c=rule.conditions[0];btn.append(el('small','',({sender:'Från',domain:'Domän',subject:'Ämne'}[c.field])+' · '+c.value+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+' villkor':'')));
-  const f=folders.find(f=>f.id===rule.target);btn.append(el('small','','↳ '+(f?.label||'Mapp saknas')));
-  btn.append(el('span','rule-tag',rule.enabled?(rule.scope==='account'?'Hela kontot · efter läsning':'Vald mapp · efter läsning'):'Avstängd'));
-  btn.addEventListener('click',()=>{if(!dirty||confirm('Lämna osparade ändringar?'))loadRule(rule.id);});
-  row.append(check,btn);list.append(row);
+  const c=rule.conditions[0];btn.append(el('small','',({sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort')}[c.field])+' · '+c.value+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+T('moreConditionsSuffix'):'')));
+  const f=folders.find(f=>f.id===rule.target);btn.append(el('small','','↳ '+(f?.label||T('missingFolderShort'))));
+  btn.append(el('span','rule-tag',ruleTagText(rule)));
+  btn.addEventListener('click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule(rule.id);});
+  const opts=el('div','rule-inline-opts');
+  const moveUnreadLbl=el('label'),moveUnreadChk=el('input');moveUnreadChk.type='checkbox';
+  const rf=rule.readFilter||'default';
+  moveUnreadChk.checked=rf==='both'||rf==='unread'||(rf==='default'&&(state.moveMode==='direct'||state.newInboxDirect!==false));
+  moveUnreadLbl.append(moveUnreadChk,el('span','',T('inlineMoveUnread')));
+  const openWinLbl=el('label'),openWinChk=el('input');openWinChk.type='checkbox';
+  const ua=rule.unreadAction||'default';
+  openWinChk.checked=ua==='window'||(ua==='default'&&state.openWindow!==false);
+  openWinChk.disabled=!moveUnreadChk.checked;
+  openWinLbl.append(openWinChk,el('span','',T('inlineOpenWindow')));
+  moveUnreadChk.addEventListener('change',async e=>{
+   e.stopPropagation();
+   try{
+    const nextRf=moveUnreadChk.checked?'both':'read';
+    const rules=state.config.rules.map(r=>r.id===rule.id?{...r,readFilter:nextRf}:r);
+    const next=await rpc('saveRules',{rules,revision:state.config.revision});
+    dirty=false;renderStatus(next);if(selectedId===rule.id)loadRule(rule.id);
+    toast(T('toastRuleSaved'));
+   }catch(err){moveUnreadChk.checked=!moveUnreadChk.checked;alertError(err);}
+  });
+  openWinChk.addEventListener('change',async e=>{
+   e.stopPropagation();
+   try{
+    const nextUa=openWinChk.checked?'window':'keep';
+    const rules=state.config.rules.map(r=>r.id===rule.id?{...r,unreadAction:nextUa}:r);
+    const next=await rpc('saveRules',{rules,revision:state.config.revision});
+    dirty=false;renderStatus(next);if(selectedId===rule.id)loadRule(rule.id);
+    toast(T('toastRuleSaved'));
+   }catch(err){openWinChk.checked=!openWinChk.checked;alertError(err);}
+  });
+  opts.append(moveUnreadLbl,openWinLbl);
+  main.append(btn,opts);
+  const quick=el('div','rule-quick');
+  const runBtn=el('button','rule-mini-btn','▶');runBtn.type='button';runBtn.title=T('runRuleNowTitle');runBtn.disabled=!rule.enabled||!!state.fault||state.config.paused;
+  runBtn.addEventListener('click',async e=>{
+   e.stopPropagation();
+   try{
+    const r=await rpc('catchUp',{ruleId:rule.id});renderStatus(await rpc('status'));
+    toast(currentLang==='en'?'Rule "'+rule.name+'": scanned '+r.scanned+', queued '+r.queued+'.':'Regel "'+rule.name+'": skannade '+r.scanned+', köade '+r.queued+'.');
+   }catch(err){alertError(err);}
+  });
+  const dupBtn=el('button','rule-mini-btn','⧉');dupBtn.type='button';dupBtn.title=T('dupRuleTitle');
+  dupBtn.addEventListener('click',e=>{
+   e.stopPropagation();
+   if(dirty&&!confirm(T('confirmDiscard')))return;
+   loadRule(rule.id);
+   selectedId='';
+   $('editorTitle').textContent=T('editorNew');
+   $('ruleName').value=(rule.name+T('copySuffix')).slice(0,100);
+   $('delete').disabled=true;$('up').disabled=true;$('down').disabled=true;
+   dirty=true;renderRules();$('ruleName').focus();
+   toast(T('toastDuplicated'));
+  });
+  quick.append(runBtn,dupBtn);
+  row.append(check,main,quick);list.append(row);
  }
 }
 function selectOptions(select,items,placeholder,value=''){
@@ -69,55 +831,61 @@ function selectOptions(select,items,placeholder,value=''){
  for(const f of items){const o=el('option','',f.label);o.value=f.id;select.append(o);}select.value=value;
 }
 function accounts(){const seen=new Set();return folders.filter(f=>{if(!f.accountId||seen.has(f.accountId))return false;seen.add(f.accountId);return true;}).map(f=>({id:f.accountId,label:f.accountName||f.accountId}));}
-function accountOptions(value=''){selectOptions($('source'),accounts(),'Välj ett konto…',value);}
+function accountOptions(value=''){selectOptions($('source'),accounts(),T('chooseAccount'),value);}
 function targetOptions(value=''){
- // Mål kan ligga i samma eller ett annat konto (t.ex. IMAP → Lokala mappar).
- selectOptions($('target'),folders,'Välj en målmapp…',value);
+ selectOptions($('target'),folders,T('chooseTarget'),value);
 }
 function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},target:''}){
- if($('branches').children.length>=8){toast('Högst åtta fördelningar per regel.');return;}
+ if($('branches').children.length>=8){toast(T('maxBranches'));return;}
  const row=el('div','branch-row'),field=el('select'),op=el('select'),value=el('input'),target=el('select'),remove=el('button','remove-condition','×');
- field.setAttribute('aria-label','Fördelningsfält');op.setAttribute('aria-label','Fördelningsjämförelse');value.setAttribute('aria-label','Fördelningsvärde');value.maxLength=256;value.required=true;value.placeholder='Exempel: Faktura';target.setAttribute('aria-label','Fördelningsmålmapp');remove.type='button';remove.title='Ta bort fördelning';remove.setAttribute('aria-label','Ta bort fördelning');
- for(const [v,t] of [['subject','Ämne'],['sender','Från (adress)'],['domain','Avsändardomän']]){const x=el('option','',t);x.value=v;field.append(x);}field.value=b.condition.field;
- function operators(val){op.replaceChildren();for(const [v,t] of [['contains','innehåller'],['equals','är exakt'],['starts','börjar med'],['ends','slutar med']]){if(field.value==='domain'&&v!=='equals')continue;const x=el('option','',t);x.value=v;op.append(x);}op.value=[...op.options].some(o=>o.value===val)?val:'contains';}
+ field.setAttribute('aria-label','Fördelningsfält');op.setAttribute('aria-label','Fördelningsjämförelse');value.setAttribute('aria-label','Fördelningsvärde');value.maxLength=256;value.required=true;value.placeholder=T('branchPlaceholder');target.setAttribute('aria-label','Fördelningsmålmapp');remove.type='button';remove.title='Ta bort fördelning';remove.setAttribute('aria-label','Ta bort fördelning');
+ for(const [v,t] of [['subject',T('optSubject')],['sender',T('optSender')],['domain',T('optDomain')]]){const x=el('option','',t);x.value=v;field.append(x);}field.value=b.condition.field;
+ function operators(val){op.replaceChildren();for(const [v,t] of [['contains',T('opContains')],['equals',T('opEquals')],['starts',T('opStarts')],['ends',T('opEnds')]]){if(field.value==='domain'&&v!=='equals')continue;const x=el('option','',t);x.value=v;op.append(x);}op.value=[...op.options].some(o=>o.value===val)?val:'contains';}
  operators(b.condition.op);value.value=b.condition.value;
- selectOptions(target,folders,'Välj målmapp…',b.target);
+ selectOptions(target,folders,T('chooseTarget'),b.target);
  field.addEventListener('change',()=>{operators(op.value);dirty=true;});remove.addEventListener('click',()=>{row.remove();dirty=true;});
  row.append(field,op,value,target,remove);$('branches').append(row);
 }
 function addCondition(c={field:'domain',op:'equals',value:''}){
- if($('conditions').children.length>=8){toast('Högst åtta villkor per regel.');return;}
+ if($('conditions').children.length>=8){toast(T('maxConditions'));return;}
  const row=el('div','condition-row'),field=el('select'),op=el('select'),value=el('input'),remove=el('button','remove-condition','×');
- field.setAttribute('aria-label','Villkorsfält');op.setAttribute('aria-label','Jämförelse');value.setAttribute('aria-label','Villkorsvärde');value.maxLength=256;value.required=true;value.placeholder='Exempel: fortnox.se';remove.type='button';remove.title='Ta bort villkor';remove.setAttribute('aria-label','Ta bort villkor');
- for(const [v,t] of [['domain','Avsändardomän'],['sender','Från (adress)'],['subject','Ämne']]){const x=el('option','',t);x.value=v;field.append(x);}field.value=c.field;
- function operators(val){op.replaceChildren();for(const [v,t] of [['equals','är exakt'],['contains','innehåller'],['starts','börjar med'],['ends','slutar med']]){if(field.value==='domain'&&v!=='equals')continue;const x=el('option','',t);x.value=v;op.append(x);}op.value=[...op.options].some(o=>o.value===val)?val:'equals';}
+ field.setAttribute('aria-label','Villkorsfält');op.setAttribute('aria-label','Jämförelse');value.setAttribute('aria-label','Villkorsvärde');value.maxLength=256;value.required=true;value.placeholder=T('condPlaceholder');remove.type='button';remove.title='Ta bort villkor';remove.setAttribute('aria-label','Ta bort villkor');
+ for(const [v,t] of [['domain',T('optDomain')],['sender',T('optSender')],['subject',T('optSubject')]]){const x=el('option','',t);x.value=v;field.append(x);}field.value=c.field;
+ function operators(val){op.replaceChildren();for(const [v,t] of [['equals',T('opEquals')],['contains',T('opContains')],['starts',T('opStarts')],['ends',T('opEnds')]]){if(field.value==='domain'&&v!=='equals')continue;const x=el('option','',t);x.value=v;op.append(x);}op.value=[...op.options].some(o=>o.value===val)?val:'equals';}
  operators(c.op);value.value=c.value;
- field.addEventListener('change',()=>{operators(op.value);dirty=true;});remove.addEventListener('click',()=>{if($('conditions').children.length===1){toast('Behåll minst ett villkor.');return;}row.remove();dirty=true;});
+ field.addEventListener('change',()=>{operators(op.value);dirty=true;});remove.addEventListener('click',()=>{if($('conditions').children.length===1){toast(T('minConditions'));return;}row.remove();dirty=true;});
  row.append(field,op,value,remove);$('conditions').append(row);
 }
-function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,
+function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.children[3].value}))});}
-function loadRule(id=''){
+function loadRule(id='',presetAccount=''){
  const rule=state.config.rules.find(r=>r.id===id);selectedId=rule?.id||'';
- $('editorTitle').textContent=rule?'Redigera regel':'Ny regel';$('ruleName').value=rule?.name||'';$('enabled').checked=rule?.enabled??true;
- $('match').value=rule?.match||'all';const ruleAccount=rule?.sourceAccount||folders.find(f=>f.id===rule?.source)?.accountId||'';accountOptions(ruleAccount);targetOptions(rule?.target||'');
+ $('editorTitle').textContent=rule?T('editorEdit'):T('editorNew');$('ruleName').value=rule?.name||'';$('enabled').checked=rule?.enabled??true;
+ $('match').value=rule?.match||'all';
+ if($('ruleReadFilter'))$('ruleReadFilter').value=rule?.readFilter||'default';
+ if($('ruleUnreadAction'))$('ruleUnreadAction').value=rule?.unreadAction||'default';
+ updateReadPolicy();
+ const ruleAccount=rule?(rule.sourceAccount||folders.find(f=>f.id===rule.source)?.accountId||''):(presetAccount||accounts()[0]?.id||'');
+ accountOptions(ruleAccount);targetOptions(rule?.target||'');
  $('conditions').replaceChildren();for(const c of rule?.conditions||[{field:'domain',op:'equals',value:''}])addCondition(c);
  $('branches').replaceChildren();for(const b of rule?.branches||[])addBranchRow(b);
- $('testResult').hidden=true;$('delete').disabled=!rule;const i=state.config.rules.findIndex(r=>r.id===selectedId);$('up').disabled=i<=0;$('down').disabled=i<0||i>=state.config.rules.length-1;
+ $('testResult').hidden=true;$('delete').disabled=!rule;
+ if($('duplicate'))$('duplicate').disabled=!rule&&!$('ruleName').value.trim();
+ const i=state.config.rules.findIndex(r=>r.id===selectedId);$('up').disabled=i<=0;$('down').disabled=i<0||i>=state.config.rules.length-1;
  dirty=false;editRevision=state.config.revision;editToken=currentToken();renderRules();
  rpc('prefs',{prefs:{lastRule:selectedId}}).catch(()=>{});
 }
 function renderActivity(){
  $('logRows').replaceChildren();for(const log of [...state.logs].reverse()){
-  const tr=el('tr');for(const text of [new Date(log.time).toLocaleString('sv-SE'),(eventNames[log.event]||'Teknisk händelse')+(log.data.detail?' – '+log.data.detail:''),log.level,log.data.count])tr.append(el('td','',text));$('logRows').append(tr);
+  const tr=el('tr');for(const text of [new Date(log.time).toLocaleString(locale()),Tevent(log.event)+(log.data.detail?' – '+log.data.detail:''),log.level,log.data.count])tr.append(el('td','',text));$('logRows').append(tr);
  }
- if(!state.logs.length){const tr=el('tr'),td=el('td','','Inga händelser ännu.');td.colSpan=4;tr.append(td);$('logRows').append(tr);}
+ if(!state.logs.length){const tr=el('tr'),td=el('td','',T('noLogsYet'));td.colSpan=4;tr.append(td);$('logRows').append(tr);}
 }
 function renderBackups(){
- $('backupList').replaceChildren();for(const b of state.backups){const row=el('div','backup');row.append(el('span','',new Date(b.time).toLocaleString('sv-SE')+' · '+b.count+' regler'));const btn=el('button','text-button','Återställ');btn.addEventListener('click',async()=>{if(!confirm('Återställ denna regelversion? Nuvarande regler säkerhetskopieras. Bevakningen blir pausad i testläge.'))return;try{const s=await rpc('restoreBackup',{index:b.index,revision:state.config.revision});dirty=false;renderStatus(s);loadRule();toast('Regelversion återställd. Testa innan du aktiverar.');}catch(e){alertError(e);}});row.append(btn);$('backupList').append(row);}
- if(!state.backups.length)$('backupList').append(el('p','muted','En kopia skapas när du sparar din första regeländring.'));
- $('blockedInfo').textContent=state.blocked?state.blocked+' spärrade/osäkra försök. Kontrollera mapparna i Thunderbird innan spärrarna rensas.':'Inga osäkra flyttförsök.';
+ $('backupList').replaceChildren();for(const b of state.backups){const row=el('div','backup');row.append(el('span','',new Date(b.time).toLocaleString(locale())+' · '+b.count+T('rulesCountSuffix')));const btn=el('button','text-button',T('restoreBtn'));btn.addEventListener('click',async()=>{if(!confirm(T('confirmRestore')))return;try{const s=await rpc('restoreBackup',{index:b.index,revision:state.config.revision});dirty=false;renderStatus(s);loadRule();toast(T('toastRestored'));}catch(e){alertError(e);}});row.append(btn);$('backupList').append(row);}
+ if(!state.backups.length)$('backupList').append(el('p','muted',T('backupHint')));
+ $('blockedInfo').textContent=state.blocked?state.blocked+T('blockedSome'):T('blockedNone');
  $('clearBlocked').disabled=!state.blocked||!!state.inflight;
 }
 async function download(data,filename){
@@ -127,78 +895,145 @@ async function download(data,filename){
 }
 function showView(view){activeView=view;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));}
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
-$('ruleForm').addEventListener('input',()=>dirty=true);$('ruleForm').addEventListener('change',()=>dirty=true);
-handle('newRule','click',()=>{if(!dirty||confirm('Lämna osparade ändringar?'))loadRule();});
+for(const pill of document.querySelectorAll('#rfPills .rf-pill')){
+ pill.addEventListener('click',()=>{
+  if($('ruleReadFilter')){$('ruleReadFilter').value=pill.dataset.rf;dirty=true;updateReadPolicy();}
+ });
+}
+$('ruleForm').addEventListener('input',()=>{dirty=true;if($('duplicate'))$('duplicate').disabled=false;});
+$('ruleForm').addEventListener('change',e=>{
+ dirty=true;if($('duplicate'))$('duplicate').disabled=false;
+ if(e.target?.id!=='ruleMoveUnread'&&e.target?.id!=='ruleOpenWindow')updateReadPolicy();
+});
+handle('newRule','click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule('',$('source').value);});
 handle('ruleSearch','input',renderRules);
 handle('source','change',()=>{dirty=true;});
+handle('ruleMoveUnread','change',()=>{
+ if($('ruleReadFilter'))$('ruleReadFilter').value=$('ruleMoveUnread').checked?'both':'read';
+ dirty=true;updateReadPolicy();
+});
+handle('ruleOpenWindow','change',()=>{
+ if($('ruleUnreadAction'))$('ruleUnreadAction').value=$('ruleOpenWindow').checked?'window':'keep';
+ dirty=true;updateReadPolicy();
+});
+handle('ruleReadFilter','change',()=>{dirty=true;updateReadPolicy();});
+handle('ruleUnreadAction','change',()=>{dirty=true;updateReadPolicy();});
 handle('addCondition','click',()=>{addCondition({field:'subject',op:'contains',value:''});dirty=true;});
 handle('addBranch','click',()=>{addBranchRow();dirty=true;});
-handle('ruleForm','submit',async e=>{
- e.preventDefault();const rule=draft();$('save').disabled=true;
- try{const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===rule.id);if(i<0)rules.push(rule);else rules[i]=rule;
- const next=await rpc('saveRules',{rules,revision:editRevision});dirty=false;renderStatus(next);loadRule(rule.id);toast('Regeln sparad. Testa den på ett markerat mejl.');}
- finally{$('save').disabled=false;}
+
+async function saveCurrentRule({openNewAfter=false}={}){
+ const rule=draft();
+ const keptAccount=$('source').value;
+ $('save').disabled=true;if($('saveAndNew'))$('saveAndNew').disabled=true;
+ try{
+  const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===rule.id);
+  if(i<0)rules.push(rule);else rules[i]=rule;
+  const next=await rpc('saveRules',{rules,revision:editRevision});
+  dirty=false;renderStatus(next);
+  if(openNewAfter){
+   loadRule('',keptAccount);
+   $('ruleName').focus();
+   toast(T('toastSavedAndNew'));
+  }else{
+   loadRule(rule.id);
+   toast(T('toastRuleSaved'));
+  }
+ }finally{
+  $('save').disabled=false;if($('saveAndNew'))$('saveAndNew').disabled=false;
+ }
+}
+
+handle('ruleForm','submit',async e=>{e.preventDefault();await saveCurrentRule({openNewAfter:false});});
+handle('saveAndNew','click',async()=>{await saveCurrentRule({openNewAfter:true});});
+handle('duplicate','click',()=>{
+ selectedId='';
+ $('editorTitle').textContent=T('editorNew');
+ const baseName=$('ruleName').value.trim();
+ $('ruleName').value=(baseName?baseName+T('copySuffix'):'').slice(0,100);
+ $('delete').disabled=true;$('up').disabled=true;$('down').disabled=true;
+ dirty=true;renderRules();$('ruleName').focus();
+ toast(T('toastDuplicated'));
 });
+
 handle('fromSelected','click',async()=>{
  const m=await rpc('selected');if(!folders.some(f=>f.accountId===m.sourceAccount))throw new C.RuleError('unsafe_folder');
  $('source').value=m.sourceAccount;targetOptions($('target').value);
  const row=$('conditions').children[0],field=row.children[0].value;
  row.children[2].value=field==='domain'?m.domain:field==='sender'?m.email:m.subject.slice(0,256);
- if(!$('ruleName').value)$('ruleName').value=('Mejl från '+(m.domain||'avsändaren')).slice(0,100);
- dirty=true;$('target').focus();toast('Klart! Exempelmejlet är hämtat. Välj nu målmappen och tryck Spara.');
+ if(!$('ruleName').value)$('ruleName').value=(T('defaultRulePrefix')+(m.domain||T('defaultSenderFallback'))).slice(0,100);
+ dirty=true;$('target').focus();toast(T('toastFromSelected'));
 });
 handle('test','click',async()=>{
  const result=await rpc('testRule',{rule:draft()});
- const reasons={no_match:'Villkoren matchar inte det markerade mejlet.',disabled:'Villkoren matchar, men regeln är avstängd.',unread:'Villkoren matchar, men mejlet är oläst. Ingen flytt får ske.',displayed:'Villkoren matchar. Mejlet är läst men fortfarande öppet i en mejlflik eller ett fönster.',eligible:'Villkoren matchar. Mejlet är läst och visas inte längre.'};
- $('testResult').textContent='TEST · '+reasons[result.reason]+' Testet flyttar ingenting. '+(result.matches?'Mål: '+label(result.target)+'. ':'')+'Testet gäller bara regeln i redigeraren och bortser från vilken mapp mejlet ligger i.'+(result.outsideSource?' Mejlet ligger just nu utanför källmappen: bevakningen flyttar nya mejl som kommer till källmappen, och "Sortera befintliga lästa" flyttar redan befintliga mejl oavsett mapp.':'');$('testResult').hidden=false;
+ const reasons={no_match:T('testReasonNoMatch'),disabled:T('testReasonDisabled'),unread:T('testReasonUnread'),already_read:T('testReasonAlreadyRead'),displayed:T('testReasonDisplayed'),eligible:T('testReasonEligible')};
+ $('testResult').textContent='TEST · '+(reasons[result.reason]||reasons.no_match)+T('testNoMove')+(result.matches?T('testTargetPrefix')+label(result.target)+'. ':'')+T('testTail')+(result.outsideSource?T('testOutside'):'');$('testResult').hidden=false;
 });
-handle('delete','click',async()=>{if(!selectedId||!confirm('Ta bort regeln? En regelkopia sparas. Inga mejl tas bort.'))return;const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==selectedId),revision:editRevision});dirty=false;renderStatus(next);loadRule();});
+handle('delete','click',async()=>{if(!selectedId||!confirm(T('confirmDelete')))return;const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==selectedId),revision:editRevision});dirty=false;renderStatus(next);loadRule();});
 for(const [id,step] of [['up',-1],['down',1]])handle(id,'click',async()=>{
- if(dirty){toast('Spara regeln innan du ändrar prioritet.');return;}const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===selectedId),j=i+step;if(i<0||j<0||j>=rules.length)return;
+ if(dirty){toast(T('saveBeforePriority'));return;}const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===selectedId),j=i+step;if(i<0||j<0||j>=rules.length)return;
  [rules[i],rules[j]]=[rules[j],rules[i]];renderStatus(await rpc('saveRules',{rules,revision:editRevision}));loadRule(selectedId);
 });
 handle('pause','click',async()=>{renderStatus(await rpc('setMode',{revision:state.config.revision,paused:!state.config.paused,dryRun:state.config.dryRun}));});
 handle('mode','click',async()=>{
  const becomingLive=state.config.dryRun;
- if(becomingLive&&!confirm('Aktivera riktiga mejlflyttar enligt dina aktiva regler?\n\nBörja med en provmapp och granska Testa-resultaten. Väntande testjobb rensas. Befintliga olästa mejl flyttas inte.'))return;
- renderStatus(await rpc('setMode',{revision:state.config.revision,paused:false,dryRun:!becomingLive}));toast(becomingLive?'Flyttläge aktiverat för nya läsmarkeringar.':'Testläge aktiverat. Inga nya flyttar startas.');
+ if(becomingLive&&!confirm(T('confirmEnableLive')))return;
+ renderStatus(await rpc('setMode',{revision:state.config.revision,paused:false,dryRun:!becomingLive}));toast(becomingLive?T('toastLiveOn'):T('toastTestOn'));
 });
-handle('queueSelected','click',async()=>{const r=await rpc('queueSelected');toast(r.queued?'Mejlet väntar nu på att lämnas i alla mejlflikar.':'Redan hanterat eller köat i denna session.');});
+handle('queueSelected','click',async()=>{const r=await rpc('queueSelected');toast(r.queued?T('toastQueued'):T('toastAlreadyQueued'));});
 handle('showActivity','click',()=>showView('activity'));
 handle('sweepNow','click',async()=>{
- $('sweepNow').disabled=true;$('sweepNow').textContent='Kontrollerar…';
+ $('sweepNow').disabled=true;$('sweepNow').textContent=T('sweepChecking');
  try{
   const r=await rpc('sweepNow');renderStatus(await rpc('status'));
-  const mode=state.config.dryRun?' Testläge: inga mejl flyttas.':' Matchande mejl flyttas när de inte längre visas.';
-  toast('Kontrollen är klar: '+r.scanned+' mejl granskade i '+(r.searchedFolders??'kontots')+' mappar, '+r.queued+' matchade och köade.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep eftersom flyttkön tar 500 åt gången.':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+mode);
+  if(currentLang==='en'){
+   const mode=state.config.dryRun?' Test mode: no emails moved.':' Matching emails will move according to your rules.';
+   toast('Scan complete: '+r.scanned+' emails checked in '+(r.searchedFolders??'account')+' folders, '+r.queued+' matched and queued.'+(r.deferred?' '+r.deferred+' deferred to next batch (500 max).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+mode);
+  }else{
+   const mode=state.config.dryRun?' Testläge: inga mejl flyttas.':' Matchande mejl flyttas enligt dina regler.';
+   toast('Kontrollen är klar: '+r.scanned+' mejl granskade i '+(r.searchedFolders??'kontots')+' mappar, '+r.queued+' matchade och köade.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep eftersom flyttkön tar 500 åt gången.':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+mode);
+  }
  }finally{if(state)$('sweepNow').disabled=!!state.fault||state.config.paused||!state.config.rules.some(r=>r.enabled);}
 });
 handle('catchUp','click',async()=>{
- if(dirty){toast('Spara regeln först.');return;}
- if(!selectedId){toast('Öppna eller skapa en regel först.');return;}
- if(!confirm('Skanna kontots mappar, inklusive undermappar men utan regelns målmappar, efter befintliga lästa mejl som matchar den sparade regeln?\n\nOlästa mejl röras inte. I testläge räknas träffar som prov utan flytt.'))return;
+ if(dirty){toast(T('saveFirst'));return;}
+ if(!selectedId){toast(T('openRuleFirst'));return;}
+ if(!confirm(T('confirmCatchUp')))return;
  const r=await rpc('catchUp',{ruleId:selectedId});renderStatus(await rpc('status'));
- toast('Skannade '+r.scanned+' meddelanden i '+(r.searchedFolders??'kontots')+' mappar, köade '+r.queued+'.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep (500 per batch).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+(state.config.dryRun?' Testläge: inga flyttar utfördes.':''));
+ if(currentLang==='en'){
+  toast('Scanned '+r.scanned+' messages in '+(r.searchedFolders??'account')+' folders, queued '+r.queued+'.'+(r.deferred?' '+r.deferred+' deferred to next batch (500 max).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+(state.config.dryRun?' Test mode: no moves executed.':''));
+ }else{
+  toast('Skannade '+r.scanned+' meddelanden i '+(r.searchedFolders??'kontots')+' mappar, köade '+r.queued+'.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep (500 per batch).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+(state.config.dryRun?' Testläge: inga flyttar utfördes.':''));
+ }
 });
 handle('export','click',async()=>download(await rpc('export'),'lasfilter-regler-'+new Date().toISOString().slice(0,10)+'.json'));
 handle('exportLog','click',async()=>download(await rpc('exportLog'),'lasfilter-tekniklogg-'+new Date().toISOString().slice(0,10)+'.json'));
 handle('import','change',async()=>{
  try{const file=$('import').files[0];if(!file)return;if(file.size>1048576)throw new C.RuleError('bad_schema');let data;try{data=JSON.parse(await file.text());}catch{throw new C.RuleError('bad_schema');}
- if(!confirm('Ersätt reglerna med denna fil? Nuvarande regler kopieras. Efter import blir bevakningen pausad i testläge.'))return;
- const next=await rpc('import',{backup:data,revision:state.config.revision});dirty=false;renderStatus(next);loadRule();toast('Regler importerade. Granska mappar och villkor.');}finally{$('import').value='';}
+ if(!confirm(T('confirmImport')))return;
+ const next=await rpc('import',{backup:data,revision:state.config.revision});dirty=false;renderStatus(next);loadRule();toast(T('toastImported'));}finally{$('import').value='';}
 });
-handle('clearBlocked','click',async()=>{if(!confirm('Har du kontrollerat de berörda mapparna?\n\nSpärrarna rensas utan ångring eller omförsök. Bevakningen blir pausad.'))return;renderStatus(await rpc('clearBlocked'));});
+handle('clearBlocked','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
+if($('clearFault'))handle('clearFault','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
 handle('theme','change',async()=>{state.prefs=await rpc('prefs',{prefs:{theme:$('theme').value}});applyTheme(state.prefs);});
 handle('fontSize','change',async()=>{state.prefs=await rpc('prefs',{prefs:{fontSize:Number($('fontSize').value)}});applyTheme(state.prefs);});
 handle('themeQuick','click',async()=>{state.prefs=await rpc('prefs',{prefs:{theme:document.documentElement.dataset.theme==='dark'?'light':'dark'}});applyTheme(state.prefs);});
-handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:true,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));toast($('moveMode').value==='direct'?'Direktläge: nya matchande mejl flyttas även olästa och öppnas i eget fönster.':'Nya mejl flyttas när de är lästa och lämnade.');});
-for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:true,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));if(id==='verbose')toast($('verbose').checked?'Detaljlogg på: händelser syns under Aktivitet och i exporten.':'Detaljlogg av.');if(id==='fileLog')toast($('fileLog').checked?'Loggfil på: Hämtade filer/Lasfilter/lasfilter-logg.txt uppdateras automatiskt.':'Automatisk loggfil av.');if(id==='sweepMinutes')toast('Kontosvep körs var '+$('sweepMinutes').value+':e minut.');if(id==='newInboxDirect')toast($('newInboxDirect').checked?'Nya matchande mejl i Inkorgen flyttas direkt.':'Direktflytt av nyinkomna mejl är avstängd.');});
-handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();toast('Konton och mappar uppdaterade.');});
+async function switchLanguage(nextLang){
+ state.prefs=await rpc('prefs',{prefs:{lang:nextLang}});
+ applyLanguage(nextLang);
+ renderStatus(state);
+ toast(T('toastLangChanged'));
+}
+handle('langSv','click',async()=>switchLanguage('sv'));
+handle('langEn','click',async()=>switchLanguage('en'));
+handle('lang','change',async()=>switchLanguage($('lang').value));
+handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
+for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));});
+handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();toast(T('toastFoldersRefreshed'));});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(state)applyTheme(state.prefs);});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 async function refresh(){try{renderStatus(await rpc('status'));}catch(e){alertError(e);}}
 if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{if(msg?.event==='statusChanged')refresh();});
 (async()=>{
  try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');}
- catch(e){$('statusPill').textContent='Inte ansluten';$('notice').hidden=false;$('notice').textContent=errors[e.code]||errors.internal_error;$('notice').className='notice error';}
+ catch(e){$('statusPill').textContent=T('pillDisconnected');$('notice').hidden=false;$('notice').textContent=Terr(e.code);$('notice').className='notice error';}
 })();

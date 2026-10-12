@@ -114,3 +114,100 @@ test('old config enables automatic text log on migration',()=>{const raw=C.defau
 test('error diagnostics survive log cleaning',()=>{const e=C.event('error',0,Date.now(),'motor_stoppad code=sweep_error');assert.equal(C.cleanLogs([e])[0].data.detail,'motor_stoppad code=sweep_error');});
 test('sweep interval accepts 15 minute steps',()=>{assert.equal(C.config({...C.defaults(),sweepMinutes:15}).sweepMinutes,15);assert.throws(()=>C.config({...C.defaults(),sweepMinutes:20}));});
 test('new unread inbox mail moves directly even in read mode',async()=>{const f=fixture();const incoming={...msg(5),read:false};f.messages.clear();f.messages.set(5,incoming);assert.equal(await f.e.newInboxMessages([incoming]),1);await f.e.tick();assert.equal(f.e.stats.moved,1);});
+test('onMoved confirms move when Thunderbird recalculates message size in target folder',async()=>{
+ const f=fixture();
+ f.api.messages.move=async(ids,target)=>{
+  const old=structuredClone(f.messages.get(ids[0])),m={...old,id:ids[0]+1000,size:old.size+47,folder:{id:target,accountId:'a'}};
+  f.messages.delete(ids[0]);f.messages.set(m.id,m);
+  await f.e.onMoved({messages:[old]},{messages:[m]});
+ };
+ await f.ready();
+ assert.equal(f.e.stats.moved,1);assert.equal(f.e.fault,'');assert.equal(f.e.blocked(),0);
+});
+test('IMAP move without onMoved event is confirmed via folder verification',async()=>{
+ const f=fixture();
+ f.api.messages.move=async(ids,target)=>{
+  const old=structuredClone(f.messages.get(ids[0])),m={...old,id:ids[0]+1000,size:old.size+12,folder:{id:target,accountId:'a'}};
+  f.messages.delete(ids[0]);f.messages.set(m.id,m);
+ };
+ await f.ready();
+ assert.equal(f.e.stats.moved,1);assert.equal(f.e.fault,'');assert.equal(f.e.blocked(),0);
+});
+test('restore automatically clears attempted record when message is already in target',async()=>{
+ const f=fixture({noAck:true});await f.ready();assert.equal(f.e.blocked(),1);
+ const g=fixture();
+ const old=g.messages.get(1);g.messages.delete(1);g.messages.set(1001,{...old,id:1001,size:old.size+32,folder:{id:'archive',accountId:'a'}});
+ await g.e.restore(f.e.recordList());
+ assert.equal(g.e.blocked(),0);assert.equal(g.e.fault,'');
+});
+test('sweepAll picks up unread matching mail in real inbox when newInboxDirect is enabled',async()=>{
+ const f=fixture();
+ f.api.accounts.list=async()=>[{id:'a',rootFolder:{id:'root',accountId:'a',isRoot:true,subFolders:[{id:'inbox',accountId:'a',name:'Inkorg',specialUse:['inbox']},{id:'archive',accountId:'a',name:'Arkiv',specialUse:[]}]}}];
+ f.messages.clear();f.messages.set(9117,{...msg(9117),read:false});
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);await f.e.tick();assert.equal(f.e.stats.moved,1);
+});
+test('vanished message in queue is dropped without stopping engine',async()=>{
+ const f=fixture();await f.e.enqueue(msg(1));await f.e.tick();
+ f.messages.delete(1);f.advance();await f.e.tick();
+ assert.equal(f.e.fault,'');assert.equal(f.e.pending.size,0);
+});
+test('rule readFilter supports read, unread, both and default',()=>{
+ for(const rf of ['default','read','unread','both'])assert.equal(C.validateRule({...base(),readFilter:rf}).readFilter,rf);
+ assert.throws(()=>C.validateRule({...base(),readFilter:'invalid'}));
+});
+test('rule with readFilter=both moves both unread and read mail immediately',async()=>{
+ const f=fixture();f.e.config.rules=C.validateRules([{...base(),id:'r-both',readFilter:'both'}]);
+ const unreadMsg={...msg(10),read:false};
+ const readMsg={...msg(11),read:true};
+ f.messages.clear();f.messages.set(10,unreadMsg);f.messages.set(11,readMsg);
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,2);
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,2);
+});
+test('rule with readFilter=unread moves only unread mail and skips read mail',async()=>{
+ const f=fixture();f.e.config.newInboxDirect=false;f.e.config.rules=C.validateRules([{...base(),id:'r-unread',readFilter:'unread'}]);
+ const unreadMsg={...msg(20),read:false};
+ const readMsg={...msg(21),read:true};
+ f.messages.clear();f.messages.set(20,unreadMsg);f.messages.set(21,readMsg);
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.messages.get(21)?.folder.id,'inbox');
+});
+test('rule with readFilter=read skips unread mail even when newInboxDirect is enabled',async()=>{
+ const f=fixture();f.e.config.newInboxDirect=true;f.e.config.rules=C.validateRules([{...base(),id:'r-read',readFilter:'read'}]);
+ const unreadMsg={...msg(30),read:false};
+ f.messages.clear();f.messages.set(30,unreadMsg);
+ assert.equal(await f.e.newInboxMessages([unreadMsg]),0);
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,0);
+ f.messages.set(30,{...unreadMsg,read:true});
+ await f.e.readChanged(f.messages.get(30),{read:true},{read:false});
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+});
+test('multiple rules with different readFilter settings route unread and read mail to separate folders',async()=>{
+ const f=fixture();
+ f.e.config.newInboxDirect=false;
+ f.e.config.rules=C.validateRules([
+  {...base(),id:'r1',name:'Olästa fakturor',target:'brt',readFilter:'unread'},
+  {...base(),id:'r2',name:'Lästa fakturor',target:'archive',readFilter:'read'}
+ ]);
+ const mUnread={...msg(40),read:false};
+ const mRead={...msg(41),read:true};
+ f.messages.clear();f.messages.set(40,mUnread);f.messages.set(41,mRead);
+ await f.e.sweepAll();
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.e.stats.moved,2);
+ const movedFolders=[...f.messages.values()].map(m=>m.folder.id).sort();
+ assert.deepEqual(movedFolders,['archive','brt']);
+});
+test('rule unreadAction supports default, keep, window and read',()=>{
+ for(const ua of ['default','keep','window','read'])assert.equal(C.validateRule({...base(),unreadAction:ua}).unreadAction,ua);
+ assert.throws(()=>C.validateRule({...base(),unreadAction:'invalid'}));
+});
+
+

@@ -119,10 +119,6 @@ const I18N={
   inlineMoveUnread:'Flytta olästa mejl',
   inlineOpenWindow:'Öppna i nytt fönster',
   readFilterLabel:'Flytta olästa / lästa mejl för denna regel',
-  rfPillDefault:'✓ Standard (lästa + nya i Inkorg)',
-  rfPillBoth:'⚡ Både olästa & lästa direkt',
-  rfPillRead:'📖 Endast lästa (efter läsning)',
-  rfPillUnread:'✉ Endast olästa direkt',
   rfDefault:'Enligt standardinställning (lästa + nya i Inkorgen)',
   rfRead:'Endast lästa mejl (vänta tills mejlet är läst och lämnat)',
   rfBoth:'Både olästa och lästa mejl (flytta direkt)',
@@ -348,7 +344,6 @@ const I18N={
   condPlaceholderCc:'t.ex. ekonomi@',
   ruleYearFoldersLabel:'Lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)',
   yearFoldersNote:'Årsmappen skapas automatiskt när den behövs. Välj Endast lästa mejl nedan om olästa mejl ska vänta tills du har läst dem.',
-  yearFoldersShort:'🗓️ årsmappar',
   tagYearFolders:'🗓️ årsmappar',
   tplYearArchive:'Arkivera föregående år',
   tplOlder90:'Arkivera äldre än 90 dagar',
@@ -370,7 +365,6 @@ const I18N={
   suggestTitle:'✨ Föreslå regler från Inkorgen',
   suggestBtn:'✨ Skanna Inkorgen',
   suggestHelp:'SortBro tittar lokalt i Inkorgen och föreslår avsändare som återkommer. Inget skapas förrän du själv väljer målmapp och godkänner.',
-  suggestScanning:'Skannar Inkorgen lokalt…',
   suggestEmpty:'Inga nya förslag just nu – Inkorgen har inga återkommande avsändare som saknar regel.',
   suggestSummary:'{count} mejl',
   suggestFound:'{count} förslag hittades i Inkorgen.',
@@ -563,10 +557,6 @@ const I18N={
   inlineMoveUnread:'Move unread mail',
   inlineOpenWindow:'Open in new window',
   readFilterLabel:'Move unread / read emails for this rule',
-  rfPillDefault:'✓ Default (read + new in Inbox)',
-  rfPillBoth:'⚡ Both unread & read immediately',
-  rfPillRead:'📖 Read only (after reading)',
-  rfPillUnread:'✉ Unread only immediately',
   rfDefault:'Use global default (read + new in Inbox)',
   rfRead:'Read emails only (wait until read and closed)',
   rfBoth:'Both unread and read emails (move immediately)',
@@ -792,7 +782,6 @@ const I18N={
   condPlaceholderCc:'e.g. finance@',
   ruleYearFoldersLabel:'Put each year in its own year folder under the target folder (e.g. Archive/2025)',
   yearFoldersNote:'The year folder is created automatically when needed. Choose Read emails only below if unread emails should wait until you have read them.',
-  yearFoldersShort:'🗓️ year folders',
   tagYearFolders:'🗓️ year folders',
   tplYearArchive:'Archive previous years',
   tplOlder90:'Archive older than 90 days',
@@ -814,7 +803,6 @@ const I18N={
   suggestTitle:'✨ Suggest rules from the Inbox',
   suggestBtn:'✨ Scan the Inbox',
   suggestHelp:'SortBro looks locally at your Inbox and suggests senders that keep coming back. Nothing is created until you pick a target folder and approve.',
-  suggestScanning:'Scanning the Inbox locally…',
   suggestEmpty:'No new suggestions right now – your Inbox has no recurring senders without a rule.',
   suggestSummary:'{count} emails',
   suggestFound:'{count} suggestions found in the Inbox.',
@@ -916,9 +904,6 @@ function updateReadPolicy(){
  const ua=$('ruleUnreadAction')?.value||'default';
  if($('ruleMoveUnread'))$('ruleMoveUnread').checked=(rf==='both'||rf==='unread'||(rf==='default'&&(state?.moveMode==='direct'||state?.newInboxDirect!==false)));
  if($('ruleOpenWindow'))$('ruleOpenWindow').checked=(ua==='window'||(ua==='default'&&state?.openWindow!==false));
- for(const pill of document.querySelectorAll('#rfPills .rf-pill')){
-  pill.classList.toggle('active',pill.dataset.rf===rf);
- }
  const map={
   default:['policyDefaultTitle','policyDefaultBody'],
   read:['policyReadTitle','policyReadBody'],
@@ -1494,11 +1479,6 @@ handle('swishBtnHero','click',showSwishQr);
 handle('swishBtnMain','click',showSwishQr);
 if($('qrModeSwish'))handle('qrModeSwish','click',()=>{qrMode='swish';updateDonationView();});
 if($('qrModeCam'))handle('qrModeCam','click',()=>{qrMode='cam';updateDonationView();});
-for(const pill of document.querySelectorAll('#rfPills .rf-pill')){
- pill.addEventListener('click',()=>{
-  if($('ruleReadFilter')){$('ruleReadFilter').value=pill.dataset.rf;dirty=true;updateReadPolicy();}
- });
-}
 $('ruleForm').addEventListener('input',()=>{dirty=true;if($('duplicate'))$('duplicate').disabled=false;});
 $('ruleForm').addEventListener('change',e=>{
  dirty=true;if($('duplicate'))$('duplicate').disabled=false;

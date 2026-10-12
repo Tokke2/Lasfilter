@@ -209,5 +209,29 @@ test('rule unreadAction supports default, keep, window and read',()=>{
  for(const ua of ['default','keep','window','read'])assert.equal(C.validateRule({...base(),unreadAction:ua}).unreadAction,ua);
  assert.throws(()=>C.validateRule({...base(),unreadAction:'invalid'}));
 });
+test('tick processes pending messages even when an unloaded background tab hangs in getDisplayedMessages',async()=>{
+ const f=fixture();
+ f.e.hooks.displayTimeout=20;
+ f.api.messageDisplay.getDisplayedMessages=async id=>{if(id===8)return new Promise(()=>{});return [];};
+ await f.ready();
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.e.fault,'');
+});
+test('tick processes pending messages even when sweeping counter is non-zero',async()=>{
+ const f=fixture({moveMode:'direct'});
+ await f.e.enqueue(msg(1));
+ f.e.sweeping=1;
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+});
+test('sweepRule silently skips already queued messages without spamming debug log',async()=>{
+ const f=fixture({moveMode:'direct'});
+ f.messages.clear();f.messages.set(5,msg(5));
+ await f.e.catchUp('rule1');
+ f.debugs.length=0;
+ await f.e.catchUp('rule1');
+ assert.equal(f.debugs.filter(d=>d.includes('redan hanterad eller köad')).length,0);
+});
+
 
 

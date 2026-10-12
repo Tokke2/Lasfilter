@@ -53,7 +53,7 @@ App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
   for(const delay of [150,800])setTimeout(()=>B.messages.update(id,{read:true}).catch(()=>{}),delay);
   return;
  }
- const shouldOpenWindow=action==='window'||(action==='default'&&App.engine?.config.openWindow!==false);
+ const shouldOpenWindow=(action==='window'||(action==='default'&&App.engine?.config.openWindow!==false))&&(App.engine?.pending.size||0)<=3;
  App.keepUnread.set(id,Date.now()+30000);
  if(shouldOpenWindow){
   try{await B.messageDisplay.open({messageId:id,location:'window'});}catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
@@ -121,8 +121,8 @@ App.handle=async msg=>{
    }
    App.log('simulated',1);return {matches,reason,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&m.folder?.id!==r.source)};
   }
-  case 'catchUp':return App.engine.catchUp(msg.ruleId);
-  case 'sweepNow':return App.engine.sweepAll();
+  case 'catchUp':{const r=await App.engine.catchUp(msg.ruleId);App.kick();return r;}
+  case 'sweepNow':{const r=await App.engine.sweepAll();App.kick();return r;}
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean')throw new C.RuleError('bad_schema');
@@ -253,7 +253,11 @@ B.commands.onCommand.addListener(cmd=>{
  if(cmd==='open_ui')B.tabs.query({active:true,currentWindow:true}).then(tabs=>App.open(tabs[0])).catch(()=>App.log('error',0,'oppna_granssnitt_misslyckades'));
 });
 B.folders.onFolderInfoChanged.addListener(()=>{
- if(!App.engine||App.engine.config.moveMode!=='direct')return;
+ if(!App.engine)return;
+ if(App.engine.pending.size){App.kick();return;}
+ if(App.engine.config.moveMode!=='direct'||App.engine.busy||App.engine.sweeping)return;
  clearTimeout(App.sweepDebounce);
- App.sweepDebounce=setTimeout(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'direkt_svep_misslyckades')),3000);
+ App.sweepDebounce=setTimeout(()=>{
+  if(App.engine&&!App.engine.busy&&!App.engine.sweeping&&!App.engine.pending.size)App.engine.sweepAll().catch(()=>App.log('error',0,'direkt_svep_misslyckades'));
+ },10000);
 });

@@ -17,26 +17,34 @@ class Engine {
  enabled(){return !this.config.paused&&!this.fault&&!this.hold;}
  recordList(){return [...this.records.values()].map(r=>({...r}));}
  blocked(){const active=new Set([...this.pending.values()].map(j=>j.record.key));return [...this.records.values()].filter(r=>r.stage==='attempted'&&!active.has(r.key)).length;}
+ withTimeout(promise,ms, onTimeout){
+  let timer;
+  return Promise.race([
+   Promise.resolve(promise).finally(()=>clearTimeout(timer)),
+   new Promise((resolve,reject)=>{timer=setTimeout(()=>{if(typeof onTimeout==='function')resolve(onTimeout());else reject(new Error('timeout'));},ms);})
+  ]);
+ }
  async displayed(){
-  const ids=new Set(),tabs=await this.api.tabs.query({});
-  for(const tab of tabs){
+  const ids=new Set(),tabs=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,()=>[]);
+  for(const tab of tabs||[]){
    if(!['mail','messageDisplay'].includes(tab.type))continue;
    try{
-    const messages=await this.api.messageDisplay.getDisplayedMessages(tab.id);
-    if(!Array.isArray(messages))throw new C.RuleError('display_error');
-    for(const m of messages)ids.add(m.id);
+    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??600,()=>[]);
+    const messages=Array.isArray(raw)?raw:Array.isArray(raw?.messages)?raw.messages:null;
+    if(!messages)throw new C.RuleError('display_error');
+    for(const m of messages)if(Number.isSafeInteger(m?.id))ids.add(m.id);
    }catch(error){
     // En flik kan ha stängts mellan listning och kontroll. Bara en bekräftat
     // försvunnen flik får ignoreras; övriga fel stoppar bevakningen.
-    const current=await this.api.tabs.query({});
-    if(current.some(t=>t.id===tab.id))throw error;
+    const current=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,()=>[]);
+    if((current||[]).some(t=>t.id===tab.id))throw error;
    }
   }return ids;
  }
  async pair(rule){return this.pairFolders(rule.source,rule.target);}
  async pairFolders(sourceId,targetId){
-  const [source,target]=await Promise.all([this.api.folders.get(sourceId,false),this.api.folders.get(targetId,false)]);
-  const [sc,tc]=await Promise.all([this.api.folders.getFolderCapabilities(sourceId),this.api.folders.getFolderCapabilities(targetId)]);
+  const [source,target]=await this.withTimeout(Promise.all([this.api.folders.get(sourceId,false),this.api.folders.get(targetId,false)]),5000);
+  const [sc,tc]=await this.withTimeout(Promise.all([this.api.folders.getFolderCapabilities(sourceId),this.api.folders.getFolderCapabilities(targetId)]),5000);
   C.validatePair(source,target,sc,tc);return {source,target};
  }
  async validateRuleFolders(rule){
@@ -140,10 +148,10 @@ class Engine {
   if(!folderId||!headerMessageId)return null;
   let page=null;
   try{
-   page=await this.api.messages.query({folderId,headerMessageId});
+   page=await this.withTimeout(this.api.messages.query({folderId,headerMessageId}),5000);
    return (page?.messages||[])[0]||null;
   }catch{return null;}
-  finally{if(page?.id)await this.api.messages.abortList(page.id).catch(()=>{});}
+  finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
  }
  async confirmMove(id,op,after=null){
   if(op.confirmed)return true;
@@ -234,7 +242,7 @@ class Engine {
     else if(!folderDirect)q.unread=false;
     let page=null;
     try{
-     page=await this.api.messages.query(q);searchedFolders++;
+     page=await this.withTimeout(this.api.messages.query(q),this.hooks.queryTimeout??10000);searchedFolders++;
      for(;;){
       for(const m of page.messages||[]){
        if(!this.enabled())break;
@@ -243,25 +251,28 @@ class Engine {
        if(rf==='unread'&&m.read===true)continue;
        if(!folderDirect&&m.read!==true)continue;
        if(!C.match(rule,m,false,true))continue;
+       const fk=C.fingerprint(m);
+       if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id))continue;
        if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
        if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both')}))queued++;
       }
       if(!page.id||!this.enabled())break;
-      page=await this.api.messages.continueList(page.id);
+      page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
      }
     }catch(error){
      // En enskild IMAP-/nyhetsmapp kan vara frånkopplad eller sakna lokal
      // databas. Hoppa över just den mappen i stället för att stoppa kontot.
      skippedFolders++;this.debug('svep_query_failed folder_index='+(searchedFolders+skippedFolders)+' error_type='+(error?.name||'Error'));
-    }finally{if(page?.id)await this.api.messages.abortList(page.id).catch(()=>{});}
+    }finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
    }
    if(folders.length&&searchedFolders===0)throw new C.RuleError('sweep_error');
    this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' skannade='+scanned+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
    this.log('catchup',queued);this.change();
    return {scanned,queued,deferred,searchedFolders,skippedFolders};
-  }finally{this.sweeping--;if(!this.sweeping&&this.pending.size)this.hooks.kick?.();}
+  }finally{this.sweeping=Math.max(0,this.sweeping-1);if(this.pending.size)this.hooks.kick?.();}
  }
  async sweepAll(){
+  if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0};}
   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0;
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
@@ -291,17 +302,23 @@ class Engine {
   }
  }
  async tick(){
-  if(this.busy||this.sweeping||!this.enabled()||!this.pending.size)return;
+  if(this.busy||!this.enabled()||!this.pending.size)return;
   this.busy=true;const epoch=this.epoch;this.lastCheck=this.now();
   try{
-   const allDirect=this.config.moveMode==='direct',shown=allDirect?new Set():await this.displayed();
+   const jobs=[...this.pending.values()];
+   const allDirect=this.config.moveMode==='direct'||jobs.every(j=>{
+    const rule=this.config.rules.find(r=>r.id===j.record.ruleId);
+    return j.record.notify===true||['both','unread'].includes(this.ruleMode(rule));
+   });
+   const shown=allDirect?new Set():await this.displayed();
    if(!this.enabled()||epoch!==this.epoch)return;
    this.debug('tick pending='+this.pending.size+' direct='+(allDirect?'ja':'blandat')+' displayed='+shown.size);
-   for(const job of [...this.pending.values()]){
+   for(const job of jobs){
     if(!this.enabled()||epoch!==this.epoch)break;
     if(!job.persisted||job.record.stage!=='pending')continue;
     if(job.record.rulesVersion!==this.config.rulesVersion){await this.dropId(job.id);continue;}
-    const direct=allDirect||job.record.notify===true;
+    const rule=this.config.rules.find(r=>r.id===job.record.ruleId);
+    const direct=allDirect||job.record.notify===true||['both','unread'].includes(this.ruleMode(rule));
     if(!direct&&shown.has(job.id)){job.hiddenSince=null;continue;}
     if(!direct&&job.hiddenSince===null){job.hiddenSince=this.now();continue;}
     if(!direct&&this.now()-job.hiddenSince<2000)continue;
@@ -313,7 +330,7 @@ class Engine {
  async process(job,epoch){
   let called=false,op=null;
   try{
-   let m;try{m=await this.api.messages.get(job.id);}catch{this.debug('jobb '+job.id+' slappt: meddelandet finns inte langre');await this.dropId(job.id);return;}
+   let m;try{m=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet finns inte langre');await this.dropId(job.id);return;}
    const rule=this.config.rules.find(r=>r.id===job.record.ruleId);
    const rf=this.ruleMode(rule);
    const allowUnread=job.record.notify||rf==='both'||rf==='unread'||this.config.moveMode==='direct';
@@ -329,7 +346,7 @@ class Engine {
     this.pending.delete(job.id);this.records.delete(job.record.key);this.done.add(job.record.key);this.trimDone();
     await this.persist();this.stats.simulated++;this.log('simulated',1);return;
    }
-   let latest;try{latest=await this.api.messages.get(job.id);}catch{this.debug('jobb '+job.id+' slappt: meddelandet forsvann fore flytt');await this.dropId(job.id);return;}
+   let latest;try{latest=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet forsvann fore flytt');await this.dropId(job.id);return;}
    const visible=direct?new Set():await this.displayed();
    if(!this.enabled()||epoch!==this.epoch||(rf==='unread'&&latest.read===true)||(latest.read!==true&&!allowUnread)||latest.folder?.id!==job.record.source||
       C.fingerprint(latest)!==job.record.key||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||C.targetFor(rule,latest)!==job.record.target){
@@ -342,7 +359,7 @@ class Engine {
    let resolve;const ack=new Promise(r=>resolve=r);
    op={record:job.record,resolve,confirmed:false};this.inflight.set(job.id,op);
    this.done.add(job.record.key);this.trimDone();called=true;
-   await this.api.messages.move([job.id],job.record.target,{isUserAction:true});
+   await this.withTimeout(this.api.messages.move([job.id],job.record.target,{isUserAction:true}),8000);
    if(!op.confirmed){
     let timer;await Promise.race([ack,new Promise(r=>timer=setTimeout(()=>r(false),this.hooks.ackTimeout??2000))]);clearTimeout(timer);
    }

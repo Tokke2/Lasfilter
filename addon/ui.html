@@ -399,8 +399,12 @@
           </div>
           <div id="qrbox" class="qrbox" hidden>
             <p style="font-weight:800;color:var(--accent);margin:0 0 8px" data-i18n="supQrTitle">💚 Skanna med Swish-appen på mobilen</p>
+            <div style="display:inline-flex;gap:6px;margin-bottom:10px">
+              <button type="button" id="qrModeSwish" class="chip active" data-i18n="supQrModeSwish">Swish-appen (Standard)</button>
+              <button type="button" id="qrModeCam" class="chip" data-i18n="supQrModeCam">Vanlig mobilkamera</button>
+            </div>
             <div id="qrSvgWrap"></div>
-            <p class="muted" style="margin:8px 0 0" data-i18n="supQrSub">Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Läsfilter) är förifyllda och kan ändras fritt.</p>
+            <p class="muted" style="margin:8px 0 0" id="supQrSubText" data-i18n="supQrSub">Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Lasfilter) är förifyllda och kan ändras fritt.</p>
           </div>
         </div>
 

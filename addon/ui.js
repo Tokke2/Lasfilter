@@ -31,7 +31,10 @@ const I18N={
   supPaypalMain:'💙 PayPal – valt belopp',
   supKofiMain:'☕ Ko-fi – engångs / månadsvis',
   supQrTitle:'💚 Skanna med Swish-appen på mobilen',
+  supQrModeSwish:'Swish-appen (Standard)',
+  supQrModeCam:'Vanlig mobilkamera',
   supQrSub:'Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Lasfilter) är förifyllda och kan ändras fritt.',
+  supQrSubCam:'Rikta mobilens vanliga kamera mot QR-koden för att öppna Swish via direktlänk (swish://).',
   supWhyKicker:'Varför ditt stöd gör skillnad',
   supWhyTitle:'Du stöttar en oberoende svensk utvecklare – inte ett bolag 🛠️',
   supWhySub:'Läsfilter byggdes för att lösa ett verkligt problem i Thunderbird: att kunna läsa sina mejl i lugn och ro innan de sorteras bort, eller styra per filter vilka olästa och lästa mejl som ska flyttas. Ditt stöd håller tillägget uppdaterat och reklamfritt.',
@@ -381,7 +384,10 @@ const I18N={
   supPaypalMain:'💙 PayPal – selected amount',
   supKofiMain:'☕ Ko-fi – one-time / monthly',
   supQrTitle:'💚 Scan with the Swish app on your phone',
+  supQrModeSwish:'Swish scanner (Default)',
+  supQrModeCam:'Phone camera app',
   supQrSub:'Open Swish on your phone → Scan QR code. Amount and message (Lasfilter) are pre-filled and editable.',
+  supQrSubCam:'Point your phone\'s camera app at the QR code to open Swish via deep link (swish://).',
   supWhyKicker:'Why your support matters',
   supWhyTitle:'You support an independent Swedish developer – not a corporation 🛠️',
   supWhySub:'Läsfilter was built to solve a real pain point in Thunderbird: reading emails at your own pace before they are sorted, or controlling per filter which unread and read emails move. Your support keeps the add-on maintained and ad-free.',
@@ -972,18 +978,20 @@ function showView(view){activeView=view;document.querySelectorAll('.view').forEa
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
 handle('footerSupportBtn','click',()=>showView('support'));
 
-/* ===== Stöd / Donation (100 % lokal Swish-QR + PayPal + Ko-fi) ===== */
-let donateKr=50;
+/* ===== Stöd / Donation (100 % lokal, ISO/IEC 18004-verifierad Swish-QR + PayPal + Ko-fi) ===== */
+let donateKr=50,qrMode='swish';
 function makeQrSvg(text){
  const bytes=Array.from(new TextEncoder().encode(text));
- const VERSIONS=[null,[1,19,7,1,19,0,0,[]],[2,34,10,1,34,0,0,[6,18]],[3,55,15,1,55,0,0,[6,22]],[4,80,20,1,80,0,0,[6,26]],[5,108,26,1,108,0,0,[6,30]],[6,136,18,2,68,0,0,[6,34]],[7,156,20,4,39,0,0,[6,22,38]],[8,194,24,2,97,0,0,[6,24,42]],[9,232,30,3,46,2,47,[6,26,46]],[10,274,18,4,43,1,44,[6,28,50]]];
- const ver=VERSIONS.find(v=>v&&(v[1]-(v[0]<=9?2:3))>=bytes.length)||VERSIONS[10];
+ const VERSIONS_M=[null,[1,16,10,1,16,0,0,[]],[2,28,16,1,28,0,0,[6,18]],[3,44,26,1,44,0,0,[6,22]],[4,64,18,2,32,0,0,[6,26]]];
+ const VERSIONS_L=[null,[1,19,7,1,19,0,0,[]],[2,34,10,1,34,0,0,[6,18]],[3,55,15,1,55,0,0,[6,22]],[4,80,20,1,80,0,0,[6,26]],[5,108,26,1,108,0,0,[6,30]],[6,136,18,2,68,0,0,[6,34]],[7,156,20,2,78,0,0,[6,22,38]],[8,194,24,2,97,0,0,[6,24,42]],[9,232,30,2,116,0,0,[6,26,46]],[10,274,18,2,68,2,69,[6,28,50]]];
+ const useM=bytes.length<=62,table=useM?VERSIONS_M:VERSIONS_L,fmt=useM?0x5e7c:0x7daa;
+ const ver=table.find(v=>v&&(v[1]-(v[0]<=9?2:3))>=bytes.length)||table[table.length-1];
  const [V,totalData,ecLen,b1,d1,b2,d2,align]=ver,size=17+V*4,bits=[];
  const pushBits=(val,n)=>{for(let i=n-1;i>=0;i--)bits.push((val>>>i)&1);};
  pushBits(4,4);pushBits(bytes.length,V<=9?8:16);for(const b of bytes)pushBits(b,8);
  pushBits(0,Math.min(4,totalData*8-bits.length));while(bits.length%8)bits.push(0);
  const data=[];for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];data.push(b);}
- while(data.length<totalData)data.push((data.length&1)?0x11:0xec);
+ for(let p=0;data.length<totalData;p++)data.push((p&1)?0x11:0xec);
  const EXP=new Uint8Array(512),LOG=new Uint8Array(256);let x=1;
  for(let i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x=(x<<1)^(x&128?0x11d:0);}for(let i=255;i<512;i++)EXP[i]=EXP[i-255];
  const mul=(a,b)=>(a&&b)?EXP[LOG[a]+LOG[b]]:0;
@@ -998,30 +1006,40 @@ function makeQrSvg(text){
  const setMod=(r,c,v)=>{if(r>=0&&r<size&&c>=0&&c<size){grid[r][c]=v?1:0;used[r][c]=1;}};
  const finder=(r0,c0)=>{for(let dr=-1;dr<=7;dr++)for(let dc=-1;dc<=7;dc++)setMod(r0+dr,c0+dc,dr>=0&&dr<=6&&dc>=0&&dc<=6&&(dr===0||dr===6||dc===0||dc===6||(dr>=2&&dr<=4&&dc>=2&&dc<=4)));};
  finder(0,0);finder(0,size-7);finder(size-7,0);
- for(let i=8;i<size-8;i++){setMod(6,i,i%2===0);setMod(i,6,i%2===0);}
  for(const r of align)for(const c of align){if(used[r][c])continue;for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++)setMod(r+dr,c+dc,Math.max(Math.abs(dr),Math.abs(dc))!==1);}
+ for(let i=8;i<size-8;i++){if(!used[6][i])setMod(6,i,i%2===0);if(!used[i][6])setMod(i,6,i%2===0);}
  for(let i=0;i<9;i++){used[8][i]=1;used[i][8]=1;}for(let i=0;i<8;i++){used[8][size-1-i]=1;used[size-1-i][8]=1;}setMod(size-8,8,1);
  if(V>=7){let rem=V;for(let i=0;i<12;i++)rem=(rem<<1)^((rem>>11)*0x1f25);const vInfo=(V<<12)|rem;for(let i=0;i<18;i++){const bit=(vInfo>>i)&1,r=Math.floor(i/3),c=size-11+(i%3);setMod(r,c,bit);setMod(c,r,bit);}}
  let bitIdx=0,up=true;
- for(let c=size-1;c>0;c-=2){if(c===6)c--;for(let i=0;i<size;i++){const r=up?size-1-i:i;for(const dc of [0,-1])if(!used[r][c+dc]){const bit=bitIdx<codewords.length*8?(codewords[bitIdx>>3]>>(7-(bitIdx&7)))&1:0;bitIdx++;grid[r][c+dc]=bit^((r+c+dc)%2===0?1:0);}}up=!up;}
- const fmt=0x77c4,fPos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]],fPos2=[[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
- for(let i=0;i<15;i++){const bit=(fmt>>i)&1;grid[fPos1[i][0]][fPos1[i][1]]=bit;grid[fPos2[i][0]][fPos2[i][1]]=bit;}
+ for(let c=size-1;c>0;c-=2){if(c===6)c--;for(let i=0;i<size;i++){const r=up?size-1-i:i;for(const dc of [0,-1])if(!used[r][c+dc]){const bit=bitIdx<codewords.length*8?(codewords[bitIdx>>3]>>(7-(bitIdx&7)))&1:0;bitIdx++;grid[r][c+dc]=bit^((c+dc)%3===0?1:0);}}up=!up;}
+ const fPos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]],fPos2=[[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
+ for(let i=0;i<15;i++){const bit=(fmt>>(14-i))&1;grid[fPos1[i][0]][fPos1[i][1]]=bit;grid[fPos2[i][0]][fPos2[i][1]]=bit;}
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
- svg.setAttribute('viewBox',`0 0 ${size+4} ${size+4}`);svg.setAttribute('width','210');svg.setAttribute('height','210');
+ svg.setAttribute('viewBox',`0 0 ${size+8} ${size+8}`);svg.setAttribute('width','220');svg.setAttribute('height','220');svg.setAttribute('shape-rendering','crispEdges');
  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
- rect.setAttribute('width','100%');rect.setAttribute('height','100%');rect.setAttribute('rx','3');rect.setAttribute('fill','#ffffff');
- let d='';for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(grid[r][c])d+=`M${c+2},${r+2}h1v1h-1z`;
+ rect.setAttribute('width','100%');rect.setAttribute('height','100%');rect.setAttribute('fill','#ffffff');
+ let d='';for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(grid[r][c])d+=`M${c+4},${r+4}h1v1h-1z`;
  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
- path.setAttribute('d',d);path.setAttribute('fill','#133840');
+ path.setAttribute('d',d);path.setAttribute('fill','#000000');
  svg.append(rect,path);return svg;
+}
+function currentSwishQrPayload(){
+ if(qrMode==='cam'){
+  const data=JSON.stringify({version:1,payee:{value:'0721817177',editable:false},amount:{value:donateKr,editable:true},message:{value:'Lasfilter',editable:true}});
+  return 'swish://payment?data='+encodeURIComponent(data);
+ }
+ return `C0721817177;${donateKr};Lasfilter;6`;
 }
 function updateDonationView(){
  if($('donateAmountInfo'))$('donateAmountInfo').textContent=currentLang==='en'?`Selected: ${donateKr} SEK – thank you for supporting Läsfilter! 💚`:`Valt: ${donateKr} kr – tack för att du stöttar Läsfilter! 💚`;
  const pp=`https://paypal.me/Rickard3dPrint/${donateKr}SEK`;
  if($('paypalBtnHero'))$('paypalBtnHero').href=pp;
  if($('paypalBtnMain'))$('paypalBtnMain').href=pp;
+ if($('qrModeSwish'))$('qrModeSwish').classList.toggle('active',qrMode==='swish');
+ if($('qrModeCam'))$('qrModeCam').classList.toggle('active',qrMode==='cam');
+ if($('supQrSubText'))$('supQrSubText').textContent=qrMode==='cam'?T('supQrSubCam'):T('supQrSub');
  if($('qrbox')&&!$('qrbox').hidden&&$('qrSvgWrap')){
-  $('qrSvgWrap').replaceChildren(makeQrSvg(`C0721817177;${donateKr};Lasfilter;6`));
+  $('qrSvgWrap').replaceChildren(makeQrSvg(currentSwishQrPayload()));
  }
 }
 for(const chip of document.querySelectorAll('#beloppsrad .bchip')){
@@ -1045,11 +1063,13 @@ if($('donateCustomKr')){
 function showSwishQr(){
  if(!$('qrbox')||!$('qrSvgWrap'))return;
  $('qrbox').hidden=false;
- $('qrSvgWrap').replaceChildren(makeQrSvg(`C0721817177;${donateKr};Lasfilter;6`));
+ updateDonationView();
  $('qrbox').scrollIntoView({behavior:'smooth',block:'center'});
 }
 handle('swishBtnHero','click',showSwishQr);
 handle('swishBtnMain','click',showSwishQr);
+if($('qrModeSwish'))handle('qrModeSwish','click',()=>{qrMode='swish';updateDonationView();});
+if($('qrModeCam'))handle('qrModeCam','click',()=>{qrMode='cam';updateDonationView();});
 for(const pill of document.querySelectorAll('#rfPills .rf-pill')){
  pill.addEventListener('click',()=>{
   if($('ruleReadFilter')){$('ruleReadFilter').value=pill.dataset.rf;dirty=true;updateReadPolicy();}

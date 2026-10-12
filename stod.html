@@ -135,8 +135,12 @@
   </div>
   <div id="qrbox">
     <p style="font-weight:800;color:var(--green);margin-bottom:8px;">💚 Skanna med Swish-appen på mobilen</p>
+    <div style="display:inline-flex;gap:8px;margin-bottom:10px;">
+      <button type="button" id="qrModeSwish" class="bchip vald" style="padding:5px 14px;font-size:.8rem;">Swish-appen (Standard)</button>
+      <button type="button" id="qrModeCam" class="bchip" style="padding:5px 14px;font-size:.8rem;">Vanlig mobilkamera</button>
+    </div>
     <div id="qrSvgWrap"></div>
-    <p class="muted" style="margin-top:8px;">Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Lasfilter) är förifyllda och kan ändras fritt.</p>
+    <p id="qrSubText" class="muted" style="margin-top:8px;">Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Lasfilter) är förifyllda och kan ändras fritt.</p>
   </div>
 </div>
 
@@ -177,55 +181,74 @@
 </footer>
 
 <script>
-var valtKr = 50;
+var valtKr = 50, qrMode = 'swish';
 function makeQrSvg(text){
   const bytes=Array.from(new TextEncoder().encode(text));
-  const VERSIONS=[null,[1,19,7,1,19,0,0,[]],[2,34,10,1,34,0,0,[6,18]],[3,55,15,1,55,0,0,[6,22]],[4,80,20,1,80,0,0,[6,26]],[5,108,26,1,108,0,0,[6,30]]];
-  const ver=VERSIONS.find(v=>v&&(v[1]-2)>=bytes.length)||VERSIONS[5];
+  const VERSIONS_M=[null,[1,16,10,1,16,0,0,[]],[2,28,16,1,28,0,0,[6,18]],[3,44,26,1,44,0,0,[6,22]],[4,64,18,2,32,0,0,[6,26]]];
+  const VERSIONS_L=[null,[1,19,7,1,19,0,0,[]],[2,34,10,1,34,0,0,[6,18]],[3,55,15,1,55,0,0,[6,22]],[4,80,20,1,80,0,0,[6,26]],[5,108,26,1,108,0,0,[6,30]],[6,136,18,2,68,0,0,[6,34]],[7,156,20,2,78,0,0,[6,22,38]],[8,194,24,2,97,0,0,[6,24,42]],[9,232,30,2,116,0,0,[6,26,46]],[10,274,18,2,68,2,69,[6,28,50]]];
+  const useM=bytes.length<=62,table=useM?VERSIONS_M:VERSIONS_L,fmt=useM?0x5e7c:0x7daa;
+  const ver=table.find(v=>v&&(v[1]-(v[0]<=9?2:3))>=bytes.length)||table[table.length-1];
   const [V,totalData,ecLen,b1,d1,b2,d2,align]=ver,size=17+V*4,bits=[];
   const pushBits=(val,n)=>{for(let i=n-1;i>=0;i--)bits.push((val>>>i)&1);};
-  pushBits(4,4);pushBits(bytes.length,8);for(const b of bytes)pushBits(b,8);
+  pushBits(4,4);pushBits(bytes.length,V<=9?8:16);for(const b of bytes)pushBits(b,8);
   pushBits(0,Math.min(4,totalData*8-bits.length));while(bits.length%8)bits.push(0);
   const data=[];for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];data.push(b);}
-  while(data.length<totalData)data.push((data.length&1)?0x11:0xec);
+  for(let p=0;data.length<totalData;p++)data.push((p&1)?0x11:0xec);
   const EXP=new Uint8Array(512),LOG=new Uint8Array(256);let x=1;
   for(let i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x=(x<<1)^(x&128?0x11d:0);}for(let i=255;i<512;i++)EXP[i]=EXP[i-255];
   const mul=(a,b)=>(a&&b)?EXP[LOG[a]+LOG[b]]:0;
   let gen=[1];for(let i=0;i<ecLen;i++){const next=new Array(gen.length+1).fill(0);for(let j=0;j<gen.length;j++){next[j]^=gen[j];next[j+1]^=mul(gen[j],EXP[i]);}gen=next;}
-  const rem=new Uint8Array(ecLen);for(const b of data){const f=b^rem[0];rem.copyWithin(0,1);rem[ecLen-1]=0;for(let j=0;j<ecLen;j++)rem[j]^=mul(gen[j+1],f);}
-  const codewords=[...data,...rem];
+  const rsEncode=block=>{const rem=new Uint8Array(ecLen);for(const b of block){const f=b^rem[0];rem.copyWithin(0,1);rem[ecLen-1]=0;for(let j=0;j<ecLen;j++)rem[j]^=mul(gen[j+1],f);}return rem;};
+  const dataBlocks=[],ecBlocks=[];let offset=0;
+  for(let i=0;i<b1+b2;i++){const len=i<b1?d1:d2,blk=data.slice(offset,offset+len);offset+=len;dataBlocks.push(blk);ecBlocks.push(rsEncode(blk));}
+  const codewords=[],maxD=Math.max(d1,d2);
+  for(let i=0;i<maxD;i++)for(const blk of dataBlocks)if(i<blk.length)codewords.push(blk[i]);
+  for(let i=0;i<ecLen;i++)for(const blk of ecBlocks)codewords.push(blk[i]);
   const grid=Array.from({length:size},()=>new Int8Array(size)),used=Array.from({length:size},()=>new Uint8Array(size));
   const setMod=(r,c,v)=>{if(r>=0&&r<size&&c>=0&&c<size){grid[r][c]=v?1:0;used[r][c]=1;}};
   const finder=(r0,c0)=>{for(let dr=-1;dr<=7;dr++)for(let dc=-1;dc<=7;dc++)setMod(r0+dr,c0+dc,dr>=0&&dr<=6&&dc>=0&&dc<=6&&(dr===0||dr===6||dc===0||dc===6||(dr>=2&&dr<=4&&dc>=2&&dc<=4)));};
   finder(0,0);finder(0,size-7);finder(size-7,0);
-  for(let i=8;i<size-8;i++){setMod(6,i,i%2===0);setMod(i,6,i%2===0);}
   for(const r of align)for(const c of align){if(used[r][c])continue;for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++)setMod(r+dr,c+dc,Math.max(Math.abs(dr),Math.abs(dc))!==1);}
+  for(let i=8;i<size-8;i++){if(!used[6][i])setMod(6,i,i%2===0);if(!used[i][6])setMod(i,6,i%2===0);}
   for(let i=0;i<9;i++){used[8][i]=1;used[i][8]=1;}for(let i=0;i<8;i++){used[8][size-1-i]=1;used[size-1-i][8]=1;}setMod(size-8,8,1);
+  if(V>=7){let rem=V;for(let i=0;i<12;i++)rem=(rem<<1)^((rem>>11)*0x1f25);const vInfo=(V<<12)|rem;for(let i=0;i<18;i++){const bit=(vInfo>>i)&1,r=Math.floor(i/3),c=size-11+(i%3);setMod(r,c,bit);setMod(c,r,bit);}}
   let bitIdx=0,up=true;
-  for(let c=size-1;c>0;c-=2){if(c===6)c--;for(let i=0;i<size;i++){const r=up?size-1-i:i;for(const dc of [0,-1])if(!used[r][c+dc]){const bit=bitIdx<codewords.length*8?(codewords[bitIdx>>3]>>(7-(bitIdx&7)))&1:0;bitIdx++;grid[r][c+dc]=bit^((r+c+dc)%2===0?1:0);}}up=!up;}
-  const fmt=0x77c4,fPos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]],fPos2=[[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
-  for(let i=0;i<15;i++){const bit=(fmt>>i)&1;grid[fPos1[i][0]][fPos1[i][1]]=bit;grid[fPos2[i][0]][fPos2[i][1]]=bit;}
+  for(let c=size-1;c>0;c-=2){if(c===6)c--;for(let i=0;i<size;i++){const r=up?size-1-i:i;for(const dc of [0,-1])if(!used[r][c+dc]){const bit=bitIdx<codewords.length*8?(codewords[bitIdx>>3]>>(7-(bitIdx&7)))&1:0;bitIdx++;grid[r][c+dc]=bit^((c+dc)%3===0?1:0);}}up=!up;}
+  const fPos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]],fPos2=[[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
+  for(let i=0;i<15;i++){const bit=(fmt>>(14-i))&1;grid[fPos1[i][0]][fPos1[i][1]]=bit;grid[fPos2[i][0]][fPos2[i][1]]=bit;}
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('viewBox',`0 0 ${size+4} ${size+4}`);svg.setAttribute('width','210');svg.setAttribute('height','210');
+  svg.setAttribute('viewBox',`0 0 ${size+8} ${size+8}`);svg.setAttribute('width','220');svg.setAttribute('height','220');svg.setAttribute('shape-rendering','crispEdges');
   const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-  rect.setAttribute('width','100%');rect.setAttribute('height','100%');rect.setAttribute('rx','3');rect.setAttribute('fill','#ffffff');
-  let d='';for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(grid[r][c])d+=`M${c+2},${r+2}h1v1h-1z`;
+  rect.setAttribute('width','100%');rect.setAttribute('height','100%');rect.setAttribute('fill','#ffffff');
+  let d='';for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(grid[r][c])d+=`M${c+4},${r+4}h1v1h-1z`;
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d',d);path.setAttribute('fill','#133840');
+  path.setAttribute('d',d);path.setAttribute('fill','#000000');
   svg.append(rect,path);return svg;
+}
+function getSwishQrPayload(){
+  if(qrMode === 'cam'){
+    var payload = JSON.stringify({version:1,payee:{value:'0721817177',editable:false},amount:{value:valtKr,editable:true},message:{value:'Lasfilter',editable:true}});
+    return 'swish://payment?data=' + encodeURIComponent(payload);
+  }
+  return 'C0721817177;' + valtKr + ';Lasfilter;6';
 }
 function visaBelopp(){
   document.getElementById('beloppInfo').textContent = 'Valt: ' + valtKr + ' kr – tack för att du stöttar Läsfilter! 💚';
   var pp = 'https://paypal.me/Rickard3dPrint/' + valtKr + 'SEK';
   ['paypalBtn1','paypalBtn2'].forEach(function(id){ var el=document.getElementById(id); if(el)el.href=pp; });
+  document.getElementById('qrModeSwish').classList.toggle('vald', qrMode === 'swish');
+  document.getElementById('qrModeCam').classList.toggle('vald', qrMode === 'cam');
+  document.getElementById('qrSubText').textContent = qrMode === 'cam'
+    ? 'Rikta mobilens vanliga kamera mot QR-koden för att öppna Swish via direktlänk (swish://).'
+    : 'Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Lasfilter) är förifyllda och kan ändras fritt.';
   var box = document.getElementById('qrbox');
   if(box && box.style.display === 'block'){
-    document.getElementById('qrSvgWrap').replaceChildren(makeQrSvg('C0721817177;' + valtKr + ';Lasfilter;6'));
+    document.getElementById('qrSvgWrap').replaceChildren(makeQrSvg(getSwishQrPayload()));
   }
 }
-document.querySelectorAll('.bchip').forEach(function(c){
+document.querySelectorAll('#beloppsrad .bchip').forEach(function(c){
   c.addEventListener('click',function(){
-    document.querySelectorAll('.bchip').forEach(function(x){ x.classList.remove('vald'); });
+    document.querySelectorAll('#beloppsrad .bchip').forEach(function(x){ x.classList.remove('vald'); });
     c.classList.add('vald');
     document.getElementById('egetKr').value = '';
     valtKr = parseInt(c.getAttribute('data-kr'),10);
@@ -235,11 +258,13 @@ document.querySelectorAll('.bchip').forEach(function(c){
 document.getElementById('egetKr').addEventListener('input',function(){
   var v = parseInt(this.value,10);
   if(v > 0 && v < 100000){
-    document.querySelectorAll('.bchip').forEach(function(x){ x.classList.remove('vald'); });
+    document.querySelectorAll('#beloppsrad .bchip').forEach(function(x){ x.classList.remove('vald'); });
     valtKr = v;
     visaBelopp();
   }
 });
+document.getElementById('qrModeSwish').addEventListener('click', function(){ qrMode = 'swish'; visaBelopp(); });
+document.getElementById('qrModeCam').addEventListener('click', function(){ qrMode = 'cam'; visaBelopp(); });
 function swisha(){
   const payload = JSON.stringify({version:1,payee:{value:'0721817177',editable:false},amount:{value:valtKr,editable:true},message:{value:'Lasfilter',editable:true}});
   if(/android|iphone|ipad/i.test(navigator.userAgent)){
@@ -247,8 +272,8 @@ function swisha(){
     return;
   }
   const box = document.getElementById('qrbox');
-  document.getElementById('qrSvgWrap').replaceChildren(makeQrSvg('C0721817177;' + valtKr + ';Lasfilter;6'));
   box.style.display = 'block';
+  visaBelopp();
   box.scrollIntoView({behavior:'smooth',block:'center'});
 }
 document.getElementById('swishBtn').addEventListener('click', swisha);

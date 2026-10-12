@@ -15,6 +15,42 @@ const I18N={
   navActivity:'Vad har hänt?',
   navSettings:'Avancerat',
   navHelp:'Hjälp',
+  navSupport:'Stöd Läsfilter',
+  footerSupportLink:'💚 Stöd Läsfilter',
+  supEyebrow:'💚 100 % GRATIS • LOKALT I THUNDERBIRD • ÖPPEN KÄLLKOD',
+  supHeroTitle:'Stöd Läsfilter – för en lugnare inkorg i Thunderbird',
+  supHeroSub:'Läsfilter är helt gratis, reklamfritt och körs 100 % lokalt i din dator utan molntjänster. Din gåva stöttar fortsatt utveckling, stöd för nya Thunderbird-versioner och nya smarta filterfunktioner. Inget låses upp – alla funktioner är alltid fria för alla.',
+  supStatLocal:'🔒 100 % lokal behandling',
+  supStatFree:'💚 100 % gratis – alltid',
+  supSwishQuick:'💚 Swish (QR)',
+  supGithubBtn:'⭐ GitHub',
+  supPickKicker:'Valfritt belopp – inga nivåer, inga krav',
+  supPickTitle:'Välj belopp eller skriv ett eget',
+  supPickSub:'Beloppet följer med till Swish-QR och PayPal (och kan alltid ändras i Swish-appen). Varje krona gör direkt skillnad.',
+  supSwishMain:'💚 Visa Swish-QR för beloppet',
+  supPaypalMain:'💙 PayPal – valt belopp',
+  supKofiMain:'☕ Ko-fi – engångs / månadsvis',
+  supQrTitle:'💚 Skanna med Swish-appen på mobilen',
+  supQrSub:'Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (Lasfilter) är förifyllda och kan ändras fritt.',
+  supWhyKicker:'Varför ditt stöd gör skillnad',
+  supWhyTitle:'Du stöttar en oberoende svensk utvecklare – inte ett bolag 🛠️',
+  supWhySub:'Läsfilter byggdes för att lösa ett verkligt problem i Thunderbird: att kunna läsa sina mejl i lugn och ro innan de sorteras bort, eller styra per filter vilka olästa och lästa mejl som ska flyttas. Ditt stöd håller tillägget uppdaterat och reklamfritt.',
+  supImp1Title:'Thunderbird-kompatibilitet',
+  supImp1Body:'Löpande uppdateringar och IMAP-tester när Thunderbird släpper nya versioner.',
+  supImp2Title:'Nya smarta filterfunktioner',
+  supImp2Body:'Utveckling av nya regelvillkor, fönsterhantering och förenklingar efter användarönskemål.',
+  supImp3Title:'100 % privat & lokalt',
+  supImp3Body:'Inga molntjänster, ingen spårning och inga låsta betalversioner – någonsin.',
+  supTrust1:'🔒 Swish, PayPal & Ko-fi – tryggt & krypterat',
+  supTrust2:'🕊️ Ingen spårning i tillägget (connect-src \'none\')',
+  supTrust3:'🇸🇪 Svensk öppen källkod',
+  supFaqKicker:'Vanliga frågor – lugnt & tryggt',
+  supFaq1Q:'💚 Hur fungerar Swish-QR-koden här i Thunderbird?',
+  supFaq1A:'QR-koden skapas 100 % lokalt direkt i tillägget utan att kontakta någon extern server. Öppna Swish-appen på din mobil, välj Skanna och rikta kameran mot koden så fylls mottagare, valt belopp och meddelandet "Lasfilter" i automatiskt.',
+  supFaq2Q:'🔒 Läser eller skickar Läsfilter några betal- eller mejluppgifter?',
+  supFaq2A:'Aldrig. Läsfilter har en strikt säkerhetspolicy (connect-src \'none\') som blockerar all nätverkstrafik från tillägget. Betalning sker helt i din egen Swish-app eller i webbläsaren via PayPal/Ko-fi.',
+  supFaq3Q:'🎁 Låser en donation upp några extra funktioner?',
+  supFaq3A:'Nej – alla funktioner i Läsfilter är 100 % gratis för alla, alltid. En gåva är helt frivillig och ett varmt tack som gör det möjligt att fortsätta utveckla och underhålla tillägget.',
   sidebarNoteTitle:'Du läser i lugn och ro.',
   sidebarNoteBody:'Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.',
   versionText:'Lokal behandling · v1.0.0 · Inga molntjänster',
@@ -329,6 +365,42 @@ const I18N={
   navActivity:'Activity Log',
   navSettings:'Advanced',
   navHelp:'Help',
+  navSupport:'Support Läsfilter',
+  footerSupportLink:'💚 Support Läsfilter',
+  supEyebrow:'💚 100% FREE • LOCAL IN THUNDERBIRD • OPEN SOURCE',
+  supHeroTitle:'Support Läsfilter – for a calmer Thunderbird inbox',
+  supHeroSub:'Läsfilter is completely free, ad-free and runs 100% locally on your computer with zero cloud services. Your gift supports continued development, compatibility with new Thunderbird releases and new smart filter features. Nothing is paywalled – all features are free for everyone.',
+  supStatLocal:'🔒 100% local processing',
+  supStatFree:'💚 100% free – always',
+  supSwishQuick:'💚 Swish (QR)',
+  supGithubBtn:'⭐ GitHub',
+  supPickKicker:'Any amount – no tiers, no paywalls',
+  supPickTitle:'Choose an amount or enter your own',
+  supPickSub:'The selected amount is pre-filled in the Swish QR code and PayPal link (and can always be changed). Every contribution makes a difference.',
+  supSwishMain:'💚 Show Swish QR for amount',
+  supPaypalMain:'💙 PayPal – selected amount',
+  supKofiMain:'☕ Ko-fi – one-time / monthly',
+  supQrTitle:'💚 Scan with the Swish app on your phone',
+  supQrSub:'Open Swish on your phone → Scan QR code. Amount and message (Lasfilter) are pre-filled and editable.',
+  supWhyKicker:'Why your support matters',
+  supWhyTitle:'You support an independent Swedish developer – not a corporation 🛠️',
+  supWhySub:'Läsfilter was built to solve a real pain point in Thunderbird: reading emails at your own pace before they are sorted, or controlling per filter which unread and read emails move. Your support keeps the add-on maintained and ad-free.',
+  supImp1Title:'Thunderbird compatibility',
+  supImp1Body:'Ongoing updates and IMAP testing as Thunderbird releases new versions.',
+  supImp2Title:'New smart filter features',
+  supImp2Body:'New rule conditions, window controls and workflow improvements based on user feedback.',
+  supImp3Title:'100% private & local',
+  supImp3Body:'No cloud services, no telemetry and no locked Pro tiers – ever.',
+  supTrust1:'🔒 Swish, PayPal & Ko-fi – encrypted & secure',
+  supTrust2:'🕊️ Zero tracking in the add-on (connect-src \'none\')',
+  supTrust3:'🇸🇪 Swedish open-source project',
+  supFaqKicker:'Frequently asked questions',
+  supFaq1Q:'💚 How does the Swish QR code work inside Thunderbird?',
+  supFaq1A:'The QR code is generated 100% locally inside the add-on without contacting any external server. Open the Swish app on your phone, tap Scan and point the camera at the QR code to pre-fill recipient, amount and the message "Lasfilter".',
+  supFaq2Q:'🔒 Does Läsfilter read or send any payment or email data?',
+  supFaq2A:'Never. Läsfilter enforces a strict security policy (connect-src \'none\') blocking all network traffic from the add-on. Payments happen entirely in your own Swish app or browser via PayPal/Ko-fi.',
+  supFaq3Q:'🎁 Does donating unlock any extra features?',
+  supFaq3A:'No – all features in Läsfilter are 100% free for everyone, always. Donating is completely voluntary and helps keep development going.',
   sidebarNoteTitle:'Read at your own pace.',
   sidebarNoteBody:'Read messages stay put while open in any mail tab or message window.',
   versionText:'Local processing · v1.0.0 · No cloud services',
@@ -742,6 +814,9 @@ function renderStatus(next){
  $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?T('noticeStoppedPrefix')+Terr(state.fault)+T('noticeStoppedSuffix'):'';
  $('lastCheck').textContent=state.lastCheck?T('lastCheckPrefix')+new Date(state.lastCheck).toLocaleTimeString(locale())+' · '+state.stats.checks+T('lastCheckCountSuffix'):T('lastCheckWaiting');
  if(editToken===currentToken())editRevision=cfg.revision;
+ if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
+ if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
+ updateDonationView();
  renderRules();renderActivity();renderBackups();
 }
 function ruleTagText(rule){
@@ -895,6 +970,86 @@ async function download(data,filename){
 }
 function showView(view){activeView=view;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));}
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
+handle('footerSupportBtn','click',()=>showView('support'));
+
+/* ===== Stöd / Donation (100 % lokal Swish-QR + PayPal + Ko-fi) ===== */
+let donateKr=50;
+function makeQrSvg(text){
+ const bytes=Array.from(new TextEncoder().encode(text));
+ const VERSIONS=[null,[1,19,7,1,19,0,0,[]],[2,34,10,1,34,0,0,[6,18]],[3,55,15,1,55,0,0,[6,22]],[4,80,20,1,80,0,0,[6,26]],[5,108,26,1,108,0,0,[6,30]],[6,136,18,2,68,0,0,[6,34]],[7,156,20,4,39,0,0,[6,22,38]],[8,194,24,2,97,0,0,[6,24,42]],[9,232,30,3,46,2,47,[6,26,46]],[10,274,18,4,43,1,44,[6,28,50]]];
+ const ver=VERSIONS.find(v=>v&&(v[1]-(v[0]<=9?2:3))>=bytes.length)||VERSIONS[10];
+ const [V,totalData,ecLen,b1,d1,b2,d2,align]=ver,size=17+V*4,bits=[];
+ const pushBits=(val,n)=>{for(let i=n-1;i>=0;i--)bits.push((val>>>i)&1);};
+ pushBits(4,4);pushBits(bytes.length,V<=9?8:16);for(const b of bytes)pushBits(b,8);
+ pushBits(0,Math.min(4,totalData*8-bits.length));while(bits.length%8)bits.push(0);
+ const data=[];for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];data.push(b);}
+ while(data.length<totalData)data.push((data.length&1)?0x11:0xec);
+ const EXP=new Uint8Array(512),LOG=new Uint8Array(256);let x=1;
+ for(let i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x=(x<<1)^(x&128?0x11d:0);}for(let i=255;i<512;i++)EXP[i]=EXP[i-255];
+ const mul=(a,b)=>(a&&b)?EXP[LOG[a]+LOG[b]]:0;
+ let gen=[1];for(let i=0;i<ecLen;i++){const next=new Array(gen.length+1).fill(0);for(let j=0;j<gen.length;j++){next[j]^=gen[j];next[j+1]^=mul(gen[j],EXP[i]);}gen=next;}
+ const rsEncode=block=>{const rem=new Uint8Array(ecLen);for(const b of block){const f=b^rem[0];rem.copyWithin(0,1);rem[ecLen-1]=0;for(let j=0;j<ecLen;j++)rem[j]^=mul(gen[j+1],f);}return rem;};
+ const dataBlocks=[],ecBlocks=[];let offset=0;
+ for(let i=0;i<b1+b2;i++){const len=i<b1?d1:d2,blk=data.slice(offset,offset+len);offset+=len;dataBlocks.push(blk);ecBlocks.push(rsEncode(blk));}
+ const codewords=[],maxD=Math.max(d1,d2);
+ for(let i=0;i<maxD;i++)for(const blk of dataBlocks)if(i<blk.length)codewords.push(blk[i]);
+ for(let i=0;i<ecLen;i++)for(const blk of ecBlocks)codewords.push(blk[i]);
+ const grid=Array.from({length:size},()=>new Int8Array(size)),used=Array.from({length:size},()=>new Uint8Array(size));
+ const setMod=(r,c,v)=>{if(r>=0&&r<size&&c>=0&&c<size){grid[r][c]=v?1:0;used[r][c]=1;}};
+ const finder=(r0,c0)=>{for(let dr=-1;dr<=7;dr++)for(let dc=-1;dc<=7;dc++)setMod(r0+dr,c0+dc,dr>=0&&dr<=6&&dc>=0&&dc<=6&&(dr===0||dr===6||dc===0||dc===6||(dr>=2&&dr<=4&&dc>=2&&dc<=4)));};
+ finder(0,0);finder(0,size-7);finder(size-7,0);
+ for(let i=8;i<size-8;i++){setMod(6,i,i%2===0);setMod(i,6,i%2===0);}
+ for(const r of align)for(const c of align){if(used[r][c])continue;for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++)setMod(r+dr,c+dc,Math.max(Math.abs(dr),Math.abs(dc))!==1);}
+ for(let i=0;i<9;i++){used[8][i]=1;used[i][8]=1;}for(let i=0;i<8;i++){used[8][size-1-i]=1;used[size-1-i][8]=1;}setMod(size-8,8,1);
+ if(V>=7){let rem=V;for(let i=0;i<12;i++)rem=(rem<<1)^((rem>>11)*0x1f25);const vInfo=(V<<12)|rem;for(let i=0;i<18;i++){const bit=(vInfo>>i)&1,r=Math.floor(i/3),c=size-11+(i%3);setMod(r,c,bit);setMod(c,r,bit);}}
+ let bitIdx=0,up=true;
+ for(let c=size-1;c>0;c-=2){if(c===6)c--;for(let i=0;i<size;i++){const r=up?size-1-i:i;for(const dc of [0,-1])if(!used[r][c+dc]){const bit=bitIdx<codewords.length*8?(codewords[bitIdx>>3]>>(7-(bitIdx&7)))&1:0;bitIdx++;grid[r][c+dc]=bit^((r+c+dc)%2===0?1:0);}}up=!up;}
+ const fmt=0x77c4,fPos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]],fPos2=[[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
+ for(let i=0;i<15;i++){const bit=(fmt>>i)&1;grid[fPos1[i][0]][fPos1[i][1]]=bit;grid[fPos2[i][0]][fPos2[i][1]]=bit;}
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox',`0 0 ${size+4} ${size+4}`);svg.setAttribute('width','210');svg.setAttribute('height','210');
+ const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+ rect.setAttribute('width','100%');rect.setAttribute('height','100%');rect.setAttribute('rx','3');rect.setAttribute('fill','#ffffff');
+ let d='';for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(grid[r][c])d+=`M${c+2},${r+2}h1v1h-1z`;
+ const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+ path.setAttribute('d',d);path.setAttribute('fill','#133840');
+ svg.append(rect,path);return svg;
+}
+function updateDonationView(){
+ if($('donateAmountInfo'))$('donateAmountInfo').textContent=currentLang==='en'?`Selected: ${donateKr} SEK – thank you for supporting Läsfilter! 💚`:`Valt: ${donateKr} kr – tack för att du stöttar Läsfilter! 💚`;
+ const pp=`https://paypal.me/Rickard3dPrint/${donateKr}SEK`;
+ if($('paypalBtnHero'))$('paypalBtnHero').href=pp;
+ if($('paypalBtnMain'))$('paypalBtnMain').href=pp;
+ if($('qrbox')&&!$('qrbox').hidden&&$('qrSvgWrap')){
+  $('qrSvgWrap').replaceChildren(makeQrSvg(`C0721817177;${donateKr};Lasfilter;6`));
+ }
+}
+for(const chip of document.querySelectorAll('#beloppsrad .bchip')){
+ chip.addEventListener('click',()=>{
+  for(const c of document.querySelectorAll('#beloppsrad .bchip'))c.classList.remove('vald');
+  chip.classList.add('vald');
+  if($('donateCustomKr'))$('donateCustomKr').value='';
+  donateKr=parseInt(chip.dataset.kr,10)||50;
+  updateDonationView();
+ });
+}
+if($('donateCustomKr')){
+ $('donateCustomKr').addEventListener('input',e=>{
+  const v=parseInt(e.target.value,10);
+  if(v>0&&v<100000){
+   for(const c of document.querySelectorAll('#beloppsrad .bchip'))c.classList.remove('vald');
+   donateKr=v;updateDonationView();
+  }
+ });
+}
+function showSwishQr(){
+ if(!$('qrbox')||!$('qrSvgWrap'))return;
+ $('qrbox').hidden=false;
+ $('qrSvgWrap').replaceChildren(makeQrSvg(`C0721817177;${donateKr};Lasfilter;6`));
+ $('qrbox').scrollIntoView({behavior:'smooth',block:'center'});
+}
+handle('swishBtnHero','click',showSwishQr);
+handle('swishBtnMain','click',showSwishQr);
 for(const pill of document.querySelectorAll('#rfPills .rf-pill')){
  pill.addEventListener('click',()=>{
   if($('ruleReadFilter')){$('ruleReadFilter').value=pill.dataset.rf;dirty=true;updateReadPolicy();}

@@ -1236,6 +1236,309 @@ th {
   padding: 5px 0;
 }
 
+.topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-brand img {
+  border-radius: 6px;
+}
+
+/* Support / Donation View (adapted from stod.html for Läsfilter) */
+.support-hero {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  background: linear-gradient(130deg, #175c53 0%, #1e8449 38%, #0f6b5c 74%, #d99b26 115%);
+  color: #fff;
+  border-radius: 18px;
+  padding: 28px 24px 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 12px 34px rgba(23, 92, 83, 0.25);
+}
+
+.support-hero img.support-logo {
+  width: 76px;
+  height: 76px;
+  background: #f3f6f6;
+  border-radius: 20px;
+  padding: 7px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
+  margin-bottom: 10px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .support-hero img.support-logo {
+    animation: supportFloat 4.5s ease-in-out infinite;
+  }
+  @keyframes supportFloat {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-5px) rotate(2deg); }
+  }
+}
+
+.support-eyebrow {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1.5px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  padding: 5px 16px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+
+.support-hero h2 {
+  font-size: 1.65rem;
+  color: #fff;
+  margin: 0 0 8px;
+}
+
+.support-hero p {
+  color: rgba(255, 255, 255, 0.94);
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.support-hstats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.support-hstat {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.support-ctas {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.btn-donate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 20px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.88rem;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.13s ease, filter 0.15s ease;
+}
+
+.btn-donate:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+
+.btn-swish {
+  background: linear-gradient(135deg, #00d68a, #00a868);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(0, 180, 110, 0.32);
+}
+
+.btn-paypal {
+  background: linear-gradient(135deg, #1a8ad6, #0070ba);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(0, 112, 186, 0.28);
+}
+
+.btn-kofi {
+  background: linear-gradient(135deg, #ff7572, #ff5e5b);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(255, 94, 91, 0.28);
+}
+
+.btn-gh {
+  background: var(--card);
+  color: var(--text);
+  border: 1.5px solid var(--line);
+}
+
+.support-card {
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  border-top: 4px solid var(--tc, var(--accent));
+}
+
+.support-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+
+.beloppsrad {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0 6px;
+}
+
+.bchip {
+  border: 2px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+
+.bchip:hover {
+  border-color: var(--accent);
+}
+
+.bchip.vald {
+  background: linear-gradient(135deg, #175c53, #27ae60);
+  color: #fff;
+  border-color: #175c53;
+}
+
+.eget-belopp {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 13px;
+}
+
+.eget-belopp input {
+  border: 0;
+  outline: 0;
+  width: 72px;
+  padding: 4px;
+  font-weight: 800;
+  background: transparent;
+}
+
+.belopp-info {
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 700;
+  margin: 8px 0 12px;
+}
+
+.qrbox {
+  text-align: center;
+  margin: 14px 0 6px;
+  padding: 18px;
+  background: var(--soft);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+}
+
+.qrbox svg {
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.impact-item {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+
+.impact-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--soft);
+  display: grid;
+  place-items: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.impact-item h4 {
+  font-size: 0.85rem;
+  margin: 0 0 3px;
+}
+
+.impact-item p {
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.trust-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.trust-pills span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.support-faq details {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+}
+
+.support-faq summary {
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.86rem;
+}
+
+.support-faq details p {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 hr {
   border: 0;
   border-top: 1px solid var(--line);

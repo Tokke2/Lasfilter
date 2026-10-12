@@ -547,6 +547,73 @@ test('year folder limit guards against runaway folder creation',async()=>{
  assert.equal(f.e.fault,'');
 });
 
+test('yearNameOf godkänner bara riktiga årtal som årsmappenamn',()=>{
+ assert.equal(C.yearNameOf('2025'),2025);
+ assert.equal(C.yearNameOf(' 1999 '),1999);
+ assert.equal(C.yearNameOf('1899'),0);
+ assert.equal(C.yearNameOf('Arkiv'),0);
+ assert.equal(C.yearNameOf('2025x'),0);
+ assert.equal(C.yearNameOf(''),0);
+ assert.equal(C.yearNameOf(null),0);
+});
+
+test('svepet räknar träffar och hoppar över målmappen helt',async()=>{
+ const f=fixture();
+ f.e.config.rules=C.validateRules([base()]);
+ f.messages.clear();
+ f.messages.set(1,{...msg(1),folder:{id:'archive',accountId:'a'}}); /* redan i målmappen – skannas inte */
+ f.messages.set(2,msg(2));                                          /* ska flyttas */
+ f.messages.set(3,{...msg(3),subject:'Hej'});                       /* matchar inte */
+ const r=await f.e.sweepAll();
+ assert.equal(r.scanned,2,'målmappen skannas aldrig');
+ assert.equal(r.matched,1,'ett mejl matchade regeln');
+ assert.equal(r.inTarget,0);
+ assert.equal(r.queued,1);
+ assert.equal(r.handled,0);
+});
+
+test('mejl som redan ligger i sin årsmapp räknas som klara i stället för att köas om',async()=>{
+ const f=fixture({yearFolders:true});
+ f.api.addFolder('year-2025','2025','archive');
+ f.api.addFolder('other-2025','2025','other');
+ f.e.config.rules=[C.validateRule(yearRule())];
+ f.messages.clear();
+ /* Samma år men i en mapp som heter 2025 någon annanstans: känns igen på namnet. */
+ f.messages.set(1,{...oldMsg(1,2025,true),folder:{id:'other-2025',accountId:'a',name:'2025'}});
+ /* Redan i årsmappen under målmappen: känns igen på mapp-id:t. */
+ f.messages.set(2,{...oldMsg(2,2025,true),folder:{id:'year-2025',accountId:'a'}});
+ const r=await f.e.sweepAll();
+ assert.equal(r.matched,2);
+ assert.equal(r.inTarget,2,'bägge ligger redan i en årsmapp');
+ assert.equal(r.queued,0);
+ assert.equal(f.api.created.length,0,'ingen ny årsmapp skapas för mejl som redan är arkiverat');
+});
+
+test('svepet skiljer på redan hanterade mejl och nya träffar',async()=>{
+ const f=fixture();
+ f.e.config.rules=C.validateRules([base()]);
+ f.messages.clear();
+ f.messages.set(1,msg(1));
+ await f.e.sweepAll();                    /* första svepet köar mejlet */
+ const r=await f.e.sweepAll();            /* andra svepet ser att det redan är köat */
+ assert.equal(r.matched,1);
+ assert.equal(r.handled,1);
+ assert.equal(r.queued,0);
+ assert.equal(r.inTarget,0);
+});
+
+test('inga årsmappar läggs inuti en målmapp som redan är en årsmapp',async()=>{
+ const f=fixture({yearFolders:true});
+ f.api.addFolder('year-2025','2025','archive');
+ const rule=C.validateRule({...yearRule(),id:'nested',target:'year-2025'});
+ f.e.config.rules=[rule];
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ const target=await f.e.resolveTarget(rule,f.messages.get(1));
+ assert.equal(target,'year-2025','Arkiv/2025 ska inte få en årsmapp inuti sig');
+ assert.equal(f.api.created.length,0,'ingen ny mapp skapas');
+});
+
 test('year folders are optional and off unless the rule asks for them',async()=>{
  const f=fixture({yearFolders:true});
  f.e.config.rules=C.validateRules([{...base(),id:'plain',target:'archive'}]);

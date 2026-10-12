@@ -2,6 +2,7 @@
 (function(root){
 'use strict';
 const C=root.LasCore||(typeof require!=='undefined'?require('./core.js'):null);
+const ZERO_SWEEP={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,matched:0,inTarget:0,handled:0};
 class Engine {
  constructor(api,config,hooks={}){
   this.api=api;this.config=config;this.hooks=hooks;this.now=hooks.now||Date.now;
@@ -93,6 +94,8 @@ class Engine {
   let folderId='';
   try{
    const parent=await this.withTimeout(this.api.folders.get(base,true),5000);
+   /* Målmappen är redan en årsmapp (t.ex. Arkiv/2025): lägg aldrig en årsmapp inuti den. */
+   if(C.yearNameOf(parent?.name)){this.debug('arsmapp_hoppas_over: malmappen ar redan en arsmapp');return base;}
    const child=(parent?.subFolders||[]).find(f=>f&&f.id&&String(f.name||'')===year);
    if(child?.id)folderId=child.id;
    else if(create&&typeof this.api.folders?.create==='function'&&this.yearCreated<C.LIMITS.yearFolders){
@@ -336,7 +339,7 @@ class Engine {
    const rf=this.ruleMode(rule);
    const direct=rf==='both'||rf==='unread'||(rf==='default'&&this.config.moveMode==='direct');
    const {account,excluded,folders}=await this.ruleFolders(rule);
-   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0;
+   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
    for(const folder of folders){
     if(!this.enabled())break;
     const isInbox=[...(folder.specialUse||[]),folder.type].includes('inbox');
@@ -371,10 +374,14 @@ class Engine {
        if(rf==='unread'&&m.read===true)continue;
        if(!folderDirect&&m.read!==true)continue;
        if(!C.match(rule,m,false,true))continue;
+       matched++;
+       /* Redan i målmappen eller i sin årsmapp: räkna som klar utan att ens slå upp målet. */
+       if(this.sameTarget(rule,m)){inTarget++;continue;}
        const target=await this.resolveTarget(rule,m);
-       if(!target||target===m.folder.id)continue;
+       if(!target)continue;
+       if(target===m.folder.id){inTarget++;continue;}
        const fk=C.fingerprint(m);
-       if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id))continue;
+       if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id)){handled++;continue;}
        if(this.records.size>=C.LIMITS.queue){
         if(this.hooks.ackTimeout===undefined&&!this.config.dryRun&&this.enabled()){
          this.hooks.kick?.();
@@ -408,21 +415,21 @@ class Engine {
     }
    }
    if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders===0)throw new C.RuleError('sweep_error');
-   this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
+   this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' matchade='+matched+' i_mal='+inTarget+' klara='+handled+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
    this.log('catchup',queued);this.change();
-   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders};
+   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled};
   }finally{this.sweeping=Math.max(0,this.sweeping-1);if(this.pending.size)this.hooks.kick?.();}
  }
  async sweepAll(){
-  if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};}
+  if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {...ZERO_SWEEP};}
   this.lastSweep=this.now();
-  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0;
+  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
-   try{const r=await this.sweepRule(rule,{includeInboxUnread:true});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;}
+   try{const r=await this.sweepRule(rule,{includeInboxUnread:true});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
    catch(error){const code=error?.code||error?.name||'Error';this.debug('svep_regel_misslyckades error_code='+code);this.log('error',0,'svep av regel misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');throw new C.RuleError('sweep_error');}
   }
-  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled};
  }
  async catchUp(ruleId){
   return this.sweepRule(this.config.rules.find(r=>r.id===ruleId),{includeInboxUnread:false});

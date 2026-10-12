@@ -356,6 +356,9 @@ const I18N={
   runAllSkipped:'{n} otillgängliga mappar hoppades över.',
   runAllTestMode:'Testläge: inga mejl flyttades.',
   runAllPaused:'Bevakningen är pausad – inga regler kördes. Tryck Pausa igen för att återuppta.',
+  runAllInTarget:'{n} matchade reglerna men ligger redan i målmappen (eller i sin årsmapp).',
+  runAllHandled:'{n} var redan hanterade sedan tidigare.',
+  runAllNoMatch:'Inga mejl matchade reglerna – öppna regeln och tryck 🔎 Varför flyttas inte mejlen?',
   runAllStopped:'Motorn är stoppad av ett fel – inga regler kördes. Meddelande: {code}',
   runAllBusy:'En körning pågår redan – vänta några sekunder och tryck igen.',
   runAllWaited:'En körning pågick redan, så siffrorna gäller hela körningen.',
@@ -833,6 +836,9 @@ const I18N={
   runAllSkipped:'{n} unavailable folders were skipped.',
   runAllTestMode:'Test mode: no emails were moved.',
   runAllPaused:'Monitoring is paused – no rules were run. Press Pause again to resume.',
+  runAllInTarget:'{n} matched the rules but are already in the target folder (or in their year folder).',
+  runAllHandled:'{n} had already been handled.',
+  runAllNoMatch:'No emails matched the rules – open the rule and press 🔎 Why are the emails not moving?',
   runAllStopped:'The engine is stopped by an error – no rules were run. Message: {code}',
   runAllBusy:'A run is already in progress – wait a few seconds and try again.',
   runAllWaited:'A run was already in progress, so the figures cover the whole run.',
@@ -1333,7 +1339,11 @@ function renderRules(){
    e.stopPropagation();
    try{
     const r=await rpc('catchUp',{ruleId:rule.id});renderStatus(await rpc('status'));
-    toast(currentLang==='en'?'Rule "'+rule.name+'": scanned '+r.scanned+', queued '+r.queued+'.':'Regel "'+rule.name+'": skannade '+r.scanned+', köade '+r.queued+'.');
+    const extra=r.queued?'':
+     r.inTarget?(currentLang==='en'?' '+r.inTarget+' already in the target folder.':' '+r.inTarget+' låg redan i målmappen.'):
+     r.matched?(currentLang==='en'?' All matching emails were already handled.':' Alla matchande mejl var redan hanterade.'):
+     (r.scanned?(currentLang==='en'?' No email matched the rule.':' Inga mejl matchade regeln.'):'');
+    toast(currentLang==='en'?'Rule "'+rule.name+'": scanned '+r.scanned+', queued '+r.queued+'.'+extra:'Regel "'+rule.name+'": skannade '+r.scanned+', köade '+r.queued+'.'+extra);
    }catch(err){alertError(err);}
   });
   const dupBtn=el('button','rule-mini-btn','⧉');dupBtn.type='button';dupBtn.title=T('dupRuleTitle');
@@ -1740,6 +1750,9 @@ async function runAllRules(){
   if(r.busy){toast(T('runAllBusy'));return;}
   const parts=[T('runAllScanned').replace('{n}',r.scanned).replace('{f}',r.searchedFolders??0),
    T('runAllQueued').replace('{n}',r.queued)];
+  if(r.inTarget)parts.push(T('runAllInTarget').replace('{n}',r.inTarget));
+  if(r.handled)parts.push(T('runAllHandled').replace('{n}',r.handled));
+  if(!r.matched&&r.scanned)parts.push(T('runAllNoMatch'));
   if(r.deferred)parts.push(T('runAllDeferred').replace('{n}',r.deferred));
   if(r.cachedFolders)parts.push(T('runAllCached').replace('{n}',r.cachedFolders));
   if(r.skippedFolders)parts.push(T('runAllSkipped').replace('{n}',r.skippedFolders));

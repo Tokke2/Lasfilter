@@ -155,6 +155,8 @@ function match(rule,message,includeDisabled=false,ignoreSource=false,now=Date.no
 /* Årsmappar: meddelandets år, används för mål som Arkiv/2025. */
 function yearOf(message){const t=+new Date(message?.date);return Number.isFinite(t)?new Date(t).getFullYear():null;}
 function yearFolderName(message){const y=yearOf(message);return y?String(y):'';}
+/* Ett mappnamn som bara är ett årtal (t.ex. "2025") är en årsmapp. */
+function yearNameOf(text){const name=String(text==null?'':text).trim();return /^(19|20)\d{2}$/.test(name)&&+name>=1970&&+name<=9999?+name:0;}
 function targetFor(rule,message){
  const values=valuesFor(message);
  for(const b of rule.branches||[])if(condHit(b.condition,values))return b.target;
@@ -191,6 +193,6 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,yearOf,yearFolderName};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,yearOf,yearFolderName,yearNameOf};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

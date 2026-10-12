@@ -64,7 +64,7 @@ globalThis.LasDemo=(()=>{
    case 'sweepNow':
     /* Samma svar som den riktiga bakgrunden: pausat läge kör ingenting, annars en liten fiktiv körning. */
     if(state.config.paused)data={scanned:0,queued:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,deferred:0,skipped:'paused',fault:state.fault||''};
-    else{data={scanned:6,queued:2,searchedFolders:4,skippedFolders:0,emptyFolders:1,cachedFolders:12,deferred:0};state.queued+=2;}
+    else{data={scanned:6,queued:1,matched:5,inTarget:3,handled:1,searchedFolders:4,skippedFolders:0,emptyFolders:1,cachedFolders:12,deferred:0};state.queued+=1;}
     break;
    case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.revision++;data=state;break;
    default:throw new LasCore.RuleError('bad_request');

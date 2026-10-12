@@ -256,8 +256,24 @@ class Engine {
        if(!C.match(rule,m,false,true))continue;
        const fk=C.fingerprint(m);
        if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id))continue;
-       if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
-       if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true}))queued++;
+       if(this.records.size>=C.LIMITS.queue){
+        if(this.hooks.ackTimeout===undefined&&!this.config.dryRun&&this.enabled()){
+         this.hooks.kick?.();
+         const waitStart=Date.now();
+         while(this.records.size>=C.LIMITS.queue&&this.enabled()&&Date.now()-waitStart<15000){
+          if(!this.busy)await this.tick();
+          else await new Promise(r=>setTimeout(r,40));
+         }
+        }
+        if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
+       }
+       if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true})){
+        queued++;
+        if(this.hooks.ackTimeout===undefined&&!this.config.dryRun){
+         if(!this.busy)this.tick().catch(()=>{});
+         await new Promise(r=>setTimeout(r,0));
+        }
+       }
       }
       if(!page.id||!this.enabled())break;
       page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
@@ -329,7 +345,13 @@ class Engine {
     await this.process(job,epoch,batchState);
    }
   }catch{this.stop('display_error');}
-  finally{this.busy=false;this.change();}
+  finally{
+   this.busy=false;this.change();
+   if(this.enabled()&&this.pending.size){
+    const ready=[...this.pending.values()].some(j=>j.persisted&&j.record.stage==='pending'&&(this.config.moveMode==='direct'||j.record.notify===true||['both','unread'].includes(this.ruleMode(this.config.rules.find(r=>r.id===j.record.ruleId)))||(j.hiddenSince!==null&&this.now()-j.hiddenSince>=2000)));
+    if(ready)this.hooks.kick?.();
+   }
+  }
  }
  async currentDisplayed(batchState){
   if(batchState&&this.now()-batchState.shownAt<1500)return batchState.shown;

@@ -2,7 +2,16 @@
 const C=LasCore,B=browser;
 const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map()};
 App.write=fn=>{const p=App.writeChain.then(fn);App.writeChain=p.catch(()=>{});return p;};
-App.persistWork=()=>App.write(()=>B.storage.local.set({work:App.engine.recordList()}));
+App.persistPending=null;
+App.persistWork=()=>{
+ if(!App.persistPending){
+  App.persistPending=App.write(async()=>{
+   App.persistPending=null;
+   await B.storage.local.set({work:App.engine.recordList()});
+  });
+ }
+ return App.persistPending;
+};
 App.writeTextLog=async()=>{
  if(!App.engine?.config.fileLog)return;
  const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
@@ -19,7 +28,7 @@ App.log=(name,count=0,detail='')=>{
 // Behåll alltid det första, mest specifika felet. Händelselyssnare ska inte
 // skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
-App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},50);};
+App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
 App.scheduleSweep=()=>{clearInterval(App.sweepTimer);if(!App.engine?.config.hourly)return;App.sweepTimer=setInterval(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'intervall_svep_misslyckades')),App.engine.config.sweepMinutes*60000);};
 App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
@@ -291,6 +300,17 @@ App.ready=(async()=>{
   await App.engine.restore(pendingWork.slice(0,20));
  }
  App.log('start');App.changed();
+ try{
+  const uiUrl=B.runtime.getURL('ui.html');
+  const tabs=await B.tabs.query({});
+  const uiTabs=(tabs||[]).filter(t=>typeof t.url==='string'&&t.url.startsWith(uiUrl));
+  if(uiTabs.length){
+   const keep=uiTabs.find(t=>t.active)||uiTabs[0];
+   App.uiTab=keep.id;
+   for(const t of uiTabs)if(t.id!==keep.id)B.tabs.remove(t.id).catch(()=>{});
+   B.tabs.reload(keep.id).catch(()=>{});
+  }
+ }catch{}
  App.timer=setInterval(()=>App.engine.tick().catch(()=>App.fail('internal_error')),2000);App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
  if(App.engine.enabled()&&!App.engine.config.dryRun&&App.engine.config.rules.some(r=>r.enabled)&&(needResweep||App.engine.config.hourly)){

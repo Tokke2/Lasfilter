@@ -97,7 +97,32 @@
                 <h2 data-i18n="rulesTitle">Dina automatiska flyttar</h2>
                 <p data-i18n="rulesSub">Ställ in olästa mejl och nytt fönster direkt på varje filter.</p>
               </div>
-              <button id="newRule" class="button small secondary" data-i18n="newRuleBtn">＋ Lägg till</button>
+              <div class="rules-header-actions">
+                <button id="newFromSelected" type="button" class="button small primary" data-i18n="newFromSelectedBtn">✉ Ny från markerat mejl</button>
+                <button id="newRule" type="button" class="button small secondary" data-i18n="newRuleBtn">＋ Ny tom regel</button>
+              </div>
+            </div>
+            <div id="quickRuleBox" class="quick-rule-box">
+              <div class="quick-rule-head">
+                <strong data-i18n="quickRuleTitle">⚡ Snabbskapa nytt filter (lägg till flera olika direkt)</strong>
+                <button id="quickFetchBtn" type="button" class="text-button" data-i18n="quickFetchBtn">✉ Hämta från markerat mejl</button>
+              </div>
+              <div class="quick-rule-row">
+                <select id="quickField" aria-label="Fält">
+                  <option value="domain" data-i18n="optDomain">Avsändardomän</option>
+                  <option value="sender" data-i18n="optSender">Från (adress)</option>
+                  <option value="subject" data-i18n="optSubject">Ämne</option>
+                </select>
+                <input id="quickValue" type="text" maxlength="256" placeholder="t.ex. fortnox.se, klarna.se eller Faktura…">
+              </div>
+              <div class="quick-rule-row">
+                <select id="quickTarget" aria-label="Målmapp"><option value="">Välj målmapp…</option></select>
+                <button id="quickAddBtn" type="button" class="button small primary" data-i18n="quickAddBtn">＋ Lägg till filter</button>
+              </div>
+              <div class="quick-rule-checks">
+                <label class="rule-check-chip"><input id="quickMoveUnread" type="checkbox" checked> <span data-i18n="inlineMoveUnread">Flytta olästa mejl</span></label>
+                <label class="rule-check-chip"><input id="quickOpenWindow" type="checkbox"> <span data-i18n="inlineOpenWindow">Öppna i nytt fönster</span></label>
+              </div>
             </div>
             <label class="search">
               <span>⌕</span>
@@ -222,7 +247,8 @@
               <div class="form-actions">
                 <button id="test" type="button" class="button secondary" data-i18n="testBtn">▷ Kontrollera</button>
                 <button id="save" type="submit" class="button primary" data-i18n="saveBtn">Spara automatisk flytt</button>
-                <button id="saveAndNew" type="button" class="button secondary" data-i18n="saveAndNewBtn">＋ Spara & ny regel</button>
+                <button id="saveAsNew" type="button" class="button secondary" data-i18n="saveAsNewBtn">＋ Spara som ny regel</button>
+                <button id="saveAndNew" type="button" class="button secondary" data-i18n="saveAndNewBtn">＋ Spara & ny tom</button>
               </div>
               <div class="editor-footer">
                 <button id="up" type="button" class="text-button" data-i18n="upBtn">↑ Prioritet</button>

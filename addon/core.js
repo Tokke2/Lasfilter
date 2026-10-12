@@ -1,7 +1,7 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:500,logs:5000});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000});
 class RuleError extends Error { constructor(code){super(code);this.code=code;} }
 const fail=code=>{throw new RuleError(code);};
 const norm=s=>String(s??'').normalize('NFKC').toLocaleLowerCase('sv-SE');

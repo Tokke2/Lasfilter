@@ -776,6 +776,50 @@ p {
   color: var(--accent);
 }
 
+.rules-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-rule-box {
+  margin: 0 20px 12px;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--accent);
+  border-radius: 10px;
+  background: var(--mint-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-rule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.quick-rule-row {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-rule-row:nth-of-type(3) {
+  grid-template-columns: 1fr auto;
+}
+
+.quick-rule-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .card-foot {
   display: flex;
   flex-wrap: wrap;

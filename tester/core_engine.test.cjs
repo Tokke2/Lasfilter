@@ -70,7 +70,7 @@ test('ambiguous restore skipped',async()=>{const f=fixture();await f.e.enqueue(m
 test('old rule version not restored',async()=>{const f=fixture();await f.e.enqueue(msg());const g=fixture();g.e.config.rulesVersion=9;await g.e.restore(f.e.recordList());assert.equal(g.e.pending.size,0);});
 test('restore unknown metadata skipped',async()=>{const f=fixture();await f.e.restore([{key:'fake',stage:'pending'}]);assert.equal(f.e.records.size,0);});
 test('rule edit clears queued jobs and dry-run done markers',async()=>{const f=fixture({dryRun:true});await f.ready();assert(f.e.done.size);await f.e.clearPending();assert.equal(f.e.done.size,0);assert(await f.e.enqueue(msg()));});
-test('queue bound defers safely without stopping monitoring',async()=>{const f=fixture();for(let i=1;i<=501;i++)await f.e.enqueue(msg(i));assert.equal(f.e.records.size,500);assert.equal(f.e.fault,'');});
+test('queue bound defers safely without stopping monitoring',async()=>{const f=fixture();for(let i=1;i<=101;i++)await f.e.enqueue(msg(i));assert.equal(C.LIMITS.queue,100);assert.equal(f.e.records.size,100);assert.equal(f.e.fault,'');});
 
 test('old rule generation never executed from live queue',async()=>{const f=fixture();await f.e.enqueue(msg());f.e.config.rulesVersion++;await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);assert.equal(f.e.pending.size,0);});
 test('cannot clear journal during preparation',async()=>{const f=fixture();await f.e.enqueue(msg());f.e.records.values().next().value.stage='attempted';f.e.busy=true;assert.equal(f.e.blocked(),0);await assert.rejects(f.e.clearBlocked(),e=>e.code==='operation_running');assert.equal(f.e.records.size,1);});
@@ -255,6 +255,26 @@ test('unmovable subfolder message from sweep is dropped without stopping other q
  assert.equal(f.e.stats.moved,1);
  assert.equal(f.e.stats.skipped,1);
 });
+test('sweepRule moves messages concurrently while building the queue and drains when reaching 100 in queue',async()=>{
+ const f=fixture();
+ delete f.e.hooks.ackTimeout;
+ f.messages.clear();
+ let movedDuringEnqueue=0;
+ const origMove=f.api.messages.move;
+ f.api.messages.move=async(ids,target,opts)=>{
+  if(f.e.sweeping>0)movedDuringEnqueue++;
+  return origMove(ids,target,opts);
+ };
+ for(let i=1;i<=125;i++)f.messages.set(i,msg(i));
+ const r=await f.e.catchUp('rule1');
+ await f.e.tick();
+ assert.equal(r.queued,125);
+ assert.equal(r.deferred,0);
+ assert.ok(movedDuringEnqueue>0,'moves should happen concurrently while sweepRule is still building the queue');
+ assert.equal(f.e.stats.moved,125);
+ assert.equal(f.e.pending.size,0);
+});
+
 
 
 

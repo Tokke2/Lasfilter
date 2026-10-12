@@ -77,7 +77,12 @@ const I18N={
   statMatched:'matchade sedan start',
   rulesTitle:'Dina automatiska flyttar',
   rulesSub:'Lägg upp hur många regler du vill. Varje regel visar villkor, oläst/läst-val och målmapp.',
-  newRuleBtn:'＋ Lägg till',
+  newFromSelectedBtn:'✉ Ny från markerat mejl',
+  newRuleBtn:'＋ Ny tom regel',
+  quickRuleTitle:'⚡ Snabbskapa nytt filter (lägg till flera olika direkt)',
+  quickFetchBtn:'✉ Hämta från markerat mejl',
+  quickAddBtn:'＋ Lägg till filter',
+  quickValuePlaceholder:'t.ex. fortnox.se, klarna.se eller Faktura…',
   ruleSearchPlaceholder:'Sök bland dina regler…',
   exportBtn:'↓ Exportera regler (.json)',
   importBtn:'↑ Importera (.json)',
@@ -132,7 +137,8 @@ const I18N={
   addBranchBtn:'＋ Lägg till fördelning',
   testBtn:'▷ Kontrollera',
   saveBtn:'Spara automatisk flytt',
-  saveAndNewBtn:'＋ Spara & ny regel',
+  saveAsNewBtn:'＋ Spara som ny regel',
+  saveAndNewBtn:'＋ Spara & ny tom',
   upBtn:'↑ Prioritet',
   downBtn:'↓ Prioritet',
   duplicateBtn:'⧉ Duplicera regel',
@@ -263,9 +269,11 @@ const I18N={
   toastSavedAndNew:'Regeln sparad! Fyll i nästa regel nedan.',
   toastDuplicated:'Regeln duplicerad som ny regel – anpassa och tryck Spara.',
   defaultRulePrefix:'Mejl från ',
+  defaultSubjectPrefix:'Ämne: ',
   defaultSenderFallback:'avsändaren',
   copySuffix:' (kopia)',
-  toastFromSelected:'Klart! Exempelmejlet är hämtat. Välj nu målmappen och tryck Spara.',
+  toastFromSelected:'Hämtat från markerat mejl! Välj nu målmappen och tryck Spara.',
+  toastQuickAdded:'Nytt filter tillagt! Skriv eller hämta nästa mejl för att lägga till fler.',
   testReasonNoMatch:'Villkoren matchar inte det markerade mejlet.',
   testReasonDisabled:'Villkoren matchar, men regeln är avstängd.',
   testReasonUnread:'Villkoren matchar, men mejlet är oläst. Ingen flytt får ske.',
@@ -437,7 +445,12 @@ const I18N={
   statMatched:'matched since start',
   rulesTitle:'Your automatic rules',
   rulesSub:'Create as many rules as you like. Each row shows conditions, read/unread mode and target folder.',
-  newRuleBtn:'＋ Add rule',
+  newFromSelectedBtn:'✉ New from selected email',
+  newRuleBtn:'＋ New blank rule',
+  quickRuleTitle:'⚡ Quick-create filter (add multiple rules directly)',
+  quickFetchBtn:'✉ Fetch from selected email',
+  quickAddBtn:'＋ Add filter',
+  quickValuePlaceholder:'e.g. fortnox.se, klarna.se or Invoice…',
   ruleSearchPlaceholder:'Search your rules…',
   exportBtn:'↓ Export rules (.json)',
   importBtn:'↑ Import (.json)',
@@ -492,7 +505,8 @@ const I18N={
   addBranchBtn:'＋ Add branch',
   testBtn:'▷ Test rule',
   saveBtn:'Save automatic move',
-  saveAndNewBtn:'＋ Save & new rule',
+  saveAsNewBtn:'＋ Save as new rule',
+  saveAndNewBtn:'＋ Save & new blank',
   upBtn:'↑ Priority',
   downBtn:'↓ Priority',
   duplicateBtn:'⧉ Duplicate rule',
@@ -623,9 +637,11 @@ const I18N={
   toastSavedAndNew:'Rule saved! Fill in your next rule below.',
   toastDuplicated:'Rule duplicated as a new draft – adjust and click Save.',
   defaultRulePrefix:'Mail from ',
+  defaultSubjectPrefix:'Subject: ',
   defaultSenderFallback:'sender',
   copySuffix:' (copy)',
-  toastFromSelected:'Done! Sample email fetched. Now choose a target folder and click Save.',
+  toastFromSelected:'Fetched from selected email! Now choose a target folder and click Save.',
+  toastQuickAdded:'New filter added! Enter or fetch your next email to add more.',
   testReasonNoMatch:'Conditions do not match the selected email.',
   testReasonDisabled:'Conditions match, but this rule is disabled.',
   testReasonUnread:'Conditions match, but the email is unread and this rule only moves read emails.',
@@ -775,6 +791,7 @@ function applyLanguage(lang){
  if($('themeQuick')){$('themeQuick').title=T('themeQuickTitle');$('themeQuick').setAttribute('aria-label',T('themeQuickTitle'));}
  if($('ruleSearch'))$('ruleSearch').placeholder=T('ruleSearchPlaceholder');
  if($('ruleName'))$('ruleName').placeholder=T('ruleNamePlaceholder');
+ if($('quickValue'))$('quickValue').placeholder=T('quickValuePlaceholder');
  const srcVal=$('source')?.value||'',trgVal=$('target')?.value||'';
  if(folders.length){accountOptions(srcVal);targetOptions(trgVal);}
  for(const row of $('conditions')?.children||[]){
@@ -929,6 +946,10 @@ function accounts(){const seen=new Set();return folders.filter(f=>{if(!f.account
 function accountOptions(value=''){selectOptions($('source'),accounts(),T('chooseAccount'),value);}
 function targetOptions(value=''){
  selectOptions($('target'),folders,T('chooseTarget'),value);
+ if($('quickTarget')){
+  const qVal=$('quickTarget').value;
+  selectOptions($('quickTarget'),folders,T('chooseTarget'),qVal||value||'');
+ }
 }
 function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},target:''}){
  if($('branches').children.length>=8){toast(T('maxBranches'));return;}
@@ -1116,10 +1137,25 @@ handle('ruleUnreadAction','change',()=>{dirty=true;updateReadPolicy();});
 handle('addCondition','click',()=>{addCondition({field:'subject',op:'contains',value:''});dirty=true;});
 handle('addBranch','click',()=>{addBranchRow();dirty=true;});
 
-async function saveCurrentRule({openNewAfter=false}={}){
- const rule=draft();
+async function saveCurrentRule({openNewAfter=false,forceNew=false}={}){
+ const oldSelected=selectedId;
+ if(forceNew&&selectedId){
+  const existing=state.config.rules.find(r=>r.id===selectedId);
+  selectedId='';
+  if(existing&&$('ruleName').value.trim()===existing.name){
+   const firstVal=$('conditions')?.children?.[0]?.children?.[2]?.value?.trim();
+   $('ruleName').value=(firstVal?T('defaultRulePrefix')+firstVal:existing.name+T('copySuffix')).slice(0,100);
+  }
+ }
+ let rule;
+ try{
+  rule=draft();
+ }catch(err){
+  selectedId=oldSelected;
+  throw err;
+ }
  const keptAccount=$('source').value;
- $('save').disabled=true;if($('saveAndNew'))$('saveAndNew').disabled=true;
+ $('save').disabled=true;if($('saveAndNew'))$('saveAndNew').disabled=true;if($('saveAsNew'))$('saveAsNew').disabled=true;
  try{
   const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===rule.id);
   if(i<0)rules.push(rule);else rules[i]=rule;
@@ -1134,12 +1170,13 @@ async function saveCurrentRule({openNewAfter=false}={}){
    toast(T('toastRuleSaved'));
   }
  }finally{
-  $('save').disabled=false;if($('saveAndNew'))$('saveAndNew').disabled=false;
+  $('save').disabled=false;if($('saveAndNew'))$('saveAndNew').disabled=false;if($('saveAsNew'))$('saveAsNew').disabled=false;
  }
 }
 
 handle('ruleForm','submit',async e=>{e.preventDefault();await saveCurrentRule({openNewAfter:false});});
 handle('saveAndNew','click',async()=>{await saveCurrentRule({openNewAfter:true});});
+if($('saveAsNew'))handle('saveAsNew','click',async()=>{await saveCurrentRule({openNewAfter:false,forceNew:true});});
 handle('duplicate','click',()=>{
  selectedId='';
  $('editorTitle').textContent=T('editorNew');
@@ -1150,14 +1187,70 @@ handle('duplicate','click',()=>{
  toast(T('toastDuplicated'));
 });
 
-handle('fromSelected','click',async()=>{
+async function fetchSelectedIntoEditor({forceNew=false}={}){
  const m=await rpc('selected');if(!folders.some(f=>f.accountId===m.sourceAccount))throw new C.RuleError('unsafe_folder');
+ const existing=selectedId?state.config.rules.find(r=>r.id===selectedId):null;
+ const existingVal=existing?.conditions?.[0]?.value?.trim()?.toLowerCase()||'';
+ const incomingVal=(m.domain||m.email||m.subject||'').trim().toLowerCase();
+ if(forceNew||(existing&&existingVal&&incomingVal&&existingVal!==incomingVal)){
+  loadRule('',m.sourceAccount);
+ }
  $('source').value=m.sourceAccount;targetOptions($('target').value);
  const row=$('conditions').children[0],field=row.children[0].value;
  row.children[2].value=field==='domain'?m.domain:field==='sender'?m.email:m.subject.slice(0,256);
- if(!$('ruleName').value)$('ruleName').value=(T('defaultRulePrefix')+(m.domain||T('defaultSenderFallback'))).slice(0,100);
+ if(!$('ruleName').value)$('ruleName').value=(T('defaultRulePrefix')+(m.domain||m.email||T('defaultSenderFallback'))).slice(0,100);
  dirty=true;$('target').focus();toast(T('toastFromSelected'));
+}
+handle('fromSelected','click',async()=>fetchSelectedIntoEditor({forceNew:false}));
+if($('newFromSelected'))handle('newFromSelected','click',async()=>fetchSelectedIntoEditor({forceNew:true}));
+
+if($('quickFetchBtn'))handle('quickFetchBtn','click',async()=>{
+ const m=await rpc('selected');
+ const field=$('quickField')?.value||'domain';
+ if($('quickValue'))$('quickValue').value=field==='domain'?(m.domain||m.email||''):field==='sender'?(m.email||m.author||''):(m.subject||'').slice(0,256);
+ if($('quickTarget')&&!$('quickTarget').value){
+  const sameAcc=folders.find(f=>f.accountId===m.sourceAccount&&!(f.specialUse||[]).includes('inbox'));
+  if(sameAcc)$('quickTarget').value=sameAcc.id;
+ }
+ $('quickTarget')?.focus();
+ toast(T('toastFromSelected'));
 });
+
+async function createQuickRule(){
+ const field=$('quickField')?.value||'domain';
+ const rawVal=($('quickValue')?.value||'').trim();
+ const targetId=$('quickTarget')?.value||'';
+ if(!rawVal){$('quickValue')?.focus();throw new C.RuleError('bad_value');}
+ if(!targetId){$('quickTarget')?.focus();throw new C.RuleError('choose_target');}
+ const targetFolder=folders.find(f=>f.id===targetId)||folders[0];
+ const accountId=targetFolder?.accountId||$('source')?.value||accounts()[0]?.id||'';
+ const anchorFolder=folders.find(f=>f.accountId===accountId&&f.id!==targetId)||folders.find(f=>f.accountId===accountId)||targetFolder;
+ const op=field==='domain'?'equals':field==='sender'?(rawVal.includes('@')?'equals':'contains'):'contains';
+ const ruleName=((field==='subject'?T('defaultSubjectPrefix'):T('defaultRulePrefix'))+rawVal).slice(0,100);
+ const moveUnread=$('quickMoveUnread')?$('quickMoveUnread').checked:true;
+ const openWin=$('quickOpenWindow')?$('quickOpenWindow').checked:false;
+ const newRule=C.validateRule({
+  id:crypto.randomUUID(),
+  name:ruleName,
+  enabled:true,
+  source:anchorFolder?.id||targetId,
+  sourceAccount:accountId,
+  scope:'account',
+  target:targetId,
+  match:'all',
+  readFilter:moveUnread?'both':'read',
+  unreadAction:openWin?'window':'keep',
+  conditions:[{field,op,value:rawVal}],
+  branches:[]
+ });
+ const rules=[...state.config.rules,newRule];
+ const next=await rpc('saveRules',{rules,revision:editRevision});
+ if($('quickValue'))$('quickValue').value='';
+ dirty=false;renderStatus(next);loadRule(newRule.id);
+ toast(T('toastQuickAdded'));
+}
+if($('quickAddBtn'))handle('quickAddBtn','click',createQuickRule);
+if($('quickValue'))$('quickValue').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickAddBtn')?.click();}});
 handle('test','click',async()=>{
  const result=await rpc('testRule',{rule:draft()});
  const reasons={no_match:T('testReasonNoMatch'),disabled:T('testReasonDisabled'),unread:T('testReasonUnread'),already_read:T('testReasonAlreadyRead'),displayed:T('testReasonDisplayed'),eligible:T('testReasonEligible')};
@@ -1181,11 +1274,11 @@ handle('sweepNow','click',async()=>{
  try{
   const r=await rpc('sweepNow');renderStatus(await rpc('status'));
   if(currentLang==='en'){
-   const mode=state.config.dryRun?' Test mode: no emails moved.':' Matching emails will move according to your rules.';
-   toast('Scan complete: '+r.scanned+' emails checked in '+(r.searchedFolders??'account')+' folders, '+r.queued+' matched and queued.'+(r.deferred?' '+r.deferred+' deferred to next batch (500 max).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+mode);
+   const mode=state.config.dryRun?' Test mode: no emails moved.':' Matching emails move concurrently as the queue forms.';
+   toast('Scan complete: '+r.scanned+' emails checked in '+(r.searchedFolders??'account')+' folders, '+r.queued+' matched and queued.'+(r.deferred?' '+r.deferred+' deferred to next batch (100 max in queue).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+mode);
   }else{
-   const mode=state.config.dryRun?' Testläge: inga mejl flyttas.':' Matchande mejl flyttas enligt dina regler.';
-   toast('Kontrollen är klar: '+r.scanned+' mejl granskade i '+(r.searchedFolders??'kontots')+' mappar, '+r.queued+' matchade och köade.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep eftersom flyttkön tar 500 åt gången.':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+mode);
+   const mode=state.config.dryRun?' Testläge: inga mejl flyttas.':' Matchande mejl flyttas direkt samtidigt som kön bildas.';
+   toast('Kontrollen är klar: '+r.scanned+' mejl granskade i '+(r.searchedFolders??'kontots')+' mappar, '+r.queued+' matchade och köade.'+(r.deferred?' '+r.deferred+' väntar till nästa svep (max 100 i kö åt gången).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+mode);
   }
  }finally{if(state)$('sweepNow').disabled=!!state.fault||state.config.paused||!state.config.rules.some(r=>r.enabled);}
 });
@@ -1195,9 +1288,9 @@ handle('catchUp','click',async()=>{
  if(!confirm(T('confirmCatchUp')))return;
  const r=await rpc('catchUp',{ruleId:selectedId});renderStatus(await rpc('status'));
  if(currentLang==='en'){
-  toast('Scanned '+r.scanned+' messages in '+(r.searchedFolders??'account')+' folders, queued '+r.queued+'.'+(r.deferred?' '+r.deferred+' deferred to next batch (500 max).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+(state.config.dryRun?' Test mode: no moves executed.':''));
+  toast('Scanned '+r.scanned+' messages in '+(r.searchedFolders??'account')+' folders, queued '+r.queued+'.'+(r.deferred?' '+r.deferred+' deferred to next batch (100 max).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+(state.config.dryRun?' Test mode: no moves executed.':''));
  }else{
-  toast('Skannade '+r.scanned+' meddelanden i '+(r.searchedFolders??'kontots')+' mappar, köade '+r.queued+'.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep (500 per batch).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+(state.config.dryRun?' Testläge: inga flyttar utfördes.':''));
+  toast('Skannade '+r.scanned+' meddelanden i '+(r.searchedFolders??'kontots')+' mappar, köade '+r.queued+'.'+(r.deferred?' '+r.deferred+' väntar till nästa svep (max 100 i kö).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+(state.config.dryRun?' Testläge: inga flyttar utfördes.':''));
  }
 });
 async function exportAllRules(){

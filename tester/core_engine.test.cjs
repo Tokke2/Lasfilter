@@ -547,6 +547,42 @@ test('year folder limit guards against runaway folder creation',async()=>{
  assert.equal(f.e.fault,'');
 });
 
+test('year folders are optional and off unless the rule asks for them',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([{...base(),id:'plain',target:'archive'}]);
+ assert.equal(f.e.config.rules[0].yearFolders,false,'årsmappar är avstängt som standard');
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);
+ await f.e.tick();await f.e.tick();
+ assert.equal(f.api.created.length,0,'ingen årsmapp skapas för en vanlig regel');
+ assert.equal(f.e.stats.moved,1);
+});
+
+test('ticked box: readFilter=both moves unread mail outside the inbox too',async()=>{
+ const f=fixture();
+ f.e.config.rules=C.validateRules([{...base(),id:'r-both',readFilter:'both'}]);
+ f.messages.clear();
+ f.messages.set(1,{...msg(1),read:false,folder:{id:'sub1',accountId:'a'}});
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1,'olästa mejl i undermappar flyttas när rutan är kryssad');
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.messages.get(1001).folder.id,'archive');
+});
+
+test('unticked box: readFilter=read leaves the same unread mail in place',async()=>{
+ const f=fixture();
+ f.e.config.rules=C.validateRules([{...base(),id:'r-read',readFilter:'read'}]);
+ f.messages.clear();
+ f.messages.set(1,{...msg(1),read:false,folder:{id:'sub1',accountId:'a'}});
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,0);
+ assert.equal(f.api.calls.length,0);
+ assert.equal(f.messages.get(1).folder.id,'sub1');
+});
+
 test('date before/after the current year follow the calendar instead of a fixed year',()=>{
  const before=C.validateRule({...base(),conditions:[{field:'date',op:'beforeThisYear',value:''}]});
  const after=C.validateRule({...base(),conditions:[{field:'date',op:'afterThisYear',value:''}]});

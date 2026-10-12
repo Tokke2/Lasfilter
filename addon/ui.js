@@ -114,9 +114,10 @@ const I18N={
   step3Title:'Vart och när ska mejlen flyttas?',
   targetLabel:'Välj målmapp',
   chooseTarget:'Välj en målmapp…',
-  ruleMoveUnreadLabel:'Flytta olästa mejl i detta filter',
+  ruleMoveUnreadLabel:'Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)',
+  unreadMoveNote:'Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.',
   ruleOpenWindowLabel:'Öppna flyttade olästa mejl i nytt fönster',
-  inlineMoveUnread:'Flytta olästa mejl',
+  inlineMoveUnread:'Flytta även olästa mejl direkt',
   inlineOpenWindow:'Öppna i nytt fönster',
   readFilterLabel:'Flytta olästa / lästa mejl för denna regel',
   rfDefault:'Enligt standardinställning (lästa + nya i Inkorgen)',
@@ -188,7 +189,7 @@ const I18N={
   helpP4:'Tillägget ändrar aldrig Thunderbirds inbyggda filterfiler (msgFilterRules.dat) och använder inga molntjänster.',
   footerRight:'Egna regler · Inga ändringar i msgFilterRules.dat',
   policyDefaultTitle:'Först läst (eller direkt vid nyinkommet i Inkorgen).',
-  policyDefaultBody:'Följer standardinställningen: lästa mejl flyttas när de lämnats i 2 sekunder, och nya mejl i Inkorgen kan flyttas direkt.',
+  policyDefaultBody:'Följer standardinställningen: lästa mejl flyttas när de lämnats i 2 sekunder, och nya mejl i Inkorgen kan flyttas direkt. Kryssa i ”Flytta även olästa mejl direkt” om regeln ska flytta olästa mejl i alla mappar med en gång.',
   policyReadTitle:'Först läst. Sedan lämnat.',
   policyReadBody:'Flyttar endast lästa mejl och väntar minst två sekunder utan visning i någon mejlflik eller något fönster.',
   policyBothTitle:'Både olästa och lästa flyttas direkt.',
@@ -231,6 +232,10 @@ const I18N={
   fieldSenderShort:'Från',
   fieldDomainShort:'Domän',
   fieldSubjectShort:'Ämne',
+  fieldRecipientShort:'Till',
+  fieldCcShort:'Kopia',
+  fieldSizeShort:'Storlek',
+  fieldDateShort:'Datum',
   moreConditionsSuffix:' villkor',
   scopeAccount:'Hela kontot',
   scopeFolder:'Vald mapp',
@@ -357,11 +362,12 @@ const I18N={
   diagnoseRunning:'Undersöker kontots mappar – inget flyttas…',
   diagnoseSummary:'Granskade {s} mejl i {f} mappar. {m} matchade regeln. Regelns läsläge: {rf}.',
   diagnoseWouldMove:'{n} mejl är redo – de flyttas vid nästa körning.',
-  diagnoseUnread:'{n} matchande mejl är olästa och väntar tills du har läst dem.',
+  diagnoseUnread:'{n} matchande mejl är olästa och väntar tills du har läst dem. Kryssa i ”Flytta även olästa mejl direkt” i steg 3 om de ska flyttas utan att vänta.',
   diagnoseInTarget:'{n} mejl ligger redan i målmappen (eller i sin årsmapp).',
   diagnoseQueued:'{n} mejl är redan hanterade eller köade sedan tidigare.',
   diagnoseNoMatch:'Inga mejl matchar villkoren. Kontrollera fält, värde och konto – eller använd Kontrollera på ett markerat mejl.',
   diagnoseExamples:'Exempel på matchande mejl',
+  diagnoseFixUnread:'✔ Tillåt olästa mejl och flytta dem nu',
   diagnoseReasonMove:'flyttas',
   diagnoseReasonUnread:'oläst – väntar',
   diagnoseReasonTarget:'redan i målmappen',
@@ -373,12 +379,10 @@ const I18N={
   opBeforeThisYear:'Är före innevarande år',
   opAfterThisYear:'Är efter innevarande år',
   condPlaceholderThisYear:'Behöver inget värde – följer kalendern',
-  ruleYearFoldersLabel:'Lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)',
-  yearFoldersNote:'Årsmappen skapas automatiskt när den behövs. Välj Endast lästa mejl nedan om olästa mejl ska vänta tills du har läst dem.',
+  ruleYearFoldersLabel:'Valfritt: lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)',
+  yearFoldersNote:'Avstängt som standard – kryssa bara i om du vill ha en egen mapp per år. Årsmappen skapas automatiskt när den behövs.',
   tagYearFolders:'🗓️ årsmappar',
-  tplYearArchive:'Arkivera föregående år',
-  tplOlder90:'Arkivera äldre än 90 dagar',
-  tplNameYearArchive:'Årsarkiv – tidigare år',
+  tplOlder90:'Arkivera äldre mejl',
   tplNameOlder90:'Arkiv – äldre än 90 dagar',
   templateLabel:'1-klicksmallar:',
   tplInvoice:'Fakturor & Kvitton',
@@ -583,7 +587,8 @@ const I18N={
   step3Title:'Where and when should emails move?',
   targetLabel:'Target folder',
   chooseTarget:'Select a target folder…',
-  ruleMoveUnreadLabel:'Move unread emails in this filter',
+  ruleMoveUnreadLabel:'Move unread emails right away too (otherwise they wait until you have read them)',
+  unreadMoveNote:'Box ticked: unread emails matching the rule are moved right away. Cleared: they stay put and move only after you have read them.',
   ruleOpenWindowLabel:'Open moved unread emails in a new window',
   inlineMoveUnread:'Move unread mail',
   inlineOpenWindow:'Open in new window',
@@ -657,7 +662,7 @@ const I18N={
   helpP4:'This add-on never modifies Thunderbird\'s built-in msgFilterRules.dat and uses no cloud services.',
   footerRight:'Custom rules · No changes to msgFilterRules.dat',
   policyDefaultTitle:'Read first (or immediately on Inbox arrival).',
-  policyDefaultBody:'Follows global default: read emails move after being closed for 2 seconds, and new Inbox arrivals can move immediately.',
+  policyDefaultBody:'Follows the global default: read emails move after being closed for 2 seconds, and new Inbox arrivals can move immediately. Tick ”Move unread emails right away too” to move unread mail in every folder at once.',
   policyReadTitle:'Read first. Then closed.',
   policyReadBody:'Moves read emails only, waiting at least two seconds after the email is no longer displayed in any tab or window.',
   policyBothTitle:'Moves both unread and read emails immediately.',
@@ -700,6 +705,10 @@ const I18N={
   fieldSenderShort:'From',
   fieldDomainShort:'Domain',
   fieldSubjectShort:'Subject',
+  fieldRecipientShort:'To',
+  fieldCcShort:'Cc',
+  fieldSizeShort:'Size',
+  fieldDateShort:'Date',
   moreConditionsSuffix:' conditions',
   scopeAccount:'All folders',
   scopeFolder:'Selected folder',
@@ -826,11 +835,12 @@ const I18N={
   diagnoseRunning:'Examining the account folders – nothing is moved…',
   diagnoseSummary:'Checked {s} emails in {f} folders. {m} matched the rule. Rule read mode: {rf}.',
   diagnoseWouldMove:'{n} emails are ready – they move on the next run.',
-  diagnoseUnread:'{n} matching emails are unread and wait until you have read them.',
+  diagnoseUnread:'{n} matching emails are unread and wait until you have read them. Tick ”Move unread emails right away too” in step 3 to move them without waiting.',
   diagnoseInTarget:'{n} emails are already in the target folder (or its year folder).',
   diagnoseQueued:'{n} emails were already handled or queued earlier.',
   diagnoseNoMatch:'No emails match the conditions. Check field, value and account – or use Check on a selected email.',
   diagnoseExamples:'Examples of matching emails',
+  diagnoseFixUnread:'✔ Allow unread emails and move them now',
   diagnoseReasonMove:'will move',
   diagnoseReasonUnread:'unread – waiting',
   diagnoseReasonTarget:'already in target',
@@ -842,12 +852,10 @@ const I18N={
   opBeforeThisYear:'Is before the current year',
   opAfterThisYear:'Is after the current year',
   condPlaceholderThisYear:'No value needed – follows the calendar',
-  ruleYearFoldersLabel:'Put each year in its own year folder under the target folder (e.g. Archive/2025)',
-  yearFoldersNote:'The year folder is created automatically when needed. Choose Read emails only below if unread emails should wait until you have read them.',
+  ruleYearFoldersLabel:'Optional: put each year in its own year folder under the target folder (e.g. Archive/2025)',
+  yearFoldersNote:'Off by default – tick only if you want one folder per year. The year folder is created automatically when needed.',
   tagYearFolders:'🗓️ year folders',
-  tplYearArchive:'Archive previous years',
-  tplOlder90:'Archive older than 90 days',
-  tplNameYearArchive:'Year archive – previous years',
+  tplOlder90:'Archive older emails',
   tplNameOlder90:'Archive – older than 90 days',
   templateLabel:'One-click templates:',
   tplInvoice:'Invoices & receipts',
@@ -964,7 +972,7 @@ const label=id=>folders.find(f=>f.id===id)?.label||T('missingFolder');
 function updateReadPolicy(){
  const rf=$('ruleReadFilter')?.value||'default';
  const ua=$('ruleUnreadAction')?.value||'default';
- if($('ruleMoveUnread'))$('ruleMoveUnread').checked=(rf==='both'||rf==='unread'||(rf==='default'&&(state?.moveMode==='direct'||state?.newInboxDirect!==false)));
+ if($('ruleMoveUnread'))$('ruleMoveUnread').checked=(rf==='both'||rf==='unread'||(rf==='default'&&state?.moveMode==='direct'));
  if($('ruleOpenWindow'))$('ruleOpenWindow').checked=(ua==='window'||(ua==='default'&&state?.openWindow!==false));
  const map={
   default:['policyDefaultTitle','policyDefaultBody'],
@@ -1149,8 +1157,7 @@ const TEMPLATES={
  nyhetsbrev:{name:'tplNameNews',match:'any',conditions:[['subject','contains','nyhetsbrev'],['subject','contains','newsletter'],['sender','contains','newsletter']],hints:['nyhetsbrev','news','webb','info']},
  system:{name:'tplNameSystem',match:'any',conditions:[['sender','contains','noreply'],['sender','contains','no-reply'],['subject','contains','notis']],hints:['notis','system','support','drift']},
  bokforing:{name:'tplNameBookkeeping',match:'any',conditions:[['subject','contains','bokföring'],['subject','contains','verifikation'],['subject','contains','moms']],hints:['bokför','ekonomi','redovisning']},
- arsarkiv:{name:'tplNameYearArchive',match:'any',conditions:[['date','beforeThisYear','']],hints:['arkiv','archive'],readFilter:'read',yearFolders:true},
- aldre90:{name:'tplNameOlder90',match:'any',conditions:[['date','older','90']],hints:['arkiv','archive'],readFilter:'read',yearFolders:true}
+ aldre90:{name:'tplNameOlder90',match:'any',conditions:[['date','older','90']],hints:['arkiv','archive'],readFilter:'read'}
 };
 function applyTemplate(key){
  const template=TEMPLATES[key];if(!template)return;
@@ -1273,14 +1280,17 @@ function renderRules(){
   }catch(e){check.checked=!check.checked;alertError(e);}});
   const main=el('div','rule-main');
   const btn=el('button','rule-open');btn.type='button';btn.append(el('strong','',rule.name));
-  const c=rule.conditions[0];btn.append(el('small','',({sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort')}[c.field])+' · '+c.value+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+T('moreConditionsSuffix'):'')));
+  const c=rule.conditions[0];
+  const fieldName={sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[c.field]||T('fieldSubjectShort');
+  const valueText=String(c.value??'').trim()||T(c.op==='beforeThisYear'?'opBeforeThisYear':c.op==='afterThisYear'?'opAfterThisYear':'condPlaceholderThisYear');
+  btn.append(el('small','',fieldName+' · '+valueText+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+T('moreConditionsSuffix'):'')));
   const f=folders.find(f=>f.id===rule.target);btn.append(el('small','','↳ '+(f?.label||T('missingFolderShort'))));
   btn.append(el('span','rule-tag',ruleTagText(rule)));
   btn.addEventListener('click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule(rule.id);});
   const opts=el('div','rule-inline-opts');
   const moveUnreadLbl=el('label'),moveUnreadChk=el('input');moveUnreadChk.type='checkbox';
   const rf=rule.readFilter||'default';
-  moveUnreadChk.checked=rf==='both'||rf==='unread'||(rf==='default'&&(state.moveMode==='direct'||state.newInboxDirect!==false));
+  moveUnreadChk.checked=rf==='both'||rf==='unread';
   moveUnreadLbl.append(moveUnreadChk,el('span','',T('inlineMoveUnread')));
   const openWinLbl=el('label'),openWinChk=el('input');openWinChk.type='checkbox';
   const ua=rule.unreadAction||'default';
@@ -1767,6 +1777,22 @@ async function diagnoseCurrentRule(){
  if(r.paused||r.fault)panel.append(el('p','diagnose-warn',T(r.paused?'diagnosePaused':'diagnoseFault')));
  else if(!r.engineEnabled)panel.append(el('p','diagnose-warn',T('diagnoseStopped')));
  if(r.dryRun)panel.append(el('p','diagnose-warn',T('diagnoseDryRun')));
+ if(r.waitingUnread){
+  const fix=el('button','button small primary',T('diagnoseFixUnread'));fix.type='button';
+  fix.addEventListener('click',async()=>{
+   fix.disabled=true;
+   try{
+    if($('ruleReadFilter')){$('ruleReadFilter').value='both';updateReadPolicy();}
+    if($('ruleMoveUnread'))$('ruleMoveUnread').checked=true;
+    dirty=true;
+    await saveCurrentRule({});
+    if($('autoRunInfo')&&state.config)renderStatus(await rpc('status'));
+    await runAllRules();
+    await diagnoseCurrentRule();
+   }catch(err){fix.disabled=false;alertError(err);}
+  });
+  panel.append(fix);
+ }
  const cta=el('button','button small primary',T('runAllRulesBtn'));cta.type='button';
  cta.addEventListener('click',()=>runAllRules());
  panel.append(cta);

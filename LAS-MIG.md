@@ -39,16 +39,22 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 - **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.
 - **Högerklicksmeny på mejl:** *SortBro: Skapa filter från detta mejl…* öppnar SortBro med en ny regel förifylld från mejlet (avsändardomän, adress eller ämne). Regeln sparas först när du själv trycker Spara.
 
-## Årsarkiv: arkivera tidigare år i egna årsmappar
+## Arkivering – och varför olästa mejl kan vänta
 
-Mallen **🗓️ Arkivera föregående år** bygger en regel som flyttar allt som är äldre än innevarande år till en egen årsmapp under målmappen – precis som ett arkiv med `Arkiv/2023`, `Arkiv/2024`, `Arkiv/2025`:
+SortBro arkiverar **ingenting av sig självt**. Det finns ingen inbyggd årsarkivering som körs i bakgrunden: en regel gör precis det du har ställt in, och inget mer.
 
-1. Välj kontot och tryck på mallen. Regelnamn, villkor (**Datum · Är före år · innevarande år**) och kryssrutan **Lägg varje år i en egen årsmapp** fylls i automatiskt, och en mapp som heter *Arkiv*/*Archive* väljs som målmapp om den finns.
-2. Regeln står på **Endast lästa mejl**. Olästa mejl arkiveras därför **inte** ännu – de ligger kvar i Inkorgen och flyttas till sin årsmapp först när du har läst dem och lämnat dem (minst två sekunder utan visning).
-3. Saknas årsmappen skapas den automatiskt i målmappen (`Arkiv/2025`) när det första mejlet ska dit. Högst tolv årsmappar skapas per session; går det inte att skapa används den vanliga målmappen i stället och inget mejl tappas bort.
-4. Årsmappen återanvänds när den finns, och mejl som redan ligger i rätt årsmapp köas aldrig om.
+- **Arkivera äldre mejl** (🗄️ i mallraden) fyller i *Datum · Är äldre än 90 dagar* och väljer en mapp som heter *Arkiv*/*Archive* om den finns. Ändra 90 till valfritt antal dagar. Åldersvillkoret rullar framåt av sig självt.
+- **Årsmappar är ett valfritt tillval per regel.** Kryssrutan **Valfritt: lägg varje år i en egen årsmapp under målmappen** (steg 3) är **avstängd som standard**. Kryssar du i den hamnar tidigare års mejl i `Arkiv/2023`, `Arkiv/2024`, `Arkiv/2025` och så vidare. Mappen skapas automatiskt när den behövs (högst tolv per session); går det inte att skapa används den vanliga målmappen i stället och inget mejl tappas bort. Mejl som redan ligger i rätt årsmapp köas aldrig om.
+- **Villkoren *Är före/efter innevarande år*** finns kvar i villkorslistan för dig som vill bygga en egen årssregel. De behöver inget värde alls: de jämförs med kalenderns innevarande år vid varje körning, så regeln fortsätter betyda ”tidigare år” även nästa år.
 
-Mallen **📦 Arkivera äldre än 90 dagar** gör samma sak men med rullande fönster (*Datum · Är äldre än 90 dagar*), också den med årsmappar och endast lästa mejl.
+### Olästa mejl: rutan bestämmer
+
+Kryssrutan **Flytta även olästa mejl direkt** i steg 3 styr läsläget för regeln:
+
+- **Kryssad** → olästa mejl som matchar regeln flyttas **direkt**, utan att vänta på att bli lästa. Det gäller i alla mappar regeln söker i, inte bara i Inkorgen. Flytten sker omedelbart när mejlet kommer in eller vid nästa svep – och kryssrutan **Öppna flyttade olästa mejl i nytt fönster** avgör om ett oläst mejl också öppnas i ett fönster (annars ligger det kvar som oläst i målmappen).
+- **Omarkerad** → olästa mejl ligger kvar och flyttas först när du har läst dem och lämnat dem (minst två sekunder utan visning i någon flik eller något fönster).
+
+Under **Avancerat: läsläge & olika mål beroende på ämne** finns samma sak som fyra läslägen: *enligt standard*, *endast lästa*, *både olästa och lästa* samt *endast olästa* – kryssrutan håller sig i synk med läget.
 
 ### Nya villkor i regler
 
@@ -72,11 +78,12 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
   - *redan i målmappen* (eller i sin årsmapp),
   - *redan hanterade* – mejl som redan köats eller flyttats,
   - samt upp till fem exempelrader med ämne och avsändardomän.
-  Avslutningsvis påminner panelen om regeln står i Testläge, om tillägget är pausat/ stoppat eller om motorn har en fellåsning.
+  Avslutningsvis påminner panelen om regeln står i Testläge, om tillägget är pausat/stoppat eller om motorn har en fellåsning.
+- **✔ Tillåt olästa mejl och flytta dem nu:** knappen i diagnospanelen (syns när det finns olästa mejl som matchar) kryssar i *Flytta även olästa mejl direkt*, sparar regeln och kör alla regler – ett klick i stället för att leta i inställningarna.
 
 ### Automatiskt varje timme – med bevakning kvar
 
-**Kör alla regler automatiskt (rekommenderas)** under **Inställningar → Avancerat** kör samma svep automatiskt med valfritt intervall (steg om 15 minuter, standard **60 minuter = en gång i timmen**). Detta är *utöver* den händelsestyrda bevakningen: nya mejl som kommer in till Inkorgen hanteras direkt när de anländer, och olästa mejl som du just har läst flyttas så snart de har lämnat visningen. Intervallsvepet fångar upp allt övrigt – till exempel mejl som legat i andra mappar, mejl som blev lästa i ett annat program och årsarkivsregler vid årsskiftet. Statusraden under **Flyttstatus** visar när nästa automatiska körning sker och att inkommande mejl bevakas hela tiden.
+**Kör alla regler automatiskt (rekommenderas)** under **Inställningar → Avancerat** kör samma svep automatiskt med valfritt intervall (steg om 15 minuter, standard **60 minuter = en gång i timmen**). Detta är *utöver* den händelsestyrda bevakningen: nya mejl som kommer in till Inkorgen hanteras direkt när de anländer, och olästa mejl som du just har läst flyttas så snart de har lämnat visningen. Intervallsvepet fångar upp allt övrigt – till exempel mejl som legat i andra mappar, mejl som blev lästa i ett annat program och regler som följer kalendern vid årsskiftet. Statusraden under **Flyttstatus** visar när nästa automatiska körning sker och att inkommande mejl bevakas hela tiden.
 
 ## Design, språk och årstider
 
@@ -121,9 +128,10 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Smart mapp-cache:** tomma mappar och mappar som är oförändrade sedan förra svepet utan träffar hoppas över på under 1 ms i stället för att skannas om. Cachen invalideras vid nya mejl, ändrad lässtatus, genomförd flytt och regeländring, så inget kan missas.
 - **Säker IMAP-flytt:** progressiv verifiering via flytthändelsen och kontroll i mål- och källmapp. Gamla osäkra försök rensas vid omstart och ger inga falska `uncertain_move`-stopp.
 - **Inget popup-kaos vid mass-svep:** under ett pågående svep, eller när kön redan är lång, öppnas aldrig nya fönster – mejlen flyttas och behålls bara som olästa.
-- **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, sju 1-klicksmallar (inkl. årsarkiv), egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
+- **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, sex 1-klicksmallar (inkl. 🗄️ Arkivera äldre mejl), egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
 - **Fler villkor:** Till, Kopia (Cc), Storlek (kB) och Datum (dagar eller årtal) utöver avsändare, domän och ämne.
-- **Årsarkiv:** flytta tidigare års mejl till egna årsmappar (`Arkiv/2025`) som skapas automatiskt, med olästa mejl kvar tills de är lästa.
+- **Valfria årsmappar:** årsarkivering är inget förval utan en kryssruta per regel (avstängd som standard). Kryssar du i den hamnar tidigare års mejl i `Arkiv/2025` – annars flyttas mejlen till den målmapp du valt.
+- **Olästa mejl flyttas när rutan är kryssad:** *Flytta även olästa mejl direkt* gör att matchande olästa mejl flyttas med en gång i alla mappar, i stället för att vänta tills de är lästa.
 - **Kör alla regler nu:** en knapp sveper igenom alla aktiva regler direkt och rapporterar granskade mejl, cachade mappar, matchningar och köade flyttar.
 - **Varför flyttas inte mejlen?:** läsbar diagnos per regel som förklarar om mejlen väntar på att bli lästa, redan ligger i målmappen, redan är hanterade eller inte matchar villkoren – med exempelrader och påminnelse om Testläge/paus.
 - **Automatiskt varje timme:** standardintervallet är 60 minuter och körs vid sidan av den händelsestyrda bevakningen av inkommande mejl. Statusraden visar nästa automatiska körning.

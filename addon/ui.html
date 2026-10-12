@@ -125,8 +125,7 @@
               <button type="button" class="template-btn" data-template="nyhetsbrev">📰 <span data-i18n="tplNews">Nyhetsbrev</span></button>
               <button type="button" class="template-btn" data-template="system">🔔 <span data-i18n="tplSystem">System &amp; Notiser</span></button>
               <button type="button" class="template-btn" data-template="bokforing">📊 <span data-i18n="tplBookkeeping">Bokföring</span></button>
-              <button type="button" class="template-btn" data-template="arsarkiv">🗓️ <span data-i18n="tplYearArchive">Arkivera föregående år</span></button>
-              <button type="button" class="template-btn" data-template="aldre90">📦 <span data-i18n="tplOlder90">Arkivera äldre än 90 dagar</span></button>
+              <button type="button" class="template-btn" data-template="aldre90">🗄️ <span data-i18n="tplOlder90">Arkivera äldre mejl</span></button>
             </div>
 
             <div class="suggest-card" id="suggestCard">
@@ -235,21 +234,22 @@
                 <div class="archive-box">
                   <label class="toggle-label">
                     <input id="ruleYearFolders" type="checkbox">
-                    <span data-i18n="ruleYearFoldersLabel">Lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)</span>
+                    <span data-i18n="ruleYearFoldersLabel">Valfritt: lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)</span>
                   </label>
-                  <p class="muted" data-i18n="yearFoldersNote">Årsmappen skapas automatiskt när den behövs. Välj <em>Endast lästa mejl</em> nedan om olästa mejl ska vänta tills du har läst dem.</p>
+                  <p class="muted" data-i18n="yearFoldersNote">Avstängt som standard – kryssa bara i om du vill ha en egen mapp per år. Årsmappen skapas automatiskt när den behövs.</p>
                 </div>
 
                 <div class="unread-toggles">
                   <label class="toggle-label">
                     <input id="ruleMoveUnread" type="checkbox">
-                    <span data-i18n="ruleMoveUnreadLabel">Flytta olästa mejl i detta filter</span>
+                    <span data-i18n="ruleMoveUnreadLabel">Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)</span>
                   </label>
                   <label class="toggle-label">
                     <input id="ruleOpenWindow" type="checkbox" checked>
                     <span data-i18n="ruleOpenWindowLabel">Öppna flyttade olästa mejl i nytt fönster</span>
                   </label>
                 </div>
+                <p class="simple-help" data-i18n="unreadMoveNote">Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.</p>
 
                 <details class="advanced-box">
                   <summary data-i18n="branchSummary">Avancerat: läsläge & olika mål beroende på ämne</summary>

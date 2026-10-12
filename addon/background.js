@@ -39,7 +39,7 @@ App.log=(name,count=0,detail='')=>{
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
 App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
 App.emptySweep={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};
-App.runAllRules=async()=>{
+App.runAllRules=async(force=false)=>{
  const e=App.engine;if(!e)throw new C.RuleError('internal_error');
  /* Pausad eller stoppad motor är ett normalt läge – inget fel och inga nollor utan förklaring. */
  if(!e.enabled())return {...App.emptySweep,skipped:e.fault?'stopped':'paused',fault:e.fault||''};
@@ -53,7 +53,8 @@ App.runAllRules=async()=>{
  }
  for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
  if(e.pending.size)App.kick();
- const result=await e.sweepAll();
+ /* En manuell körning läser om allt (force); det tidsstyrda svepet använder cachen. */
+ const result=await e.sweepAll({force:force===true});
  for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
  App.kick();
  await Promise.race([e.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
@@ -305,7 +306,7 @@ App.handle=async msg=>{
    await Promise.race([App.engine.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
    return r;
   }
-  case 'sweepNow':return App.runAllRules();
+  case 'sweepNow':return App.runAllRules(true);
   case 'diagnose':{
    const rule=C.validateRule(msg.rule);
    return App.engine.diagnose(rule);

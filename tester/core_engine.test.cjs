@@ -339,6 +339,19 @@ test('folder cache is invalidated when the engine sees new mail, moves or reads'
  assert.equal(f.e.folderCache.size,0,'a confirmed move clears the cached folder picture');
 });
 
+test('en manuell körning läser om mappar som cachen annars hoppar över',async()=>{
+ const f=fixture({folderInfo:true});
+ f.messages.set(9,{...msg(9),subject:'Hej',author:'x@other.invalid',folder:{id:'brt',accountId:'a'}});
+ await f.e.catchUp('rule1');
+ const cached=await f.e.catchUp('rule1');
+ assert.ok(cached.cachedFolders>=1,'cachen hoppar över oförändrade mappar');
+ const forced=await f.e.sweepAll({force:true});
+ assert.equal(forced.cachedFolders,0,'en tvingad körning hoppar inte över något på grund av cachen');
+ assert.ok(forced.searchedFolders>=2);
+ assert.ok(forced.scanned>=cached.scanned);
+ assert.deepEqual(f.api.calls,[]);
+});
+
 test('folder info failure falls back to a normal scan',async()=>{
  const f=fixture({folderInfoReject:true});
  const r=await f.e.catchUp('rule1');

@@ -1766,7 +1766,8 @@ if($('sweepNow'))handle('sweepNow','click',async()=>runAllRules());
 /* Kör samtliga aktiva regler direkt och berätta exakt vad som hände. */
 async function runAllRules(){
  const button=$('runAllRulesBtn'),guide=$('sweepNow');
- if(button)button.disabled=true;if(guide)guide.disabled=true;
+ if(button)button.disabled=true;
+ if(guide){guide.disabled=true;guide.textContent=T('sweepChecking');}
  try{
   const r=await rpc('sweepNow');renderStatus(await rpc('status'));
   /* Svara ärligt i stället för att visa nollor: pausat, stoppat eller redan pågående. */
@@ -1787,7 +1788,7 @@ async function runAllRules(){
  }catch(err){alertError(err);}
  finally{
   if(button)button.disabled=false;
-  if(guide)guide.disabled=!!state?.fault||state?.config.paused||!(state?.config.rules||[]).some(x=>x.enabled);
+  if(guide){guide.disabled=!!state?.fault||state?.config.paused||!(state?.config.rules||[]).some(x=>x.enabled);guide.textContent=state?.queued?T('sweepQueueNow'):T('sweepRunNow');}
  }
 }
 
@@ -1898,19 +1899,6 @@ async function diagnoseCurrentRule(){
  panel.append(cta);
 }
 if($('diagnoseBtn'))handle('diagnoseBtn','click',diagnoseCurrentRule);
-handle('sweepNow','click',async()=>{
- $('sweepNow').disabled=true;$('sweepNow').textContent=T('sweepChecking');
- try{
-  const r=await rpc('sweepNow');renderStatus(await rpc('status'));
-  if(currentLang==='en'){
-   const mode=state.config.dryRun?' Test mode: no emails moved.':' Matching emails move concurrently as the queue forms.';
-   toast('Scan complete: '+r.scanned+' emails checked in '+(r.searchedFolders??'account')+' folders, '+r.queued+' matched and queued.'+(r.deferred?' '+r.deferred+' deferred to next batch (100 max in queue).':'')+(r.skippedFolders?' '+r.skippedFolders+' offline folders skipped.':'')+mode);
-  }else{
-   const mode=state.config.dryRun?' Testläge: inga mejl flyttas.':' Matchande mejl flyttas direkt samtidigt som kön bildas.';
-   toast('Kontrollen är klar: '+r.scanned+' mejl granskade i '+(r.searchedFolders??'kontots')+' mappar, '+r.queued+' matchade och köade.'+(r.deferred?' '+r.deferred+' väntar till nästa svep (max 100 i kö åt gången).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+mode);
-  }
- }finally{if(state)$('sweepNow').disabled=!!state.fault||state.config.paused||!state.config.rules.some(r=>r.enabled);}
-});
 handle('catchUp','click',async()=>{
  if(dirty){toast(T('saveFirst'));return;}
  if(!selectedId){toast(T('openRuleFirst'));return;}

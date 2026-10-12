@@ -122,6 +122,16 @@ test('knappen väntar in ett pågående svep i stället för att visa nollor',as
  assert.equal(r.busy,undefined);
 });
 
+test('knappen Kör alla regler nu tvingar en full genomsökning',async()=>{
+ const {app,tick}=await loadBackground();
+ const calls=[];
+ fakeEngine(app,{sweepAll:async opts=>{calls.push(opts);return {scanned:3,queued:1,deferred:0,searchedFolders:2,skippedFolders:0,emptyFolders:0,cachedFolders:0};}});
+ await app.handle({type:'sweepNow'});
+ assert.equal(calls[0]?.force,true,'knappen ska läsa om allt, inte lita på cachen');
+ await tick.settle(app.autoSweep());
+ assert.equal(calls[calls.length-1]?.force,false,'det tidsstyrda svepet får använda cachen');
+});
+
 test('ett svep som inte blir klart i tid svarar "pågår redan" i stället för nollor',async()=>{
  const {app,tick}=await loadBackground();
  fakeEngine(app,{sweeping:1}); /* ett svep som aldrig blir klart */

@@ -356,7 +356,7 @@ class Engine {
   this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' med_eller='+out.anyMatched+' utan_traff='+out.unmatched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
   return out;
  }
- async sweepRule(rule,{includeInboxUnread=false}={}){
+ async sweepRule(rule,{includeInboxUnread=false,force=false}={}){
   if(!this.enabled())throw new C.RuleError('paused');
   if(!rule||!rule.enabled)throw new C.RuleError('disabled');
   this.sweeping++;
@@ -373,13 +373,13 @@ class Engine {
     // förra svepet utan träffar. Invalideras vid nya mejl, lässtatus, flytt och
     // regeländring, så inget kan missas.
     const info=await this.folderInfo(folder.id);
-    const cached=this.folderCache.get(folder.id);
+    const cached=force?null:this.folderCache.get(folder.id);
     if(info&&info.total===0){
      emptyFolders++;this.cacheStats.empty++;
-     this.folderCache.set(folder.id,{total:0,unread:info.unread??0,scanned:true});
+     this.folderCache.set(folder.id,{total:0,unread:info.unread??0,scanned:true,rulesVersion:this.config.rulesVersion});
      continue;
     }
-    if(info&&cached&&cached.scanned&&cached.total===info.total&&cached.unread===info.unread){
+    if(info&&cached&&cached.scanned&&cached.rulesVersion===this.config.rulesVersion&&cached.total===info.total&&cached.unread===info.unread){
      cachedFolders++;this.cacheStats.hits++;continue;
     }
     this.cacheStats.misses++;
@@ -436,22 +436,22 @@ class Engine {
      skippedFolders++;this.debug('svep_query_failed folder_index='+(searchedFolders+skippedFolders)+' error_type='+(error?.name||'Error'));
     }finally{
      if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});
-     if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true});
+     if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true,rulesVersion:this.config.rulesVersion});
     }
    }
    if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders===0)throw new C.RuleError('sweep_error');
-   this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' matchade='+matched+' i_mal='+inTarget+' klara='+handled+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
+   this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' matchade='+matched+' i_mal='+inTarget+' klara='+handled+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last')+(force?' tvingad':''));
    this.log('catchup',queued);this.change();
    return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled};
   }finally{this.sweeping=Math.max(0,this.sweeping-1);if(this.pending.size)this.hooks.kick?.();}
  }
- async sweepAll(){
+ async sweepAll({force=false}={}){
   if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {...ZERO_SWEEP};}
   this.lastSweep=this.now();
   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
-   try{const r=await this.sweepRule(rule,{includeInboxUnread:true});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
+   try{const r=await this.sweepRule(rule,{includeInboxUnread:true,force});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
    catch(error){const code=error?.code||error?.name||'Error';this.debug('svep_regel_misslyckades error_code='+code);this.log('error',0,'svep av regel misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');throw new C.RuleError('sweep_error');}
   }
   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled};

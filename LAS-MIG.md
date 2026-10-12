@@ -71,7 +71,7 @@ Storlek och datum skrivs som tal (kB respektive dagar eller årtal) och validera
 
 Du behöver inte vänta på nästa automatiska körning eller på att nya mejl kommer in:
 
-- **▶ Kör alla regler nu** (knappen högst upp i regellistan, och *Kör alla regler nu* under **Flyttstatus**) sveper igenom alla aktiva regler direkt och berättar exakt vad som hände: hur många mejl som granskades, hur många mappar som gick snabbt via cachen, hur många som matchade samt hur många som köades eller väntar till nästa körning. Inkommande mejl bevakas precis som vanligt under tiden.
+- **▶ Kör alla regler nu** (knappen högst upp i regellistan, och *Kör alla regler nu* under **Flyttstatus**) sveper igenom alla aktiva regler direkt och berättar exakt vad som hände: hur många mejl som granskades, hur många som matchade samt hur många som köades eller väntar till nästa körning. Knappen läser alltid om **alla** mappar – den smarta mappcachen används bara av de tidsstyrda svepen, så en manuell körning kan aldrig gömma ett gammalt mejl. Inkommande mejl bevakas precis som vanligt under tiden.
 - **🔎 Varför flyttas inte mejlen?** (i regelredigeraren) är en **läsbar diagnos** av just den regel du har öppen. Ingenting flyttas, ingenting köas och den fungerar även när bevakningen är pausad eller står i **Testläge**. Panelen svarar i klartext:
   - *redo* – antalet mejl som matchar och flyttas vid nästa körning,
   - *olästa och väntar* – matchande mejl som står på **Endast lästa mejl** och därför väntar tills du har läst dem,
@@ -89,7 +89,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Pausad eller stoppad bevakning larmar inte.** Automatiska svep (timintervallet och svepet vid start) hoppar över i tysthet när bevakningen är pausad eller stoppad – du får ingen "Tekniskt fel"-rad för att du själv har tryckt Pausa. Är motorn stoppad av ett fel skrivs **en** tydlig notis i stället för en rad per försök.
 - **Övergående startfel försöks om i tysthet.** Direkt efter att Thunderbird har startat kan kontona svara "inte redo" ännu. Svepet gör då ett tyst andra försök efter 15 sekunder och skriver först därefter, om det fortfarande misslyckas: *Tekniskt fel – Automatiskt svep misslyckades (sweep_error) – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i.*
 - **Svepraden i loggen säger varför inget flyttas.** Varje svep skriver `skannade=… matchade=… i_mal=… klara=… koade=…`: `matchade` är mejl som träffades av regeln, `i_mal` sådana som redan låg i målmappen/sin årsmapp och `klara` sådana som redan var hanterade. Är `matchade=0` finns det helt enkelt inget som matchar regeln.
-- **▶ Kör alla regler nu väntar in en pågående körning** i stället för att rapportera noll: pågår redan ett svep (t.ex. startsvepet) väntar knappen in det och visar hela körningens siffror. Är bevakningen pausad eller stoppad säger knappen det rakt ut, och om ett svep verkligen fallerar visas felmeddelandet som en toast i stället för att tigas ihjäl.
+- **▶ Kör alla regler nu väntar in en pågående körning** i stället för att rapportera noll: pågår redan ett svep (t.ex. startsvepet) väntar knappen in det och visar hela körningens siffror. Är bevakningen pausad eller stoppad säger knappen det rakt ut, och om ett svep verkligen fallerar visas felmeddelandet som en toast i stället för att tigas ihjäl. Varje klick ger exakt **en** körning och en rapport – knappen har bara en klickhanterare.
 
 ### Automatiskt varje timme – med bevakning kvar
 
@@ -135,7 +135,7 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 ## Nyheter i 1.0.0 (SortBro)
 
 - **Motor och kö:** max 100 väntande jobb i kön, och flyttar sker parallellt medan kön byggs (svepet väntar aldrig på en full kö). När kön når 100 töms den innan fler läggs till.
-- **Smart mapp-cache:** tomma mappar och mappar som är oförändrade sedan förra svepet utan träffar hoppas över på under 1 ms i stället för att skannas om. Cachen invalideras vid nya mejl, ändrad lässtatus, genomförd flytt och regeländring, så inget kan missas.
+- **Smart mapp-cache:** tomma mappar och mappar som är oförändrade sedan förra svepet utan träffar hoppas över på under 1 ms i stället för att skannas om. Cachen invalideras vid nya mejl, ändrad lässtatus, genomförd flytt och regeländring, så inget kan missas. Den är dessutom knuten till regelversionen: sparar du en regel läses alla mappar om, så ett ändrat villkor även fångar gamla mejl.
 - **Säker IMAP-flytt:** progressiv verifiering via flytthändelsen och kontroll i mål- och källmapp. Gamla osäkra försök rensas vid omstart och ger inga falska `uncertain_move`-stopp.
 - **Inget popup-kaos vid mass-svep:** under ett pågående svep, eller när kön redan är lång, öppnas aldrig nya fönster – mejlen flyttas och behålls bara som olästa.
 - **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, sex 1-klicksmallar (inkl. 🗄️ Arkivera äldre mejl), egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.

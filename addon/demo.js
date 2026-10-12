@@ -10,12 +10,30 @@ globalThis.LasDemo=(()=>{
   {id:'demo-3',name:'Inköp & kvitton',enabled:false,source:'demo-in',target:'demo-buy',match:'all',conditions:[{field:'subject',op:'contains',value:'Kvitto'}]}]},
   prefs:{theme:'light',fontSize:14,lastRule:'demo-1',lang:'sv'},moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
- const snapshots=[];
+ const snapshots=[];let mockPrefill=null;
  function saveRules(rules){snapshots.unshift(structuredClone(state.config));snapshots.splice(5);state.backups=snapshots.map((c,i)=>({index:i,time:new Date().toISOString(),count:c.rules.length}));state.config.rules=LasCore.validateRules(rules);state.config.revision++;}
  async function request(m){try{let data;
   switch(m.type){
    case 'status':data=state;break;case 'folders':data=folders;break;case 'selected':data=selected;break;
-   case 'prefs':state.prefs={...state.prefs,...m.prefs};data=state.prefs;break;
+   case 'prefs':{
+    const p=m.prefs||{};
+    if(['auto','spring','summer','autumn','winter'].includes(p.season))p.season=p.season;
+    state.prefs={...state.prefs,...p};data=state.prefs;break;
+   }
+   case 'createFolder':{
+    const name=String(m.name||'').trim();
+    if(!name||name.length>64)throw new LasCore.RuleError('bad_folder_name');
+    if(folders.some(f=>(f.name||'').toLowerCase()===name.toLowerCase()))throw new LasCore.RuleError('folder_exists');
+    const parent=folders.find(f=>f.id===m.parentId)||folders[0];
+    const folder={id:'demo-new-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),accountId:parent?.accountId||'demo',accountName:parent?.accountName||'Exempelkonto',name,label:(parent?.accountName||'Exempelkonto')+' · '+name};
+    folders.push(folder);data=folder;break;
+   }
+   case 'suggestRules':data=[
+    {domain:'fortnox.se',count:4,subject:'Faktura 1042',sender:'faktura@fortnox.se'},
+    {domain:'klarna.se',count:3,subject:'Order bekräftad',sender:'order@klarna.se'}
+   ].filter(s=>!state.config.rules.some(r=>r.enabled&&r.conditions.some(c=>c.field==='domain'&&c.value===s.domain)));break;
+   case 'pendingPrefill':data=mockPrefill;mockPrefill=null;break;
+   case 'prefillConsumed':data=true;break;
    case 'saveRules':saveRules(m.rules);data=state;break;
    case 'testRule':{const rule=LasCore.validateRule(m.rule),matched=LasCore.match(rule,{...selected,folder:{id:selected.source}},true,true);data={matches:matched,reason:matched?(rule.enabled?'displayed':'disabled'):'no_match',read:true,target:rule.target,author:selected.author,subject:selected.subject,outsideSource:matched&&selected.source!==rule.source};break;}
    case 'setMode':state.config.paused=m.paused;state.config.dryRun=m.dryRun;state.config.revision++;state.queued=0;data=state;break;

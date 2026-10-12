@@ -7,7 +7,24 @@ class Engine {
   this.api=api;this.config=config;this.hooks=hooks;this.now=hooks.now||Date.now;
   this.pending=new Map();this.records=new Map();this.inflight=new Map();this.done=new Set();
   this.busy=false;this.sweeping=0;this.hold=false;this.fault='';this.epoch=0;
+  /* Smart mapp-cache: tomma mappar och oförändrade mappar utan träffar hoppas
+     över på under 1 ms i stället för att skannas om varje svep. */
+  this.folderCache=new Map();this.cacheStats={hits:0,misses:0,empty:0};
   this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;
+ }
+ /* Anropas när nya mejl kommer in, lässtatus ändras, mejl flyttas eller regler
+    ändras – då är den sparade mappbilden inte längre pålitlig. */
+ invalidateFolders(){this.folderCache.clear();}
+ async folderInfo(folderId){
+  if(!folderId||typeof this.api.folders?.getFolderInfo!=='function')return null;
+  try{
+   const info=await this.withTimeout(this.api.folders.getFolderInfo(folderId),this.hooks.infoTimeout??1500,()=>null);
+   if(!info||typeof info!=='object')return null;
+   const total=Number.isInteger(info.totalMessageCount)&&info.totalMessageCount>=0?info.totalMessageCount:null;
+   const unread=Number.isInteger(info.unreadMessageCount)&&info.unreadMessageCount>=0?info.unreadMessageCount:null;
+   if(total===null&&unread===null)return null;
+   return {total,unread};
+  }catch{return null;}
  }
  log(name,count=0,detail=''){this.hooks.log?.(name,count,detail);}
  debug(t){this.hooks.debug?.(t);}
@@ -89,6 +106,7 @@ class Engine {
  }
  async newInboxMessages(messages){
   if(!this.enabled())return 0;
+  this.invalidateFolders();
   const hasCustomRule=this.config.rules.some(r=>r.enabled&&['both','unread','read'].includes(r.readFilter));
   if(!this.config.newInboxDirect&&this.config.moveMode!=='direct'&&!hasCustomRule)return 0;
   this.sweeping++;let queued=0;
@@ -103,6 +121,8 @@ class Engine {
   }finally{this.sweeping--;if(!this.sweeping&&this.pending.size)this.hooks.kick?.();}
  }
  async readChanged(m,changed,old={}){
+  if(changed.read===undefined)return false;
+  this.invalidateFolders();
   if(changed.read===false){
    await this.dropId(m.id);
    if(!this.enabled())return false;
@@ -159,7 +179,7 @@ class Engine {
   op.confirmed=true;
   const afterKey=after?C.fingerprint(after):'';if(afterKey){this.done.add(afterKey);this.trimDone();}
   this.records.delete(op.record.key);this.pending.delete(id);this.inflight.delete(id);
-  this.stats.moved++;this.log('moved',1);
+  this.stats.moved++;this.log('moved',1);this.invalidateFolders();
   if(op.record.unread){
    if(Number.isSafeInteger(after?.id))this.hooks.notify?.(after.id,op.record.ruleId);
    else if(op.record.target&&op.record.headerMessageId)this.hooks.notify?.(null,op.record.ruleId,op.record.target,op.record.headerMessageId);
@@ -233,17 +253,31 @@ class Engine {
    const folders=[],seen=new Set();
    const walk=f=>{if(!f||seen.has(f.id))return;seen.add(f.id);if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
    walk(account.rootFolder);for(const f of account.folders||[])walk(f);
-   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0;
+   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0;
    for(const folder of folders){
     if(!this.enabled())break;
     const isInbox=[...(folder.specialUse||[]),folder.type].includes('inbox');
     const folderDirect=rf==='read'?false:rf==='both'||rf==='unread'?true:(direct||(includeInboxUnread&&this.config.newInboxDirect&&isInbox));
+    // Mapp-cachen: hoppa över tomma mappar och mappar som är oförändrade sedan
+    // förra svepet utan träffar. Invalideras vid nya mejl, lässtatus, flytt och
+    // regeländring, så inget kan missas.
+    const info=await this.folderInfo(folder.id);
+    const cached=this.folderCache.get(folder.id);
+    if(info&&info.total===0){
+     emptyFolders++;this.cacheStats.empty++;
+     this.folderCache.set(folder.id,{total:0,unread:info.unread??0,scanned:true});
+     continue;
+    }
+    if(info&&cached&&cached.scanned&&cached.total===info.total&&cached.unread===info.unread){
+     cachedFolders++;this.cacheStats.hits++;continue;
+    }
+    this.cacheStats.misses++;
     // Manifest V2 använder `unread: false` för lästa mejl. `read: true`
     // är MV3-syntax och gör att Thunderbird 140 avvisar hela frågan.
     const q={folderId:folder.id};
     if(rf==='unread')q.unread=true;
     else if(!folderDirect)q.unread=false;
-    let page=null;
+    let page=null,finished=false;
     try{
      page=await this.withTimeout(this.api.messages.query(q),this.hooks.queryTimeout??10000);searchedFolders++;
      for(;;){
@@ -278,27 +312,31 @@ class Engine {
       if(!page.id||!this.enabled())break;
       page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
      }
+     finished=true;
     }catch(error){
      // En enskild IMAP-/nyhetsmapp kan vara frånkopplad eller sakna lokal
      // databas. Hoppa över just den mappen i stället för att stoppa kontot.
      skippedFolders++;this.debug('svep_query_failed folder_index='+(searchedFolders+skippedFolders)+' error_type='+(error?.name||'Error'));
-    }finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
+    }finally{
+     if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});
+     if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true});
+    }
    }
-   if(folders.length&&searchedFolders===0)throw new C.RuleError('sweep_error');
-   this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' skannade='+scanned+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
+   if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders===0)throw new C.RuleError('sweep_error');
+   this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last'));
    this.log('catchup',queued);this.change();
-   return {scanned,queued,deferred,searchedFolders,skippedFolders};
+   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders};
   }finally{this.sweeping=Math.max(0,this.sweeping-1);if(this.pending.size)this.hooks.kick?.();}
  }
  async sweepAll(){
-  if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0};}
-  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0;
+  if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};}
+  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0;
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
-   try{const r=await this.sweepRule(rule,{includeInboxUnread:true});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;}
+   try{const r=await this.sweepRule(rule,{includeInboxUnread:true});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;}
    catch(error){this.debug('svep_regel_misslyckades error_code='+(error?.code||error?.name||'Error'));this.log('error',0,'svep_misslyckades code='+(error?.code||error?.name||'Error'));throw new C.RuleError('sweep_error');}
   }
-  return {scanned,queued,deferred,searchedFolders,skippedFolders};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders};
  }
  async catchUp(ruleId){
   return this.sweepRule(this.config.rules.find(r=>r.id===ruleId),{includeInboxUnread:false});

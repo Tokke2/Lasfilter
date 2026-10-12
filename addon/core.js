@@ -57,6 +57,42 @@ function validateRules(raw){
  for(const id of edges.keys())visit(id);
  return rules;
 }
+/* Årstidsteman: vår (mar–maj), sommar (jun–aug), höst (sep–nov), vinter (dec–feb). */
+const SEASONS=Object.freeze(['spring','summer','autumn','winter']);
+function seasonOf(value=new Date()){
+ const d=value instanceof Date?value:new Date(value);
+ const month=Number.isFinite(d.getTime())?d.getMonth():new Date().getMonth();
+ if(month>=2&&month<=4)return 'spring';
+ if(month>=5&&month<=7)return 'summer';
+ if(month>=8&&month<=10)return 'autumn';
+ return 'winter';
+}
+/* Popup-skydd: nya fönster öppnas aldrig under ett pågående mass-svep. */
+function shouldOpenWindow(options={}){
+ const action=options.action||'default';
+ if(action==='read'||action==='keep')return false;
+ const limit=Number.isInteger(options.limit)&&options.limit>=0?options.limit:3;
+ const pending=Number.isInteger(options.pending)&&options.pending>0?options.pending:0;
+ const sweeping=Number.isInteger(options.sweeping)&&options.sweeping>0?options.sweeping:0;
+ if(options.fromSweep===true||sweeping>0||pending>limit)return false;
+ return action==='window'||(action==='default'&&options.openWindow!==false);
+}
+/* Lokala förslag från Inkorgen. Endast förslag – inget skapas utan användarens val. */
+function suggestFrom(messages,{rules=[],limit=8,minCount=2}={}){
+ const groups=new Map();
+ for(const m of Array.isArray(messages)?messages:[]){
+  const address=email(m?.author);if(!address)continue;
+  const dom=address.split('@')[1]||'';if(!dom)continue;
+  if(rules.some(r=>r&&r.enabled&&match(r,m,false)))continue;
+  const g=groups.get(dom)||{domain:dom,count:0,subjects:[],senders:new Map()};
+  g.count++;
+  if(typeof m.subject==='string'&&m.subject.trim()&&!g.subjects.includes(m.subject.slice(0,120))&&g.subjects.length<3)g.subjects.push(m.subject.slice(0,120));
+  g.senders.set(address,(g.senders.get(address)||0)+1);
+  groups.set(dom,g);
+ }
+ return [...groups.values()].filter(g=>g.count>=minCount).sort((a,b)=>b.count-a.count||a.domain.localeCompare(b.domain,'sv')).slice(0,limit)
+  .map(g=>({domain:g.domain,count:g.count,subject:g.subjects[0]||'',sender:[...g.senders.entries()].sort((a,b)=>b[1]-a[1])[0][0]}));
+}
 function valuesFor(message){const address=email(message.author);return {sender:address,domain:address.split('@')[1]||'',subject:typeof message.subject==='string'?message.subject.slice(0,20000):''};}
 function condHit(c,values){
  const hay=norm(values[c.field]),needle=norm(c.value);if(!hay||!needle)return false;
@@ -108,6 +144,6 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs};
+const api={LIMITS,SEASONS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

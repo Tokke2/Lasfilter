@@ -13,7 +13,7 @@
   <div class="shell">
     <aside class="sidebar">
       <div class="brand">
-        <img src="icon.svg" width="40" height="40" alt="SortBro">
+        <img id="brandLogo" src="icon.svg" width="40" height="40" alt="SortBro">
         <div>
           <span data-i18n="brandName">SortBro</span>
           <small data-i18n="brandSub">FÖR THUNDERBIRD</small>
@@ -37,7 +37,7 @@
 
     <main>
       <header class="topbar">
-        <span class="topbar-brand"><img src="icon.svg" width="22" height="22" alt=""><span data-i18n="topbarTitle">THUNDERBIRD / SORTBRO</span></span>
+        <span class="topbar-brand"><img id="topbarLogo" src="icon.svg" width="22" height="22" alt=""><span data-i18n="topbarTitle">THUNDERBIRD / SORTBRO</span></span>
         <div class="top-actions">
           <div class="lang-switch" role="group" aria-label="Språk / Language">
             <button id="langSv" type="button" class="lang-btn active" title="Svenska">SV · Svenska</button>
@@ -48,16 +48,28 @@
         </div>
       </header>
 
-      <section class="intro">
-        <div>
+      <section class="intro hero-card">
+        <div class="hero-copy">
           <div class="eyebrow" data-i18n="introEyebrow">ENKEL AUTOMATISK SORTERING</div>
           <h1 data-i18n="introTitle">Flytta mejl automatiskt</h1>
           <p data-i18n="introSub">Skapa en eller flera regler, välj olästa/lästa och målmapp. Klart.</p>
+          <p class="season-greeting" id="seasonGreeting">Ha en fin höstdag! 🍂</p>
+          <div class="intro-actions">
+            <button id="pause" class="button secondary">Pausa</button>
+            <button id="mode" class="button primary">Slå på flytt</button>
+            <label class="season-pick">
+              <span data-i18n="seasonLabelShort">Årstid</span>
+              <select id="seasonQuick" aria-label="Årstidstema">
+                <option value="auto" data-i18n="seasonAuto">Auto</option>
+                <option value="spring">🌸 Vår</option>
+                <option value="summer">☀️ Sommar</option>
+                <option value="autumn">🍂 Höst</option>
+                <option value="winter">❄️ Vinter</option>
+              </select>
+            </label>
+          </div>
         </div>
-        <div class="intro-actions">
-          <button id="pause" class="button secondary">Pausa</button>
-          <button id="mode" class="button primary">Slå på flytt</button>
-        </div>
+        <div class="hero-art" id="seasonHeroArt" aria-hidden="true"></div>
       </section>
 
       <section class="setup-steps" aria-label="Kom igång">
@@ -83,10 +95,10 @@
       </section>
 
       <div class="stats">
-        <div class="stat"><span class="stat-icon mint">▤</span><div><strong id="countRules">0</strong><span data-i18n="statRules">aktiva regler</span></div></div>
-        <div class="stat"><span class="stat-icon blue">◷</span><div><strong id="countQueue">0</strong><span data-i18n="statQueue">väntar på flytt / test</span></div></div>
-        <div class="stat"><span class="stat-icon sand">↗</span><div><strong id="countMoved">0</strong><span data-i18n="statMoved">flyttade sedan start</span></div><span id="simulated" class="mini-tag">0 test</span></div>
-        <div class="stat"><span class="stat-icon blue">✓</span><div><strong id="countMatched">0</strong><span data-i18n="statMatched">matchade sedan start</span></div></div>
+        <div class="stat" id="statRulesCard"><span class="stat-icon mint">▤</span><div><strong id="countRules" class="stat-figure">0</strong><span data-i18n="statRules">aktiva regler</span></div></div>
+        <div class="stat" id="statQueueCard"><span class="stat-icon blue">◷</span><div><strong id="countQueue" class="stat-figure">0</strong><span data-i18n="statQueue">väntar på flytt / test</span></div></div>
+        <div class="stat" id="statMovedCard"><span class="stat-icon sand">↗</span><div><strong id="countMoved" class="stat-figure">0</strong><span data-i18n="statMoved">flyttade sedan start</span></div><span id="simulated" class="mini-tag">0 test</span></div>
+        <div class="stat" id="statMatchedCard"><span class="stat-icon blue">✓</span><div><strong id="countMatched" class="stat-figure">0</strong><span data-i18n="statMatched">matchade sedan start</span></div></div>
       </div>
 
       <section id="view-rules" class="view">
@@ -100,7 +112,26 @@
               <div class="rules-header-actions">
                 <button id="newFromSelected" type="button" class="button small primary" data-i18n="newFromSelectedBtn">✉ Ny från markerat mejl</button>
                 <button id="newRule" type="button" class="button small secondary" data-i18n="newRuleBtn">＋ Ny tom regel</button>
+                <button id="newFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
               </div>
+            </div>
+
+            <div class="template-bar" id="templateBar" role="group" aria-label="1-klicksmallar">
+              <span class="template-label" data-i18n="templateLabel">1-klicksmallar:</span>
+              <button type="button" class="template-btn" data-template="faktura">🧾 <span data-i18n="tplInvoice">Fakturor &amp; Kvitton</span></button>
+              <button type="button" class="template-btn" data-template="order">📦 <span data-i18n="tplOrder">Order &amp; Leverans</span></button>
+              <button type="button" class="template-btn" data-template="nyhetsbrev">📰 <span data-i18n="tplNews">Nyhetsbrev</span></button>
+              <button type="button" class="template-btn" data-template="system">🔔 <span data-i18n="tplSystem">System &amp; Notiser</span></button>
+              <button type="button" class="template-btn" data-template="bokforing">📊 <span data-i18n="tplBookkeeping">Bokföring</span></button>
+            </div>
+
+            <div class="suggest-card" id="suggestCard">
+              <div class="suggest-head">
+                <strong data-i18n="suggestTitle">✨ Föreslå regler från Inkorgen</strong>
+                <button id="suggestRulesBtn" type="button" class="button small secondary" data-i18n="suggestBtn">✨ Skanna Inkorgen</button>
+              </div>
+              <p class="simple-help" data-i18n="suggestHelp">SortBro tittar lokalt på Inkorgen och föreslår avsändare som återkommer. Inget skapas förrän du själv väljer målmapp och godkänner.</p>
+              <div id="suggestionsBox" class="suggestions"></div>
             </div>
             <div id="quickRuleBox" class="quick-rule-box">
               <div class="quick-rule-head">
@@ -117,6 +148,7 @@
               </div>
               <div class="quick-rule-row">
                 <select id="quickTarget" aria-label="Målmapp"><option value="">Välj målmapp…</option></select>
+                <button id="quickNewFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
                 <button id="quickAddBtn" type="button" class="button small primary" data-i18n="quickAddBtn">＋ Lägg till filter</button>
               </div>
               <div class="quick-rule-checks">
@@ -314,6 +346,17 @@
               </select>
             </label>
             <label class="field">
+              <span data-i18n="seasonLabel">Årstidstema</span>
+              <select id="season">
+                <option value="auto" data-i18n="seasonAuto">Auto · följer kalendern</option>
+                <option value="spring" data-i18n="seasonSpring">🌸 Vår</option>
+                <option value="summer" data-i18n="seasonSummer">☀️ Sommar</option>
+                <option value="autumn" data-i18n="seasonAutumn">🍂 Höst</option>
+                <option value="winter" data-i18n="seasonWinter">❄️ Vinter</option>
+              </select>
+            </label>
+            <p class="muted" data-i18n="seasonNote">Årstiden färgar gränssnittet, hälsningen och SortBro-ikonen i verktygsfältet – i både ljust och mörkt läge.</p>
+            <label class="field">
               <span data-i18n="moveModeLabel">Standardläge för regler (när regeln står på Standard)</span>
               <select id="moveMode">
                 <option value="read" data-i18n="moveModeRead">Flytta när läst och lämnat</option>
@@ -394,7 +437,7 @@
 
       <section id="view-support" class="view" hidden>
         <div class="support-hero">
-          <img src="icon.svg" class="support-logo" width="76" height="76" alt="SortBro">
+          <img id="supportLogo" src="icon.svg" class="support-logo" width="76" height="76" alt="SortBro">
           <div><span class="support-eyebrow" data-i18n="supEyebrow">💚 100 % GRATIS • LOKALT I THUNDERBIRD • ÖPPEN KÄLLKOD</span></div>
           <h2 data-i18n="supHeroTitle">Stöd SortBro – för en lugnare inkorg i Thunderbird</h2>
           <p data-i18n="supHeroSub">SortBro är helt gratis, reklamfritt och körs 100 % lokalt i din dator utan molntjänster. Din gåva stöttar fortsatt utveckling, stöd för nya Thunderbird-versioner och nya smarta filterfunktioner. Inget låses upp – alla funktioner är alltid fria för alla.</p>
@@ -504,6 +547,28 @@
     </main>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
+
+  <div id="folderModal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
+      <div class="eyebrow" data-i18n="newFolderEyebrow">NY MAPP I THUNDERBIRD</div>
+      <h2 id="folderModalTitle" data-i18n="newFolderTitle">Skapa en ny målmapp</h2>
+      <p class="muted" data-i18n="newFolderHelp">Mappen skapas direkt i ditt konto. Välj namn och var den ska ligga.</p>
+      <label class="field">
+        <span data-i18n="newFolderParentLabel">Placera i</span>
+        <select id="folderParent"><option value="">Kontots rotmapp</option></select>
+      </label>
+      <label class="field">
+        <span data-i18n="newFolderNameLabel">Mappnamn</span>
+        <input id="folderName" maxlength="64" placeholder="t.ex. Fakturor 2026">
+      </label>
+      <div class="modal-actions">
+        <button id="folderCreateBtn" type="button" class="button primary" data-i18n="newFolderCreate">＋ Skapa mapp</button>
+        <button id="folderCancelBtn" type="button" class="button secondary" data-i18n="cancelBtn">Avbryt</button>
+      </div>
+      <p class="muted" data-i18n="newFolderNote">SortBro rör inga andra mappar och raderar aldrig något.</p>
+    </div>
+  </div>
+
   <script src="core.js"></script>
   <script src="demo.js"></script>
   <script src="ui.js"></script>

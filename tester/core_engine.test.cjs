@@ -13,6 +13,9 @@ function fixture(options={}){
   if(options.noAck)return;const old=structuredClone(messages.get(ids[0])),m={...old,id:ids[0]+1000,folder:{id:target,accountId:'a'}};messages.delete(ids[0]);messages.set(m.id,m);
   await engine.onMoved({messages:[old]},{messages:[m]});
  }},calls:[]};
+ if(options.folderInfo)api.folders.getFolderInfo=async id=>{const list=[...messages.values()].filter(m=>m.folder?.id===id);return {totalMessageCount:list.length,unreadMessageCount:list.filter(m=>m.read!==true).length};};
+ if(options.folderInfoReject)api.folders.getFolderInfo=async()=>{throw Error('folder info offline');};
+ if(options.folderInfo){const queryInfo=api.folders.getFolderInfo;const queries=[];api.infoCalls=queries;api.folders.getFolderInfo=async id=>{queries.push(id);return queryInfo(id);};}
  engine=new Engine(api,cfg,{now:()=>now,ackTimeout:5,log:(n,c)=>logs.push(C.event(n,c,now)),notify:n=>notifications.push(n),debug:t=>debugs.push(t),persist:async()=>{if(options.persistReject)throw Error('disk SECRET');saved.push(structuredClone(engine.recordList()));}});
  return {e:engine,api,messages,shown,logs,saved,notifications,debugs,advance:(ms=2100)=>now+=ms,ready:async()=>{await engine.enqueue(messages.get(1));await engine.tick();now+=2100;await engine.tick();}};
 }
@@ -270,9 +273,117 @@ test('sweepRule moves messages concurrently while building the queue and drains 
  await f.e.tick();
  assert.equal(r.queued,125);
  assert.equal(r.deferred,0);
- assert.ok(movedDuringEnqueue>0,'moves should happen concurrently while sweepRule is still building the queue');
- assert.equal(f.e.stats.moved,125);
- assert.equal(f.e.pending.size,0);
+  assert.ok(movedDuringEnqueue>0,'moves should happen concurrently while sweepRule is still building the queue');
+  assert.equal(f.e.stats.moved,125);
+  assert.equal(f.e.pending.size,0);
+});
+
+test('folder cache skips empty folders without querying them',async()=>{
+ const f=fixture({folderInfo:true});
+ const queried=[],query=f.api.messages.query;
+ f.api.messages.query=async q=>{queried.push(q.folderId);return query(q);};
+ const r=await f.e.catchUp('rule1');
+ assert.equal(r.emptyFolders,4);
+ assert.equal(r.searchedFolders,1);
+ assert.deepEqual(queried,['inbox']);
+ assert.ok(f.api.infoCalls.includes('other'));
+});
+
+test('folder cache skips unchanged folders without hits on the next sweep',async()=>{
+ const f=fixture({folderInfo:true});
+ f.messages.set(9,{...msg(9),subject:'Hej',author:'x@other.invalid',folder:{id:'brt',accountId:'a'}});
+ const queried=[],query=f.api.messages.query;
+ f.api.messages.query=async q=>{queried.push(q.folderId);return query(q);};
+ const first=await f.e.catchUp('rule1');
+ assert.ok(first.searchedFolders>=2);
+ assert.equal(first.cachedFolders,0);
+ const before=queried.filter(id=>id==='brt').length;
+ const second=await f.e.catchUp('rule1');
+ assert.ok(second.cachedFolders>=1);
+ assert.equal(queried.filter(id=>id==='brt').length,before);
+ assert.equal(second.scanned,0);
+ assert.equal(second.queued,0);
+});
+
+test('folder cache is invalidated when the engine sees new mail, moves or reads',async()=>{
+ const f=fixture({folderInfo:true});
+ f.messages.set(9,{...msg(9),subject:'Hej',author:'x@other.invalid',folder:{id:'brt',accountId:'a'}});
+ await f.e.catchUp('rule1');
+ assert.equal((await f.e.catchUp('rule1')).cachedFolders,2);
+ f.e.invalidateFolders();
+ const after=await f.e.catchUp('rule1');
+ assert.equal(after.cachedFolders,0);
+ assert.ok(after.searchedFolders>=2);
+ f.e.config.dryRun=false;
+ await f.e.tick();
+ assert.equal(f.e.folderCache.size,0,'a confirmed move clears the cached folder picture');
+});
+
+test('folder info failure falls back to a normal scan',async()=>{
+ const f=fixture({folderInfoReject:true});
+ const r=await f.e.catchUp('rule1');
+ assert.equal(r.emptyFolders,0);
+ assert.equal(r.cachedFolders,0);
+ assert.ok(r.searchedFolders>=5);
+ assert.equal(f.e.fault,'');
+});
+
+test('folder cache counters report hits and misses',async()=>{
+ const f=fixture({folderInfo:true});
+ await f.e.catchUp('rule1');
+ assert.ok(f.e.cacheStats.misses>=1);
+ f.messages.clear();
+ f.messages.set(9,{...msg(9),subject:'Hej',author:'x@other.invalid',folder:{id:'brt',accountId:'a'}});
+ await f.e.catchUp('rule1');
+ const hits=f.e.cacheStats.hits;
+ await f.e.catchUp('rule1');
+ assert.ok(f.e.cacheStats.hits>hits);
+});
+
+test('seasonOf maps the calendar to the four seasons',()=>{
+ const monthOf=m=>C.seasonOf(new Date(Date.UTC(2026,m,15)));
+ assert.deepEqual([0,1,11].map(m=>C.seasonOf(new Date(Date.UTC(2026,m,15)))),['winter','winter','winter']);
+ assert.deepEqual([2,3,4].map(monthOf),['spring','spring','spring']);
+ assert.deepEqual([5,6,7].map(monthOf),['summer','summer','summer']);
+ assert.deepEqual([8,9,10].map(monthOf),['autumn','autumn','autumn']);
+ assert.equal(C.seasonOf('2026-10-12T08:00:00Z'),'autumn');
+ assert.equal(C.seasonOf('inte-ett-datum'),C.seasonOf());
+ assert.deepEqual([...C.SEASONS],['spring','summer','autumn','winter']);
+});
+
+test('suggestFrom groups inbox mail by domain and ignores covered domains',()=>{
+ const inbox={id:'inbox',accountId:'a'};
+ const list=[
+  {author:'Faktura <faktura@fortnox.se>',subject:'Faktura 1042',folder:inbox},
+  {author:'Faktura <faktura@fortnox.se>',subject:'Faktura 1043',folder:inbox},
+  {author:'Klarna <order@klarna.se>',subject:'Order 5',folder:inbox},
+  {author:'Klarna <order@klarna.se>',subject:'Order 6',folder:inbox},
+  {author:'Klarna <order@klarna.se>',subject:'Order 7',folder:inbox},
+  {author:'Ensamt <en@enskild.se>',subject:'Hej',folder:inbox},
+  {author:'trasig-adress',subject:'Hej',folder:inbox}
+ ];
+ const out=C.suggestFrom(list,{minCount:2});
+ assert.deepEqual(out.map(s=>s.domain),['klarna.se','fortnox.se']);
+ assert.equal(out[0].count,3);
+ assert.equal(out[0].subject,'Order 5');
+ assert.equal(out[0].sender,'order@klarna.se');
+ const covered=C.suggestFrom(list,{minCount:2,rules:[C.validateRule({id:'r1',name:'Fortnox',enabled:true,source:'inbox',sourceAccount:'a',scope:'account',target:'archive',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}]})]});
+ assert.deepEqual(covered.map(s=>s.domain),['klarna.se']);
+ assert.equal(C.suggestFrom(list,{minCount:2,limit:1}).length,1);
+ assert.deepEqual(C.suggestFrom(null),[]);
+});
+
+test('shouldOpenWindow suppresses popups during a batch sweep',()=>{
+ assert.equal(C.shouldOpenWindow({action:'window',pending:1,sweeping:0,openWindow:true}),true);
+ assert.equal(C.shouldOpenWindow({action:'window',pending:1,sweeping:1,openWindow:true}),false);
+ assert.equal(C.shouldOpenWindow({action:'window',pending:0,fromSweep:true}),false);
+ assert.equal(C.shouldOpenWindow({action:'window',pending:4}),false);
+ assert.equal(C.shouldOpenWindow({action:'default',openWindow:true,pending:1}),true);
+ assert.equal(C.shouldOpenWindow({action:'default',openWindow:false,pending:1}),false);
+ assert.equal(C.shouldOpenWindow({action:'keep',pending:0}),false);
+ assert.equal(C.shouldOpenWindow({action:'read',pending:0}),false);
+ assert.equal(C.shouldOpenWindow({}),true);
+ assert.equal(C.shouldOpenWindow({action:'window',pending:null,sweeping:null}),true);
 });
 
 

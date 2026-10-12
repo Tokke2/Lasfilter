@@ -315,8 +315,62 @@ const I18N={
   toastInboxDirectOff:'Direktflytt av nyinkomna mejl är avstängd.',
   toastFoldersRefreshed:'Konton och mappar uppdaterade.',
   toastLangChanged:'Språk ändrat till svenska.',
+  seasonLabel:'Årstidstema',
+  seasonLabelShort:'Årstid',
+  seasonAuto:'Auto · följer kalendern',
+  seasonSpring:'🌸 Vår',
+  seasonSummer:'☀️ Sommar',
+  seasonAutumn:'🍂 Höst',
+  seasonWinter:'❄️ Vinter',
+  seasonNote:'Årstiden färgar gränssnittet, hälsningen, landskapet och SortBro-ikonen i verktygsfältet – i både ljust och mörkt läge.',
+  seasonHeroSpring:'Vår',
+  seasonHeroSummer:'Sommar',
+  seasonHeroAutumn:'Höst',
+  seasonHeroWinter:'Vinter',
+  seasonGreetingSpring:'Ha en fin vårdag! 🌸',
+  seasonGreetingSummer:'Ha en skön sommar! ☀️',
+  seasonGreetingAutumn:'Ha en fin höstdag! 🍂',
+  seasonGreetingWinter:'Ha en fin vinterdag! ❄️',
+  seasonChanged:'Årstidstema uppdaterat.',
+  templateLabel:'1-klicksmallar:',
+  tplInvoice:'Fakturor & Kvitton',
+  tplOrder:'Order & Leverans',
+  tplNews:'Nyhetsbrev',
+  tplSystem:'System & Notiser',
+  tplBookkeeping:'Bokföring',
+  tplNameInvoice:'Fakturor & kvitton',
+  tplNameOrder:'Order & leveranser',
+  tplNameNews:'Nyhetsbrev',
+  tplNameSystem:'System & notiser',
+  tplNameBookkeeping:'Bokföring',
+  tplApplied:'Mallen är ifylld. Välj målmapp och spara regeln.',
+  tplTargetHint:'Tips: skapa målmappen med ＋ Ny mapp.',
+  suggestTitle:'✨ Föreslå regler från Inkorgen',
+  suggestBtn:'✨ Skanna Inkorgen',
+  suggestHelp:'SortBro tittar lokalt i Inkorgen och föreslår avsändare som återkommer. Inget skapas förrän du själv väljer målmapp och godkänner.',
+  suggestScanning:'Skannar Inkorgen lokalt…',
+  suggestEmpty:'Inga nya förslag just nu – Inkorgen har inga återkommande avsändare som saknar regel.',
+  suggestSummary:'{count} mejl',
+  suggestFound:'{count} förslag hittades i Inkorgen.',
+  suggestApprove:'✓ Godkänn',
+  suggestApproved:'Regeln skapades från Inkorgen.',
+  newFolderBtn:'＋ Ny mapp',
+  newFolderEyebrow:'NY MAPP I THUNDERBIRD',
+  newFolderTitle:'Skapa en ny målmapp',
+  newFolderHelp:'Mappen skapas direkt i ditt konto. Välj namn och var den ska ligga.',
+  newFolderParentLabel:'Placera i',
+  newFolderNameLabel:'Mappnamn',
+  newFolderCreate:'＋ Skapa mapp',
+  newFolderNote:'SortBro rör inga andra mappar och raderar aldrig något.',
+  newFolderRoot:'Kontots rotmapp',
+  cancelBtn:'Avbryt',
+  toastFolderCreated:'Mappen skapades i Thunderbird och är vald som mål.',
+  toastPrefill:'Ny regel från mejlet du högerklickade på.',
   errors:{
    bad_branch:'Ogiltig fördelning. Varje fördelning behöver ett villkor och en målmapp.',
+   bad_folder_name:'Ange ett mappnamn på 1–64 tecken utan snedstreck.',
+   folder_exists:'Det finns redan en mapp med det namnet.',
+   folder_create_failed:'Mappen kunde inte skapas i Thunderbird.',
    disabled:'Regeln är avstängd. Aktivera den först.',
    bad_domain:'Ange en fullständig domän, exempelvis fortnox.se.',
    bad_rule:'Ogiltig regel.',
@@ -683,8 +737,62 @@ const I18N={
   toastInboxDirectOff:'Immediate move for new Inbox arrivals disabled.',
   toastFoldersRefreshed:'Accounts and folders refreshed.',
   toastLangChanged:'Language switched to English.',
+  seasonLabel:'Season theme',
+  seasonLabelShort:'Season',
+  seasonAuto:'Auto · follows the calendar',
+  seasonSpring:'🌸 Spring',
+  seasonSummer:'☀️ Summer',
+  seasonAutumn:'🍂 Autumn',
+  seasonWinter:'❄️ Winter',
+  seasonNote:'The season colours the interface, the greeting, the landscape and the SortBro toolbar icon – in both light and dark mode.',
+  seasonHeroSpring:'Spring',
+  seasonHeroSummer:'Summer',
+  seasonHeroAutumn:'Autumn',
+  seasonHeroWinter:'Winter',
+  seasonGreetingSpring:'Have a lovely spring day! 🌸',
+  seasonGreetingSummer:'Enjoy the summer! ☀️',
+  seasonGreetingAutumn:'Have a lovely autumn day! 🍂',
+  seasonGreetingWinter:'Have a lovely winter day! ❄️',
+  seasonChanged:'Season theme updated.',
+  templateLabel:'One-click templates:',
+  tplInvoice:'Invoices & receipts',
+  tplOrder:'Orders & deliveries',
+  tplNews:'Newsletters',
+  tplSystem:'System & notifications',
+  tplBookkeeping:'Bookkeeping',
+  tplNameInvoice:'Invoices & receipts',
+  tplNameOrder:'Orders & deliveries',
+  tplNameNews:'Newsletters',
+  tplNameSystem:'System & notifications',
+  tplNameBookkeeping:'Bookkeeping',
+  tplApplied:'Template filled in. Choose a target folder and save the rule.',
+  tplTargetHint:'Tip: create the target folder with ＋ New folder.',
+  suggestTitle:'✨ Suggest rules from the Inbox',
+  suggestBtn:'✨ Scan the Inbox',
+  suggestHelp:'SortBro looks locally at your Inbox and suggests senders that keep coming back. Nothing is created until you pick a target folder and approve.',
+  suggestScanning:'Scanning the Inbox locally…',
+  suggestEmpty:'No new suggestions right now – your Inbox has no recurring senders without a rule.',
+  suggestSummary:'{count} emails',
+  suggestFound:'{count} suggestions found in the Inbox.',
+  suggestApprove:'✓ Approve',
+  suggestApproved:'Rule created from the Inbox.',
+  newFolderBtn:'＋ New folder',
+  newFolderEyebrow:'NEW FOLDER IN THUNDERBIRD',
+  newFolderTitle:'Create a new target folder',
+  newFolderHelp:'The folder is created directly in your account. Pick a name and where it should live.',
+  newFolderParentLabel:'Place inside',
+  newFolderNameLabel:'Folder name',
+  newFolderCreate:'＋ Create folder',
+  newFolderNote:'SortBro touches no other folders and never deletes anything.',
+  newFolderRoot:'Account root folder',
+  cancelBtn:'Cancel',
+  toastFolderCreated:'Folder created in Thunderbird and selected as target.',
+  toastPrefill:'New rule from the email you right-clicked.',
   errors:{
    bad_branch:'Invalid branch. Each branch needs a condition and a target folder.',
+   bad_folder_name:'Enter a folder name of 1–64 characters without slashes.',
+   folder_exists:'A folder with that name already exists.',
+   folder_create_failed:'The folder could not be created in Thunderbird.',
    disabled:'This rule is disabled. Enable it first.',
    bad_domain:'Enter a complete domain, for example fortnox.se.',
    bad_rule:'Invalid rule.',
@@ -814,6 +922,7 @@ function applyLanguage(lang){
  }
  updateReadPolicy();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
+ if(state)applySeason(state.prefs);
 }
 
 function applyTheme(prefs){
@@ -829,12 +938,202 @@ function applyTheme(prefs){
  }
  if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;}
 }
+/* ===== Årstidsteman: Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter ===== */
+const SEASON_KEYS=['spring','summer','autumn','winter'];
+const SEASON_CHOICES=['auto',...SEASON_KEYS];
+const SEASON_KEY_NAMES={spring:'seasonGreetingSpring',summer:'seasonGreetingSummer',autumn:'seasonGreetingAutumn',winter:'seasonGreetingWinter'};
+function resolveSeason(prefs){
+ const pref=prefs?.season;
+ return SEASON_KEYS.includes(pref)?pref:C.seasonOf(new Date());
+}
+function seasonArt(season){
+ const sun=(cx,cy,r,opacity)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--art-sun)" opacity="${opacity}"/>`;
+ const rays=(cx,cy,r)=>`<g stroke="var(--art-sun)" stroke-width="3" stroke-linecap="round" opacity="0.75">${Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return `<line x1="${(cx+Math.cos(a)*(r+7)).toFixed(1)}" y1="${(cy+Math.sin(a)*(r+7)).toFixed(1)}" x2="${(cx+Math.cos(a)*(r+16)).toFixed(1)}" y2="${(cy+Math.sin(a)*(r+16)).toFixed(1)}"/>`;}).join('')}</g>`;
+ const flakes=Array.from({length:16},(_,i)=>`<circle cx="${28+(i*53)%370}" cy="${18+(i*37)%120}" r="${i%3===0?3:2}" fill="var(--art-fg)" opacity="0.5"/>`).join('');
+ const leaves=Array.from({length:9},(_,i)=>`<ellipse cx="${40+(i*47)%340}" cy="${24+(i*31)%120}" rx="7" ry="4" fill="var(--art-fg)" opacity="0.75" transform="rotate(${i*23} ${40+(i*47)%340} ${24+(i*31)%120})"/>`).join('');
+ const pines=(x,scale)=>`<g transform="translate(${x} 0) scale(${scale})"><rect x="-4" y="132" width="8" height="26" rx="3" fill="#7a5a3a"/><path d="M0 74 L30 132 L-30 132Z" fill="var(--art-fg)"/><path d="M0 96 L26 142 L-26 142Z" fill="var(--art-fg)" opacity="0.92"/></g>`;
+ const blossoms=[[104,116],[126,104],[146,120],[118,132]].map(([cx,cy])=>`<circle cx="${cx}" cy="${cy}" r="11" fill="var(--art-fg)" opacity="0.85"/>`).join('');
+ const tree=`<rect x="121" y="124" width="7" height="30" rx="3" fill="#8a6a46"/>${blossoms}`;
+ const extras={
+  spring:`${sun(322,54,24,0.95)}${tree}<path d="M196 46 q9-8 18 0 q9-8 18 0" fill="none" stroke="var(--art-fg)" stroke-width="2.4" opacity="0.7"/>`,
+  summer:`${sun(320,48,28,1)}${rays(320,48,28)}<g stroke="var(--art-fg)" stroke-width="2.5" opacity="0.6" fill="none"><path d="M24 176 q16-7 32 0 q16 7 32 0"/><path d="M188 186 q16-7 32 0 q16 7 32 0"/></g>`,
+  autumn:`${sun(316,72,22,0.9)}${leaves}`,
+  winter:`<circle cx="322" cy="52" r="20" fill="var(--art-sun)" opacity="0.85"/>${pines(84,1)}${pines(132,0.72)}${flakes}`
+ }[season]||'';
+ const water=season==='summer'?'<rect y="168" width="420" height="32" fill="var(--art-water)" opacity="0.7"/>':'';
+ const snow=season==='winter'?'<path d="M0 146 C 90 128, 150 156, 236 138 S 350 148, 420 132 L420 200 L0 200Z" fill="#ffffff" opacity="0.55"/>':'';
+ return `<svg viewBox="0 0 420 200" preserveAspectRatio="xMidYMax slice" role="img" aria-label="${T('seasonHero'+season[0].toUpperCase()+season.slice(1))}">
+  <defs><linearGradient id="seasonSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--art-sky-top)"/><stop offset="100%" stop-color="var(--art-sky-bottom)"/></linearGradient></defs>
+  <rect width="420" height="200" fill="url(#seasonSky)"/>
+  ${extras}
+  <path d="M0 152 C 70 122, 132 170, 204 142 S 336 154, 420 126 L420 200 L0 200Z" fill="var(--art-hill)"/>
+  ${snow}
+  <path d="M0 176 C 92 154, 164 190, 252 168 S 362 180, 420 162 L420 200 L0 200Z" fill="var(--art-hill-2)"/>
+  ${water}
+ </svg>`;
+}
+function applySeason(prefs){
+ const season=resolveSeason(prefs),root=document.documentElement;
+ root.dataset.season=season;
+ root.dataset.seasonMode=SEASON_CHOICES.includes(prefs?.season)?prefs.season:'auto';
+ if($('seasonHeroArt'))$('seasonHeroArt').innerHTML=seasonArt(season);
+ if($('seasonGreeting'))$('seasonGreeting').textContent=T(SEASON_KEY_NAMES[season]||'seasonGreetingAutumn');
+ const logos=[['brandLogo','64'],['topbarLogo','32'],['supportLogo','128']];
+ for(const [id,size] of logos){
+  const img=$(id);if(!img)continue;
+  img.src='season-'+season+'-'+size+'.png';
+ }
+ const value=SEASON_CHOICES.includes(prefs?.season)?prefs.season:'auto';
+ if($('season'))$('season').value=value;
+ if($('seasonQuick'))$('seasonQuick').value=value;
+}
+/* Sifferkorten pulserar när ett värde faktiskt ändras. */
+const lastCounts={};
+function bumpCount(id,value){
+ const node=$(id);if(!node)return;
+ const text=String(value);
+ if(lastCounts[id]!==undefined&&lastCounts[id]!==text){
+  node.classList.remove('stat-pulse');void node.offsetWidth;node.classList.add('stat-pulse');
+  const card=node.closest('.stat');
+  if(card)card.classList.add('stat-updated');
+  setTimeout(()=>{node.classList.remove('stat-pulse');card?.classList.remove('stat-updated');},1100);
+ }
+ lastCounts[id]=text;node.textContent=text;
+}
+
+/* ===== ✨ Föreslå regler från Inkorgen (endast lokala förslag) ===== */
+let suggestions=[],suggestionsScanned=false;
+function renderSuggestions(){
+ const box=$('suggestionsBox');if(!box)return;
+ box.replaceChildren();
+ if(!suggestionsScanned&&!suggestions.length)return;
+ if(!suggestions.length){box.append(el('p','suggestion-empty',T('suggestEmpty')));return;}
+ for(const s of suggestions){
+  const row=el('div','suggestion-row'),main=el('div','sug-main');
+  main.append(el('strong','',s.domain));
+  const parts=[T('suggestSummary').replace('{count}',s.count)];
+  if(s.subject)parts.push(s.subject);
+  if(s.sender)parts.push(s.sender);
+  main.append(el('small','',parts.join(' · ')));
+  const select=el('select');select.setAttribute('aria-label',T('chooseTarget'));selectOptions(select,folders,T('chooseTarget'),'');
+  const ok=el('button','button small primary',T('suggestApprove'));ok.type='button';
+  ok.addEventListener('click',async()=>{try{await approveSuggestion(s,select.value);}catch(err){alertError(err);}});
+  row.append(main,select,ok);box.append(row);
+ }
+}
+async function scanInbox(){
+ if($('suggestRulesBtn'))$('suggestRulesBtn').disabled=true;
+ try{
+  suggestions=await rpc('suggestRules');
+  suggestionsScanned=true;
+  renderSuggestions();
+  toast(suggestions.length?T('suggestFound').replace('{count}',suggestions.length):T('suggestEmpty'));
+ }finally{if($('suggestRulesBtn'))$('suggestRulesBtn').disabled=false;}
+}
+async function approveSuggestion(s, targetId){
+ if(!targetId)throw new C.RuleError('choose_target');
+ const folder=folders.find(f=>f.id===targetId)||folders[0];
+ const accountId=folder?.accountId||$('source')?.value||accounts()[0]?.id||'';
+ const anchor=folders.find(f=>f.accountId===accountId&&f.id!==targetId)||folder;
+ const rule=C.validateRule({
+  id:crypto.randomUUID(),
+  name:(T('defaultRulePrefix')+s.domain).slice(0,100),
+  enabled:true,
+  source:anchor?.id||targetId,
+  sourceAccount:accountId,
+  scope:'account',
+  target:targetId,
+  match:'all',
+  readFilter:($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both',
+  unreadAction:($('quickOpenWindow')&&$('quickOpenWindow').checked)?'window':'keep',
+  conditions:[{field:'domain',op:'equals',value:s.domain}],
+  branches:[]
+ });
+ const next=await rpc('saveRules',{rules:[...state.config.rules,rule],revision:editRevision});
+ suggestions=suggestions.filter(x=>x.domain!==s.domain);
+ dirty=false;renderStatus(next);loadRule(rule.id);renderSuggestions();
+ toast(T('suggestApproved'));
+}
+
+/* ===== 1-klicksmallar ===== */
+const TEMPLATES={
+ faktura:{name:'tplNameInvoice',match:'any',conditions:[['subject','contains','faktura'],['subject','contains','kvitto']],hints:['faktur','kvitto','ekonomi','invoice']},
+ order:{name:'tplNameOrder',match:'any',conditions:[['subject','contains','order'],['subject','contains','leverans'],['subject','contains','försändelse']],hints:['order','leverans','inköp','buy']},
+ nyhetsbrev:{name:'tplNameNews',match:'any',conditions:[['subject','contains','nyhetsbrev'],['subject','contains','newsletter'],['sender','contains','newsletter']],hints:['nyhetsbrev','news','webb','info']},
+ system:{name:'tplNameSystem',match:'any',conditions:[['sender','contains','noreply'],['sender','contains','no-reply'],['subject','contains','notis']],hints:['notis','system','support','drift']},
+ bokforing:{name:'tplNameBookkeeping',match:'any',conditions:[['subject','contains','bokföring'],['subject','contains','verifikation'],['subject','contains','moms']],hints:['bokför','ekonomi','redovisning']}
+};
+function applyTemplate(key){
+ const template=TEMPLATES[key];if(!template)return;
+ if(dirty&&!confirm(T('confirmDiscard')))return;
+ selectedId='';
+ if($('ruleName'))$('ruleName').value=T(template.name);
+ if($('match'))$('match').value=template.match;
+ const box=$('conditions');if(box){box.replaceChildren();for(const [field,op,value] of template.conditions)addCondition({field,op,value});}
+ if($('branches'))$('branches').replaceChildren();
+ if($('ruleReadFilter'))$('ruleReadFilter').value=($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both';
+ if($('ruleUnreadAction'))$('ruleUnreadAction').value=($('quickOpenWindow')&&$('quickOpenWindow').checked)?'window':'keep';
+ if(!$('source')?.value){const first=accounts()[0];if(first)accountOptions(first.id);}
+ const auto=folders.find(f=>{const n=C.norm((f.name||'')+' '+(f.label||''));return template.hints.some(h=>n.includes(C.norm(h)));});
+ if($('target'))targetOptions(auto?.id||$('target').value||'');
+ if($('delete'))$('delete').disabled=true;
+ if($('editorTitle'))$('editorTitle').textContent=T('editorNew');
+ updateReadPolicy();dirty=true;showView('rules');renderRules();
+ $('ruleForm')?.scrollIntoView({behavior:'smooth',block:'center'});
+ toast(T('tplApplied')+(auto?'':' '+T('tplTargetHint')));
+}
+
+/* ===== ＋ Ny mapp ===== */
+function openFolderModal(presetAccountId){
+ const modal=$('folderModal');if(!modal)return;
+ const parent=$('folderParent');
+ if(parent)selectOptions(parent,folders,T('newFolderRoot'),'');
+ if(!$('source')?.value&&presetAccountId)accountOptions(presetAccountId);
+ if($('folderName'))$('folderName').value='';
+ modal.hidden=false;
+ $('folderName')?.focus();
+}
+async function createFolderFromModal(){
+ const name=$('folderName')?.value||'';
+ const parentId=$('folderParent')?.value||'';
+ const created=await rpc('createFolder',{parentId,name});
+ folders=await rpc('folders');
+ const src=$('source')?.value||'',target=$('target')?.value||'';
+ accountOptions(src);targetOptions(created?.id||target);
+ if($('quickTarget')&&created?.id)$('quickTarget').value=created.id;
+ const modal=$('folderModal');if(modal)modal.hidden=true;
+ renderRules();toast(T('toastFolderCreated'));
+}
+
+/* ===== Högerklicksmeny i Thunderbird: ny regel från mejl ===== */
+async function applyPrefill(){
+ if(!live||DEMO)return false;
+ let data=null;
+ try{data=await rpc('pendingPrefill');}catch{return false;}
+ if(!data)return false;
+ await rpc('prefillConsumed').catch(()=>{});
+ if(dirty&&!confirm(T('confirmDiscard')))return false;
+ loadRule('',data.accountId||'');
+ const row=$('conditions')?.children?.[0];
+ if(row){
+  const field=row.children[0];
+  field.value=data.domain?'domain':(data.email?'sender':'subject');
+  field.dispatchEvent(new Event('change',{bubbles:true}));
+  row.children[2].value=(data.domain||data.email||data.subject||'').slice(0,256);
+ }
+ if($('ruleName')&&!$('ruleName').value.trim())$('ruleName').value=(T('defaultRulePrefix')+(data.domain||data.email||T('defaultSenderFallback'))).slice(0,100);
+ dirty=true;showView('rules');
+ $('ruleName')?.focus();
+ toast(T('toastPrefill'));
+ return true;
+}
+
 function currentToken(){return JSON.stringify(state.config.rules);}
 function renderStatus(next){
- state=next;applyTheme(state.prefs);
+ state=next;applyTheme(state.prefs);applySeason(state.prefs);
  const cfg=state.config,active=cfg.rules.filter(r=>r.enabled).length;
- $('navCount').textContent=cfg.rules.length;$('countRules').textContent=active;$('countQueue').textContent=state.queued;
- $('countMoved').textContent=state.stats.moved;$('countMatched').textContent=state.stats.matched;$('simulated').textContent=state.stats.simulated+' test';
+ $('navCount').textContent=cfg.rules.length;bumpCount('countRules',active);bumpCount('countQueue',state.queued);
+ bumpCount('countMoved',state.stats.moved);bumpCount('countMatched',state.stats.matched);$('simulated').textContent=state.stats.simulated+' test';
  $('statusPill').textContent=state.fault?T('pillStopped'):cfg.paused?T('pillPaused'):cfg.dryRun?T('pillTest'):T('pillActive');
  $('statusPill').className='pill '+(state.fault?'red':cfg.dryRun||cfg.paused?'amber':'green');
  $('pause').textContent=cfg.paused?T('pauseResume'):T('pauseBtn');$('mode').textContent=cfg.dryRun?T('modeEnable'):T('modeTest');
@@ -854,7 +1153,7 @@ function renderStatus(next){
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
- renderRules();renderActivity();renderBackups();
+ renderRules();renderActivity();renderBackups();renderSuggestions();
 }
 function ruleTagText(rule){
  if(!rule.enabled)return T('tagDisabled');
@@ -975,6 +1274,8 @@ function addCondition(c={field:'domain',op:'equals',value:''}){
 function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.children[3].value}))});}
+/* Enkel regel-export använder samma validerade utkast som sparningen. */
+const buildRule=()=>draft();
 function loadRule(id='',presetAccount=''){
  const rule=state.config.rules.find(r=>r.id===id);selectedId=rule?.id||'';
  $('editorTitle').textContent=rule?T('editorEdit'):T('editorNew');$('ruleName').value=rule?.name||'';$('enabled').checked=rule?.enabled??true;
@@ -1340,12 +1641,32 @@ handle('langEn','click',async()=>switchLanguage('en'));
 handle('lang','change',async()=>switchLanguage($('lang').value));
 handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
 for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));});
-handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();toast(T('toastFoldersRefreshed'));});
+handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();renderSuggestions();toast(T('toastFoldersRefreshed'));});
+
+/* ===== Nya funktioner: mallar, förslag, ny mapp, årstid ===== */
+for(const btn of document.querySelectorAll('#templateBar .template-btn'))btn.addEventListener('click',()=>applyTemplate(btn.dataset.template));
+if($('suggestRulesBtn'))handle('suggestRulesBtn','click',scanInbox);
+if($('newFolderBtn'))handle('newFolderBtn','click',()=>openFolderModal($('source')?.value||''));
+if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',()=>openFolderModal(''));
+if($('folderCancelBtn'))handle('folderCancelBtn','click',()=>{$('folderModal').hidden=true;});
+if($('folderCreateBtn'))handle('folderCreateBtn','click',createFolderFromModal);
+if($('folderName'))$('folderName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();createFolderFromModal().catch(alertError);}});
+if($('folderModal'))$('folderModal').addEventListener('click',e=>{if(e.target===$('folderModal'))$('folderModal').hidden=true;});
+async function setSeasonPref(value){
+ if(!SEASON_CHOICES.includes(value))return;
+ state.prefs=await rpc('prefs',{prefs:{season:value}});
+ applySeason(state.prefs);
+ toast(T('seasonChanged'));
+}
+for(const id of ['season','seasonQuick'])if($(id))handle(id,'change',()=>setSeasonPref($(id).value));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(state)applyTheme(state.prefs);});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 async function refresh(){try{renderStatus(await rpc('status'));}catch(e){alertError(e);}}
-if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{if(msg?.event==='statusChanged')refresh();});
+if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
+ if(msg?.event==='statusChanged')refresh();
+ if(msg?.event==='ruleFromMessage')applyPrefill().catch(()=>{});
+});
 (async()=>{
- try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');}
+ try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');await applyPrefill();}
  catch(e){$('statusPill').textContent=T('pillDisconnected');$('notice').hidden=false;$('notice').textContent=Terr(e.code);$('notice').className='notice error';}
 })();

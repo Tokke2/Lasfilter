@@ -1,6 +1,15 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map()};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null};
+const SEASONS=['spring','summer','autumn','winter'];
+App.season=()=>{
+ const pref=App.prefs.season;
+ return SEASONS.includes(pref)?pref:C.seasonOf(new Date());
+};
+App.seasonIconPath=season=>{const s=SEASONS.includes(season)?season:C.seasonOf(new Date());return {'16':'season-'+s+'-16.png','32':'season-'+s+'-32.png','48':'season-'+s+'-48.png','64':'season-'+s+'-64.png'};};
+App.applySeasonIcon=()=>{
+ try{const season=App.season();if(App.seasonIcon===season)return;App.seasonIcon=season;B.browserAction.setIcon({path:App.seasonIconPath(season)}).catch(()=>{});}catch{}
+};
 App.write=fn=>{const p=App.writeChain.then(fn);App.writeChain=p.catch(()=>{});return p;};
 App.persistPending=null;
 App.persistWork=()=>{
@@ -34,6 +43,7 @@ App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
   const e=App.engine;if(!e)return;
   const badge=e.fault?'!':e.config.paused?'Ⅱ':e.config.dryRun?'T':'';
+  App.applySeasonIcon();
   B.browserAction.setBadgeText({text:badge}).catch(()=>{});
   B.browserAction.setBadgeBackgroundColor({color:e.fault?'#ac3434':e.config.dryRun?'#c28a24':'#2c776c'}).catch(()=>{});
   B.runtime.sendMessage({event:'statusChanged'}).catch(()=>{});
@@ -49,6 +59,51 @@ App.folderList=async()=>{
  return items;
 };
 App.captureTab=async tab=>{if(tab?.type==='mail')App.mailTab=tab.id;};
+/* ＋ Ny mapp: skapar målmappen direkt i Thunderbird, utan att lämna SortBro. */
+App.createFolder=async(parentId,name)=>{
+ const clean=typeof name==='string'?name.trim().replace(/[\u0000-\u001f]/g,''):'';
+ if(!clean||clean.length>64||/[\\/]/.test(clean))throw new C.RuleError('bad_folder_name');
+ if(typeof B.folders?.create!=='function')throw new C.RuleError('bad_request');
+ let parent=typeof parentId==='string'?parentId.trim():'';
+ if(!parent){
+  const accounts=await B.accounts.list(true);
+  parent=accounts.find(a=>a.rootFolder)?.rootFolder?.id||'';
+  if(!parent)throw new C.RuleError('unsafe_folder');
+ }
+ let siblings=[];
+ try{siblings=await App.folderList();}catch{}
+ if(siblings.some(f=>f.name&&f.name.toLowerCase()===clean.toLowerCase()&&f.id!==parent))throw new C.RuleError('folder_exists');
+ let folder;
+ try{folder=await B.folders.create(parent,clean);}
+ catch{throw new C.RuleError('folder_create_failed');}
+ App.engine?.invalidateFolders();
+ App.log('settings_saved');
+ return {id:folder?.id||'',name:folder?.name||clean,accountId:folder?.accountId||'',label:folder?.name||clean};
+};
+/* ✨ Föreslå regler från Inkorgen – endast lokala förslag, inget skapas här. */
+App.suggestRules=async()=>{
+ const accounts=await B.accounts.list(true),inboxes=[];
+ for(const account of accounts){
+  const folders=(account.rootFolder?.subFolders||[]).concat(account.folders||[]);
+  const inbox=folders.find(f=>[...(f.specialUse||[]),f.type].includes('inbox'));
+  if(inbox&&C.usableFolder(inbox))inboxes.push(inbox);
+ }
+ const collected=[];
+ for(const inbox of inboxes.slice(0,5)){
+  let page=null;
+  try{
+   page=await B.messages.query({folderId:inbox.id,unread:false});
+   for(;;){
+    collected.push(...(page?.messages||[]));
+    if(!page?.id||collected.length>=400)break;
+    page=await B.messages.continueList(page.id);
+   }
+  }catch{App.log('error',0,'forslag_inkorg_misslyckades');}
+  finally{if(page?.id)await B.messages.abortList(page.id).catch(()=>{});}
+  if(collected.length>=400)break;
+ }
+ return C.suggestFrom(collected,{rules:App.engine?.config.rules||[],limit:8,minCount:2});
+};
 App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
  if(!Number.isSafeInteger(id)&&targetFolderId&&headerMessageId){
   await new Promise(r=>setTimeout(r,350));
@@ -62,7 +117,10 @@ App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
   for(const delay of [150,800])setTimeout(()=>B.messages.update(id,{read:true}).catch(()=>{}),delay);
   return;
  }
- const shouldOpenWindow=(action==='window'||(action==='default'&&App.engine?.config.openWindow!==false))&&(App.engine?.pending.size||0)<=3;
+ // Popup-skydd: under ett pågående mass-svep (eller när kön redan är lång)
+ // öppnas aldrig nya fönster – mejlet behålls bara oläst.
+ const sweeping=App.engine?.sweeping||0;
+ const shouldOpenWindow=C.shouldOpenWindow({action,pending:App.engine?.pending.size||0,sweeping,fromSweep:sweeping>0,openWindow:App.engine?.config.openWindow!==false});
  App.keepUnread.set(id,Date.now()+30000);
  if(shouldOpenWindow){
   try{await B.messageDisplay.open({messageId:id,location:'window'});}catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
@@ -103,7 +161,7 @@ App.save=async(next,{backup=false,discard=false}={})=>{
  if(discard)await e.clearPending();
  const backups=backup?[{time:new Date().toISOString(),config:structuredClone(e.config)},...App.backups].slice(0,5):App.backups;
  await App.write(()=>B.storage.local.set({config:next,backups,work:e.recordList()}));
- e.config=next;e.epoch++;for(const j of e.pending.values())j.hiddenSince=null;
+ e.config=next;e.epoch++;e.invalidateFolders();for(const j of e.pending.values())j.hiddenSince=null;
  App.backups=backups;App.changed();
 };
 App.checkRevision=rev=>{if(rev!==App.engine.config.revision)throw new C.RuleError('stale_config');};
@@ -167,6 +225,10 @@ App.handle=async msg=>{
  switch(msg.type){
   case 'status':return App.snapshot();
   case 'folders':return App.folderList();
+  case 'createFolder':return App.createFolder(msg.parentId,msg.name);
+  case 'suggestRules':return App.suggestRules();
+  case 'pendingPrefill':return App.prefill;
+  case 'prefillConsumed':{App.prefill=null;return true;}
   case 'selected':{
    const m=await App.selected();return {author:m.author,subject:m.subject,read:m.read,source:m.folder?.id,sourceAccount:m.folder?.accountId||'',email:C.email(m.author),domain:C.email(m.author).split('@')[1]||''};
   }
@@ -260,7 +322,8 @@ App.handle=async msg=>{
    if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)next.fontSize=p.fontSize;
    if(typeof p.lastRule==='string'&&p.lastRule.length<=80)next.lastRule=p.lastRule;
    if(['sv','en'].includes(p.lang))next.lang=p.lang;
-   await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;return next;
+   if(['auto',...SEASONS].includes(p.season))next.season=p.season;
+   await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;App.applySeasonIcon();return next;
   }
   default:throw new C.RuleError('bad_request');
  }
@@ -281,6 +344,8 @@ App.ready=(async()=>{
  if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)App.prefs.fontSize=p.fontSize;
  if(typeof p.lastRule==='string'&&p.lastRule.length<=80)App.prefs.lastRule=p.lastRule;
  if(['sv','en'].includes(p.lang))App.prefs.lang=p.lang;
+ if(['auto',...SEASONS].includes(p.season))App.prefs.season=p.season;
+ App.applySeasonIcon();
  App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
   notify:App.openUnread});
  let needResweep=false;
@@ -348,7 +413,37 @@ B.commands.onCommand.addListener(cmd=>{
  if(cmd==='sweep')App.ready.then(()=>App.engine.sweepAll()).catch(()=>App.log('error',0,'snabbkommando_svep_misslyckades'));
  if(cmd==='open_ui')B.tabs.query({active:true,currentWindow:true}).then(tabs=>App.open(tabs[0])).catch(()=>App.log('error',0,'oppna_granssnitt_misslyckades'));
 });
+/* Högerklicksmeny på mejl i Thunderbird: förifyller en ny regel i SortBro. */
+App.rulePrefillFromMessage=message=>{
+ const address=C.email(message?.author);
+ return {author:message?.author||'',email:address,domain:address.split('@')[1]||'',subject:typeof message?.subject==='string'?message.subject.slice(0,256):'',
+  folderId:message?.folder?.id||'',accountId:message?.folder?.accountId||'',time:new Date().toISOString()};
+};
+App.ruleFromMessage=async info=>{
+ const list=info?.selectedMessages?.messages;
+ const first=Array.isArray(list)&&list.length?list[0]:null;
+ const folder=info?.displayedFolder||first?.folder;
+ let message=first;
+ if(!message)return false;
+ if(!message.author||message.subject===undefined){
+  try{message=await B.messages.get(message.id);}catch{return false;}
+ }
+ App.prefill=App.rulePrefillFromMessage({...message,folder:message.folder||folder});
+ App.log('debug',0,'regelforslag fran hogerklicksmeny');
+ const tabs=await B.tabs.query({active:true,currentWindow:true}).catch(()=>[]);
+ await App.open(tabs?.[0]);
+ setTimeout(()=>B.runtime.sendMessage({event:'ruleFromMessage'}).catch(()=>{}),150);
+ return true;
+};
+try{
+ if(B.menus?.create)Promise.resolve(B.menus.create({id:'sortbro-rule-from-message',title:'SortBro: Skapa filter från detta mejl…',contexts:['message_list']})).catch(()=>{});
+}catch{}
+if(B.menus?.onClicked)B.menus.onClicked.addListener((info,tab)=>{
+ if(info?.menuItemId!=='sortbro-rule-from-message')return;
+ App.ruleFromMessage(info).catch(()=>App.log('error',0,'hogerklicksmeny_misslyckades'));
+});
 B.folders.onFolderInfoChanged.addListener(()=>{
+ App.engine?.invalidateFolders();
  if(!App.engine)return;
  if(App.engine.pending.size){App.kick();return;}
  if(App.engine.config.moveMode!=='direct'||App.engine.busy||App.engine.sweeping)return;

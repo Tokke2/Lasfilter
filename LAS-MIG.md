@@ -1,6 +1,8 @@
-# Läsfilter för Thunderbird – version 1.3.2
+# SortBro – smart mejlsortering för Thunderbird (version 1.0.0)
 
-Ett Thunderbird-tillägg med ett eget svenskt gränssnitt. Det flyttar ett mejl som matchar dina regler först när Thunderbird har markerat det som läst **och** det inte längre visas i någon mejlflik eller något meddelandefönster. Tillägget börjar alltid i **testläge utan flyttar**.
+> Tilläggets id är `lasfilter@lokala-verktyg.invalid` och installationsfilen heter `SortBro-Thunderbird.xpi` (samma innehåll finns även som `Lasfilter-Thunderbird.xpi`).
+
+Ett Thunderbird-tillägg med ett eget svenskt och engelskt gränssnitt (MV2, Thunderbird 140+). Det flyttar ett mejl som matchar dina regler först när Thunderbird har markerat det som läst **och** det inte längre visas i någon mejlflik eller något meddelandefönster. Tillägget börjar alltid i **testläge utan flyttar**.
 
 ## Skillnaden mot vanliga filter
 
@@ -11,9 +13,9 @@ Thunderbirds egna filter körs när mejlet kommer in. Detta tillägg körs händ
 ## Installation
 
 1. Kontrollera att Thunderbird är **140 eller senare** (Hjälp → Om Thunderbird).
-2. Öppna Inställningar → Tillägg och teman → kugghjulet → **Installera tillägg från fil…** och välj `Lasfilter-Thunderbird.xpi`.
+2. Öppna Inställningar → Tillägg och teman → kugghjulet → **Installera tillägg från fil…** och välj `SortBro-Thunderbird.xpi`.
 3. Tillåt behörigheterna när Thunderbird frågar. De förklaras under ”Integritet”.
-4. Starta om Thunderbird om det efterfrågas. Klicka sedan på kuvertikonen i verktygsfältet eller öppna Inställningar → Tillägg → Läsfilter → Inställningar.
+4. Starta om Thunderbird om det efterfrågas. Klicka sedan på kuvertikonen i verktygsfältet eller öppna Inställningar → Tillägg → SortBro → Inställningar.
 5. Tillägget körs varje gång Thunderbird startar. Ingen separat autostart behövs.
 
 Inga filer installeras någon annanstans, och inga externa program krävs.
@@ -29,6 +31,21 @@ Inga filer installeras någon annanstans, och inga externa program krävs.
 
 Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj **Bevaka markerat läst →** i nederkanten; det köar just det mejlet.
 
+## Snabbare vägar till en färdig regel
+
+- **⚡ Snabbskapa nytt filter:** lägg till flera olika filter direkt ovanför regellistan utan att skriva över en befintlig regel. Kryssrutorna *Flytta olästa mejl* och *Öppna i nytt fönster* styr regeln direkt.
+- **✨ Föreslå regler från Inkorgen:** SortBro tittar lokalt i Inkorgen efter avsändardomäner som återkommer och visar dem som *förslag*. Inget skapas förrän du själv väljer målmapp och trycker **✓ Godkänn**. Avsändare som redan täcks av en aktiv regel föreslås aldrig.
+- **1-klicksmallar:** *Fakturor & Kvitton*, *Order & Leverans*, *Nyhetsbrev*, *System & Notiser* och *Bokföring* fyller i regelnamn och villkor. Om en mapp med passande namn finns väljs den automatiskt som mål; annars väljer du målmapp och sparar.
+- **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.
+- **Högerklicksmeny på mejl:** *SortBro: Skapa filter från detta mejl…* öppnar SortBro med en ny regel förifylld från mejlet (avsändardomän, adress eller ämne). Regeln sparas först när du själv trycker Spara.
+
+## Design, språk och årstider
+
+- **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
+- **Ljust och mörkt läge** samt **årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
+- **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
+- **Stöd SortBro** finns både i gränssnittet och i `stod.html`: 100 % lokalt genererad Swish-QR (ISO/IEC 18004-verifierad, `C0721817177;…` samt kameravy med `swish://`), PayPal och Ko-fi. Inget låses upp av en gåva.
+
 ## Säkerhetsmekaniker
 
 - Högst ett flyttförsök per meddelande. Journalen skrivs före försöket och rensas inte förrän Thunderbird har bekräftat flytthändelsen. Ett avbrutet eller osäkert försök pausar motorn och upprepas inte.
@@ -36,11 +53,13 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 - Regeländringar och växling mellan test/flytt ökar regelversionen och gör gamla köade jobb ogiltiga.
 - Flyttar godkänns bara mellan vanliga mappar i samma konto. Specialmappar, sökmappar, skrivskydd och regelkedjor med loopar avvisas. Vid ett fel görs ingen kopiering som reserv.
 - Oläst-markering, ändrad källmapp eller en öppnad visning stoppar en väntande flytt.
-- Kön är begränsad till 500 väntande jobb. Väntande jobb kan återställas efter omstart om Message-ID, datum, storlek och källmapp är entydiga; ett gammalt sessions-id återanvänds aldrig.
+- Kön är begränsad till 100 väntande jobb; när gränsen nås töms kön och resten väntar till nästa svep. Väntande jobb kan återställas efter omstart om Message-ID, datum, storlek och källmapp är entydiga; ett gammalt sessions-id återanvänds aldrig.
 
 ## Integritet och behörigheter
 
-Behörigheter som Thunderbird visar: läsa konton/mappar, läsa meddelandehuvuden, flytta meddelanden, markera läst vid återställning, skapa mappar för tester i utvecklingsversionen (finns inte i den slutliga filen), lagra egna inställningar lokalt och spara exporterade filer.
+Behörigheter som Thunderbird visar: läsa konton och mappar (`accountsRead`), skapa mappar i kontot när du själv trycker *＋ Ny mapp* (`accountsFolders`), läsa meddelandehuvuden, flytta meddelanden, markera läst vid återställning, lägga till en post i högerklicksmenyn på mejl (`menus`), lagra egna inställningar lokalt och spara exporterade filer (`downloads`).
+
+Datorns nätverk används aldrig: tilläggets säkerhetspolicy är `connect-src 'none'`. Swish-QR-koden ritas helt lokalt i gränssnittet.
 
 Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en teknisk händelselogg med endast räknare. Ingen logg eller export innehåller mejltexter, ämnesrader eller fullständiga adresser. Allt lagras i Thunderbirds eget tilläggsutrymme. Tillägget öppnar inga nätverksanslutningar.
 
@@ -56,6 +75,15 @@ Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktiv
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.0 (SortBro)
+
+- **Motor och kö:** max 100 väntande jobb i kön, och flyttar sker parallellt medan kön byggs (svepet väntar aldrig på en full kö). När kön når 100 töms den innan fler läggs till.
+- **Smart mapp-cache:** tomma mappar och mappar som är oförändrade sedan förra svepet utan träffar hoppas över på under 1 ms i stället för att skannas om. Cachen invalideras vid nya mejl, ändrad lässtatus, genomförd flytt och regeländring, så inget kan missas.
+- **Säker IMAP-flytt:** progressiv verifiering via flytthändelsen och kontroll i mål- och källmapp. Gamla osäkra försök rensas vid omstart och ger inga falska `uncertain_move`-stopp.
+- **Inget popup-kaos vid mass-svep:** under ett pågående svep, eller när kön redan är lång, öppnas aldrig nya fönster – mejlen flyttas och behålls bara som olästa.
+- **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, 1-klicksmallar, egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
+- **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.
 
 ## Nyheter i 1.3
 

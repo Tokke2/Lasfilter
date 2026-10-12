@@ -11,9 +11,11 @@
   },
   "permissions": [
     "accountsRead",
+    "accountsFolders",
     "messagesRead",
     "messagesMove",
     "messagesUpdate",
+    "menus",
     "storage",
     "downloads"
   ],

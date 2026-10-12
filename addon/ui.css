@@ -1676,3 +1676,377 @@ hr {
     gap: 5px;
   }
 }
+
+/* ===== Årstidsteman (Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter) ===== */
+:root[data-season="spring"] {
+  --season-accent: #2f8f5b;
+  --season-soft: #eaf7ef;
+  --season-art-a: #cdeed8;
+  --season-art-b: #f4fbf1;
+}
+
+:root[data-season="summer"] {
+  --season-accent: #1c7f7a;
+  --season-soft: #e6f6f4;
+  --season-art-a: #cdeef0;
+  --season-art-b: #f6fbef;
+}
+
+:root[data-season="autumn"] {
+  --season-accent: #a4602a;
+  --season-soft: #fbf0e4;
+  --season-art-a: #f0d3b0;
+  --season-art-b: #fdf6ec;
+}
+
+:root[data-season="winter"] {
+  --season-accent: #35668f;
+  --season-soft: #eaf1f8;
+  --season-art-a: #d7e6f3;
+  --season-art-b: #f7fbff;
+}
+
+:root[data-season][data-theme="dark"] {
+  --season-art-a: #1d333a;
+  --season-art-b: #14262c;
+}
+
+:root[data-theme="dark"][data-season="spring"] {
+  --season-accent: #7fd8a2;
+  --season-soft: #1f3b2c;
+}
+
+:root[data-theme="dark"][data-season="summer"] {
+  --season-accent: #7fded6;
+  --season-soft: #1c3a39;
+}
+
+:root[data-theme="dark"][data-season="autumn"] {
+  --season-accent: #e0ab72;
+  --season-soft: #3a2b1f;
+}
+
+:root[data-theme="dark"][data-season="winter"] {
+  --season-accent: #9dc4e6;
+  --season-soft: #22323f;
+}
+
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--season-soft, var(--accent-soft)), var(--card) 62%);
+  padding: 20px 22px;
+  margin: 16px 0 14px;
+  box-shadow: var(--shadow);
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 62%;
+}
+
+.season-greeting {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--season-accent, var(--accent));
+  margin: 6px 0 0;
+}
+
+.season-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
+}
+
+.season-pick span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.season-pick select {
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  color: inherit;
+}
+
+.hero-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(46%, 420px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.hero-art svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Animerad puls på sifferkorten när något faktiskt ändras */
+@keyframes stat-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.14); color: var(--season-accent, var(--accent)); }
+  100% { transform: scale(1); }
+}
+
+.stat strong.stat-pulse {
+  animation: stat-pulse 0.9s ease-out 1;
+  transform-origin: left center;
+  display: inline-block;
+}
+
+.stat.stat-updated {
+  border-color: var(--season-accent, var(--accent));
+  transition: border-color 0.4s ease;
+}
+
+/* ===== 1-klicksmallar ===== */
+.template-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.template-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.template-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: inherit;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.template-btn:hover {
+  border-color: var(--season-accent, var(--accent));
+  background: var(--season-soft, var(--accent-soft));
+  color: var(--season-accent, var(--accent));
+}
+
+/* ===== Föreslå regler från Inkorgen ===== */
+.suggest-card {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px 14px;
+  margin: 0 0 14px;
+}
+
+.suggest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.suggest-head strong {
+  font-size: 0.9rem;
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--bg);
+}
+
+.suggestion-row .sug-main {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.suggestion-row .sug-main strong {
+  display: block;
+  font-size: 0.86rem;
+}
+
+.suggestion-row .sug-main small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.suggestion-row select {
+  min-width: 150px;
+}
+
+.suggestion-empty {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 4px 0 0;
+}
+
+/* ===== Modal: ＋ Ny mapp ===== */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 24, 28, 0.45);
+  padding: 20px;
+}
+
+.modal-card {
+  width: min(420px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(10, 24, 28, 0.28);
+}
+
+.modal-card h2 {
+  margin: 4px 0 2px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+@media (max-width: 780px) {
+  .hero-copy {
+    max-width: 100%;
+  }
+
+  .hero-art {
+    opacity: 0.35;
+    width: 70%;
+  }
+}
+
+/* Landskapsfärger för det dynamiska hero-kortet (#seasonHeroArt) */
+:root {
+  --art-sky-top: #eaf4f6;
+  --art-sky-bottom: #fbfdfd;
+  --art-hill: #cfe7dc;
+  --art-hill-2: #e4f2e9;
+  --art-sun: #ffd76f;
+  --art-fg: #4f9d6a;
+  --art-water: #bfe6ea;
+}
+
+:root[data-theme="dark"] {
+  --art-sky-top: #12242a;
+  --art-sky-bottom: #16303a;
+  --art-hill: #1d3c40;
+  --art-hill-2: #204a4a;
+  --art-sun: #f0c761;
+  --art-fg: #4f8f7a;
+  --art-water: #1c3f4c;
+}
+
+:root[data-season="spring"] {
+  --art-sky-top: #eafaf1;
+  --art-sky-bottom: #fdfef9;
+  --art-hill: #a8dcb9;
+  --art-hill-2: #cdead6;
+  --art-fg: #e58fb8;
+  --art-water: #cfeef0;
+}
+
+:root[data-season="summer"] {
+  --art-sky-top: #dff2f7;
+  --art-sky-bottom: #fbf9e6;
+  --art-hill: #96d19f;
+  --art-hill-2: #c6e6a8;
+  --art-fg: #2f8f6d;
+  --art-water: #9fdce6;
+}
+
+:root[data-season="autumn"] {
+  --art-sky-top: #fdefe0;
+  --art-sky-bottom: #fdf6ec;
+  --art-hill: #dfa96b;
+  --art-hill-2: #eed0a3;
+  --art-fg: #c9612f;
+  --art-water: #d6dfe8;
+}
+
+:root[data-season="winter"] {
+  --art-sky-top: #e8f1fa;
+  --art-sky-bottom: #f9fcff;
+  --art-hill: #bcd3e6;
+  --art-hill-2: #e2edf7;
+  --art-fg: #2f6d54;
+  --art-water: #cfe2f0;
+}
+
+:root[data-theme="dark"][data-season="spring"] {
+  --art-sky-top: #142a24;
+  --art-sky-bottom: #1a3a2c;
+  --art-hill: #21503a;
+  --art-hill-2: #26603f;
+  --art-fg: #b8739a;
+}
+
+:root[data-theme="dark"][data-season="summer"] {
+  --art-sky-top: #102b33;
+  --art-sky-bottom: #17402f;
+  --art-hill: #1f5a44;
+  --art-hill-2: #2a6e4c;
+  --art-fg: #57c39a;
+  --art-sun: #ffd76f;
+}
+
+:root[data-theme="dark"][data-season="autumn"] {
+  --art-sky-top: #2b201a;
+  --art-sky-bottom: #3a2a1d;
+  --art-hill: #6a4423;
+  --art-hill-2: #7d5528;
+  --art-fg: #d98a4a;
+}
+
+:root[data-theme="dark"][data-season="winter"] {
+  --art-sky-top: #16222e;
+  --art-sky-bottom: #1e3040;
+  --art-hill: #2c4a63;
+  --art-hill-2: #385970;
+  --art-fg: #2f6d54;
+  --art-sun: #d8e6f2;
+}

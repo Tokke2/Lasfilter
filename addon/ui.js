@@ -161,8 +161,8 @@ const I18N={
   moveModeDirect:'Flytta direkt, även olästa',
   openWindowLabel:'Öppna flyttade olästa mejl i ett eget fönster som standard',
   unreadNote:'Du kan även styra per regel om olästa mejl ska behållas olästa utan fönster, öppnas i fönster eller markeras som lästa.',
-  hourlyLabel:'Skanna hela kontot automatiskt',
-  sweepMinutesLabel:'Intervall i minuter (steg om 15)',
+  hourlyLabel:'Kör alla regler automatiskt (rekommenderas)',
+  sweepMinutesLabel:'Hur ofta alla regler körs (minuter, steg om 15 – 60 = en gång i timmen)',
   newInboxDirectLabel:'Flytta nya matchande mejl direkt när de kommer till Inkorgen',
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
   fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/lasfilter-logg.txt',
@@ -342,6 +342,37 @@ const I18N={
   condPlaceholderDate:'Antal dagar eller årtal, t.ex. 90 eller 2025',
   condPlaceholderRecipient:'t.ex. faktura@ eller min adress',
   condPlaceholderCc:'t.ex. ekonomi@',
+  runAllRulesBtn:'▶ Kör alla regler nu',
+  runAllRulesCount:'▶ Kör alla regler nu ({n})',
+  runAllScanned:'Granskade {n} mejl i {f} mappar.',
+  runAllQueued:'{n} matchade och köades.',
+  runAllDeferred:'{n} väntar till nästa körning (max 100 i kö).',
+  runAllCached:'{n} oförändrade mappar hoppades över.',
+  runAllSkipped:'{n} otillgängliga mappar hoppades över.',
+  runAllTestMode:'Testläge: inga mejl flyttades.',
+  autoRunOn:'Automatiskt: {n} regler körs var {min}:e minut, nästa gång {time}. Inkommande mejl bevakas hela tiden.',
+  autoRunOff:'Automatisk körning är av – slå på den under Avancerat. Inkommande mejl bevakas ändå hela tiden.',
+  diagnoseBtn:'🔎 Varför flyttas inte mejlen?',
+  diagnoseTitle:'Varför flyttas inte mejlen?',
+  diagnoseRunning:'Undersöker kontots mappar – inget flyttas…',
+  diagnoseSummary:'Granskade {s} mejl i {f} mappar. {m} matchade regeln. Regelns läsläge: {rf}.',
+  diagnoseWouldMove:'{n} mejl är redo – de flyttas vid nästa körning.',
+  diagnoseUnread:'{n} matchande mejl är olästa och väntar tills du har läst dem.',
+  diagnoseInTarget:'{n} mejl ligger redan i målmappen (eller i sin årsmapp).',
+  diagnoseQueued:'{n} mejl är redan hanterade eller köade sedan tidigare.',
+  diagnoseNoMatch:'Inga mejl matchar villkoren. Kontrollera fält, värde och konto – eller använd Kontrollera på ett markerat mejl.',
+  diagnoseExamples:'Exempel på matchande mejl',
+  diagnoseReasonMove:'flyttas',
+  diagnoseReasonUnread:'oläst – väntar',
+  diagnoseReasonTarget:'redan i målmappen',
+  diagnoseReasonQueued:'redan hanterad',
+  diagnosePaused:'Tillägget är pausat. Tryck Pausa igen för att återuppta bevakningen.',
+  diagnoseFault:'Motorn är stoppad av ett fel. Rensa spärren och fortsätt.',
+  diagnoseStopped:'Tillägget är stoppat i denna session, så inget flyttas just nu.',
+  diagnoseDryRun:'Testläge är på: träffarna räknas som prov och inget flyttas förrän du slår på flytt.',
+  opBeforeThisYear:'Är före innevarande år',
+  opAfterThisYear:'Är efter innevarande år',
+  condPlaceholderThisYear:'Behöver inget värde – följer kalendern',
   ruleYearFoldersLabel:'Lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)',
   yearFoldersNote:'Årsmappen skapas automatiskt när den behövs. Välj Endast lästa mejl nedan om olästa mejl ska vänta tills du har läst dem.',
   tagYearFolders:'🗓️ årsmappar',
@@ -599,8 +630,8 @@ const I18N={
   moveModeDirect:'Move immediately, including unread',
   openWindowLabel:'Open moved unread emails in a separate window by default',
   unreadNote:'You can also choose per rule whether moved unread emails stay unread without a popup window, open in a window, or are marked as read.',
-  hourlyLabel:'Scan entire account automatically',
-  sweepMinutesLabel:'Interval in minutes (steps of 15)',
+  hourlyLabel:'Run all rules automatically (recommended)',
+  sweepMinutesLabel:'How often all rules run (minutes, steps of 15 – 60 = once an hour)',
   newInboxDirectLabel:'Move new matching emails immediately when they arrive in Inbox',
   verboseLabel:'Show detailed diagnostics in Activity Log',
   fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/lasfilter-logg.txt',
@@ -780,6 +811,37 @@ const I18N={
   condPlaceholderDate:'Number of days or a year, e.g. 90 or 2025',
   condPlaceholderRecipient:'e.g. invoice@ or my address',
   condPlaceholderCc:'e.g. finance@',
+  runAllRulesBtn:'▶ Run all rules now',
+  runAllRulesCount:'▶ Run all rules now ({n})',
+  runAllScanned:'Checked {n} emails in {f} folders.',
+  runAllQueued:'{n} matched and were queued.',
+  runAllDeferred:'{n} wait for the next run (max 100 queued).',
+  runAllCached:'{n} unchanged folders were skipped.',
+  runAllSkipped:'{n} unavailable folders were skipped.',
+  runAllTestMode:'Test mode: no emails were moved.',
+  autoRunOn:'Automatic: {n} rules run every {min} minutes, next at {time}. Incoming mail is monitored continuously.',
+  autoRunOff:'Automatic runs are off – enable them under Advanced. Incoming mail is still monitored continuously.',
+  diagnoseBtn:'🔎 Why are the emails not moving?',
+  diagnoseTitle:'Why are the emails not moving?',
+  diagnoseRunning:'Examining the account folders – nothing is moved…',
+  diagnoseSummary:'Checked {s} emails in {f} folders. {m} matched the rule. Rule read mode: {rf}.',
+  diagnoseWouldMove:'{n} emails are ready – they move on the next run.',
+  diagnoseUnread:'{n} matching emails are unread and wait until you have read them.',
+  diagnoseInTarget:'{n} emails are already in the target folder (or its year folder).',
+  diagnoseQueued:'{n} emails were already handled or queued earlier.',
+  diagnoseNoMatch:'No emails match the conditions. Check field, value and account – or use Check on a selected email.',
+  diagnoseExamples:'Examples of matching emails',
+  diagnoseReasonMove:'will move',
+  diagnoseReasonUnread:'unread – waiting',
+  diagnoseReasonTarget:'already in target',
+  diagnoseReasonQueued:'already handled',
+  diagnosePaused:'The add-on is paused. Press Pause again to resume monitoring.',
+  diagnoseFault:'The engine is stopped by an error. Clear the lock and continue.',
+  diagnoseStopped:'The add-on is stopped in this session, so nothing moves right now.',
+  diagnoseDryRun:'Test mode is on: matches are counted as trials and nothing moves until you enable moves.',
+  opBeforeThisYear:'Is before the current year',
+  opAfterThisYear:'Is after the current year',
+  condPlaceholderThisYear:'No value needed – follows the calendar',
   ruleYearFoldersLabel:'Put each year in its own year folder under the target folder (e.g. Archive/2025)',
   yearFoldersNote:'The year folder is created automatically when needed. Choose Read emails only below if unread emails should wait until you have read them.',
   tagYearFolders:'🗓️ year folders',
@@ -1087,7 +1149,7 @@ const TEMPLATES={
  nyhetsbrev:{name:'tplNameNews',match:'any',conditions:[['subject','contains','nyhetsbrev'],['subject','contains','newsletter'],['sender','contains','newsletter']],hints:['nyhetsbrev','news','webb','info']},
  system:{name:'tplNameSystem',match:'any',conditions:[['sender','contains','noreply'],['sender','contains','no-reply'],['subject','contains','notis']],hints:['notis','system','support','drift']},
  bokforing:{name:'tplNameBookkeeping',match:'any',conditions:[['subject','contains','bokföring'],['subject','contains','verifikation'],['subject','contains','moms']],hints:['bokför','ekonomi','redovisning']},
- arsarkiv:{name:'tplNameYearArchive',match:'any',conditions:[['date','before',String(new Date().getFullYear())]],hints:['arkiv','archive'],readFilter:'read',yearFolders:true},
+ arsarkiv:{name:'tplNameYearArchive',match:'any',conditions:[['date','beforeThisYear','']],hints:['arkiv','archive'],readFilter:'read',yearFolders:true},
  aldre90:{name:'tplNameOlder90',match:'any',conditions:[['date','older','90']],hints:['arkiv','archive'],readFilter:'read',yearFolders:true}
 };
 function applyTemplate(key){
@@ -1177,6 +1239,13 @@ function renderStatus(next){
  if($('clearFault'))$('clearFault').hidden=!state.fault&&!state.blocked;
  $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?T('noticeStoppedPrefix')+Terr(state.fault)+T('noticeStoppedSuffix'):'';
  $('lastCheck').textContent=state.lastCheck?T('lastCheckPrefix')+new Date(state.lastCheck).toLocaleTimeString(locale())+' · '+state.stats.checks+T('lastCheckCountSuffix'):T('lastCheckWaiting');
+ if($('autoRunInfo')){
+  const n=state.config.rules.filter(r=>r.enabled).length;
+  $('autoRunInfo').textContent=state.hourly
+   ?T('autoRunOn').replace('{n}',n).replace('{min}',state.sweepMinutes).replace('{time}',state.nextAutoSweep?new Date(state.nextAutoSweep).toLocaleTimeString(locale()):'-')
+   :T('autoRunOff');
+ }
+ if($('runAllRulesBtn'))$('runAllRulesBtn').textContent=state.config.rules.length?T('runAllRulesCount').replace('{n}',state.config.rules.length):T('runAllRulesBtn');
  if(editToken===currentToken())editRevision=cfg.revision;
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
@@ -1280,7 +1349,7 @@ function targetOptions(value=''){
 }
 /* Villkorsfält: text, mottagare, storlek i kB och datum (dagar eller årtal). */
 const CONDITION_FIELDS=[['domain','optDomain'],['sender','optSender'],['subject','optSubject'],['recipient','optRecipient'],['cc','optCc'],['size','optSize'],['date','optDate']];
-const OPERATOR_LABELS={equals:'opEquals',contains:'opContains',starts:'opStarts',ends:'opEnds',larger:'opLarger',smaller:'opSmaller',older:'opOlder',newer:'opNewer',before:'opBeforeYear',after:'opAfterYear'};
+const OPERATOR_LABELS={equals:'opEquals',contains:'opContains',starts:'opStarts',ends:'opEnds',larger:'opLarger',smaller:'opSmaller',older:'opOlder',newer:'opNewer',before:'opBeforeYear',after:'opAfterYear',beforeThisYear:'opBeforeThisYear',afterThisYear:'opAfterThisYear'};
 const isNumericField=field=>field==='size'||field==='date';
 function condPlaceholderFor(field){
  if(field==='size')return T('condPlaceholderSize');
@@ -1301,6 +1370,12 @@ function fillOpSelect(select,field,value){
  select.value=ops.includes(value)?value:ops[0];
 }
 function syncConditionInput(input,field,op,value){
+ if(field==='date'&&(op==='beforeThisYear'||op==='afterThisYear')){
+  input.type='text';input.removeAttribute('maxlength');input.removeAttribute('min');input.removeAttribute('max');input.removeAttribute('step');
+  input.placeholder=T('condPlaceholderThisYear');input.value='';input.disabled=true;input.required=false;
+  return;
+ }
+ input.disabled=false;input.required=true;
  if(isNumericField(field)){
   input.type='number';input.removeAttribute('maxlength');
   if(field==='size'){input.min='1';input.max='1048576';}
@@ -1632,6 +1707,71 @@ handle('mode','click',async()=>{
 });
 handle('queueSelected','click',async()=>{const r=await rpc('queueSelected');toast(r.queued?T('toastQueued'):T('toastAlreadyQueued'));});
 handle('showActivity','click',()=>showView('activity'));
+handle('runAllRulesBtn','click',async()=>runAllRules());
+if($('sweepNow'))handle('sweepNow','click',async()=>runAllRules());
+
+/* Kör samtliga aktiva regler direkt och berätta exakt vad som hände. */
+async function runAllRules(){
+ const button=$('runAllRulesBtn'),guide=$('sweepNow');
+ if(button)button.disabled=true;if(guide)guide.disabled=true;
+ try{
+  const r=await rpc('sweepNow');renderStatus(await rpc('status'));
+  const parts=[T('runAllScanned').replace('{n}',r.scanned).replace('{f}',r.searchedFolders??0),
+   T('runAllQueued').replace('{n}',r.queued)];
+  if(r.deferred)parts.push(T('runAllDeferred').replace('{n}',r.deferred));
+  if(r.cachedFolders)parts.push(T('runAllCached').replace('{n}',r.cachedFolders));
+  if(r.skippedFolders)parts.push(T('runAllSkipped').replace('{n}',r.skippedFolders));
+  if(state.config.dryRun)parts.push(T('runAllTestMode'));
+  toast(parts.join(' '));
+ }finally{
+  if(button)button.disabled=false;
+  if(guide)guide.disabled=!!state?.fault||state?.config.paused||!(state?.config.rules||[]).some(x=>x.enabled);
+ }
+}
+
+/* 🔎 Varför flyttas inte mejlen? Read-only diagnos av den regel du redigerar. */
+async function diagnoseCurrentRule(){
+ const panel=$('diagnosePanel');if(!panel)return;
+ panel.hidden=false;panel.className='diagnose-panel';
+ panel.replaceChildren(el('p','muted',T('diagnoseRunning')));
+ let rule;
+ try{rule=buildRule();}catch(err){panel.textContent=Terr(err.code);return;}
+ let r;
+ try{r=await rpc('diagnose',{rule});}
+ catch(err){panel.className='diagnose-panel error';panel.textContent=Terr(err.code||err.message);return;}
+ const lines=[];
+ if(r.wouldMove)lines.push([T('diagnoseWouldMove').replace('{n}',r.wouldMove),'ok']);
+ if(r.waitingUnread)lines.push([T('diagnoseUnread').replace('{n}',r.waitingUnread),'wait']);
+ if(r.alreadyInTarget)lines.push([T('diagnoseInTarget').replace('{n}',r.alreadyInTarget),'ok']);
+ if(r.alreadyQueued)lines.push([T('diagnoseQueued').replace('{n}',r.alreadyQueued),'ok']);
+ if(r.matched===0)lines.push([T('diagnoseNoMatch'),'wait']);
+ panel.replaceChildren();
+ panel.append(el('strong','',T('diagnoseTitle')));
+ panel.append(el('p','muted',T('diagnoseSummary').replace('{s}',r.scanned).replace('{f}',r.searchedFolders).replace('{m}',r.matched).replace('{rf}',T(r.readFilter==='read'?'rfRead':r.readFilter==='both'?'rfBoth':r.readFilter==='unread'?'rfUnread':'rfDefault'))));
+ const list=el('ul','diagnose-list');
+ for(const [text,kind] of lines)list.append(el('li','diagnose-'+kind,text));
+ panel.append(list);
+ if(r.examples.length){
+  const table=el('div','diagnose-examples');
+  table.append(el('strong','',T('diagnoseExamples')));
+  for(const ex of r.examples){
+   const row=el('div','diagnose-row');
+   const key={queued:'diagnoseReasonQueued',target:'diagnoseReasonTarget',unread:'diagnoseReasonUnread',move:'diagnoseReasonMove'}[ex.reason]||'diagnoseReasonMove';
+   row.append(el('span','diagnose-reason',T(key)));
+   row.append(el('span','diagnose-subject',ex.subject||''));
+   if(ex.domain)row.append(el('span','diagnose-domain',ex.domain));
+   table.append(row);
+  }
+  panel.append(table);
+ }
+ if(r.paused||r.fault)panel.append(el('p','diagnose-warn',T(r.paused?'diagnosePaused':'diagnoseFault')));
+ else if(!r.engineEnabled)panel.append(el('p','diagnose-warn',T('diagnoseStopped')));
+ if(r.dryRun)panel.append(el('p','diagnose-warn',T('diagnoseDryRun')));
+ const cta=el('button','button small primary',T('runAllRulesBtn'));cta.type='button';
+ cta.addEventListener('click',()=>runAllRules());
+ panel.append(cta);
+}
+if($('diagnoseBtn'))handle('diagnoseBtn','click',diagnoseCurrentRule);
 handle('sweepNow','click',async()=>{
  $('sweepNow').disabled=true;$('sweepNow').textContent=T('sweepChecking');
  try{

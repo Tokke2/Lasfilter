@@ -8,7 +8,7 @@ globalThis.LasDemo=(()=>{
  let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
-  {id:'demo-3',name:'Årsarkiv – tidigare år',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',yearFolders:true,conditions:[{field:'date',op:'before',value:'2026'}]}]},
+  {id:'demo-3',name:'Årsarkiv – tidigare år',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',yearFolders:true,conditions:[{field:'date',op:'beforeThisYear',value:''}]}]},
   prefs:{theme:'light',fontSize:14,lastRule:'demo-1',lang:'sv'},moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];let mockPrefill=null;
@@ -33,6 +33,16 @@ globalThis.LasDemo=(()=>{
     {domain:'fortnox.se',count:4,subject:'Faktura 1042',sender:'faktura@fortnox.se'},
     {domain:'klarna.se',count:3,subject:'Order bekräftad',sender:'order@klarna.se'}
    ].filter(s=>!state.config.rules.some(r=>r.enabled&&r.conditions.some(c=>c.field==='domain'&&c.value===s.domain)));break;
+   case 'diagnose':{
+    const rule=LasCore.validateRule(m.rule),rows=state.config.rules.find(r=>r.id===rule.id);
+    data={ruleId:rule.id,ruleName:rule.name,readFilter:rule.readFilter||'default',yearFolders:rule.yearFolders===true,
+     folders:4,scanned:37,searchedFolders:4,skippedFolders:0,emptyFolders:1,matched:9,wouldMove:rows?4:5,waitingUnread:3,
+     alreadyInTarget:2,alreadyQueued:0,engineEnabled:!state.config.paused,dryRun:state.config.dryRun,moveMode:state.moveMode,
+     paused:state.config.paused,fault:state.fault||'',
+     examples:[{reason:'move',subject:'Faktura 1042 – fiktivt testmeddelande',domain:'fortnox.se'},
+      {reason:'unread',subject:'Orderbekräftelse',domain:'klarna.se'},
+      {reason:'target',subject:'Arkiv/2025',domain:'example.invalid'}]};break;
+   }
    case 'pendingPrefill':data=mockPrefill;mockPrefill=null;break;
    case 'prefillConsumed':data=true;break;
    case 'saveRules':saveRules(m.rules);data=state;break;

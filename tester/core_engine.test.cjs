@@ -547,6 +547,75 @@ test('year folder limit guards against runaway folder creation',async()=>{
  assert.equal(f.e.fault,'');
 });
 
+test('date before/after the current year follow the calendar instead of a fixed year',()=>{
+ const before=C.validateRule({...base(),conditions:[{field:'date',op:'beforeThisYear',value:''}]});
+ const after=C.validateRule({...base(),conditions:[{field:'date',op:'afterThisYear',value:''}]});
+ assert.equal(before.conditions[0].value,'');
+ const at=(y,now)=>({...msg(),date:new Date(y+'-06-01T00:00:00Z'),_now:now});
+ const now2026=Date.UTC(2026,9,12),now2027=Date.UTC(2027,0,5);
+ assert.equal(C.match(before,at(2025,now2026),false,false,now2026),true);
+ assert.equal(C.match(before,at(2026,now2026),false,false,now2026),false);
+ assert.equal(C.match(before,at(2026,now2027),false,false,now2027),true,'2026 blir tidigare år 2027');
+ assert.equal(C.match(after,at(2027,now2026),false,false,now2026),true);
+ assert.equal(C.match(after,at(2026,now2026),false,false,now2026),false);
+});
+
+test('diagnose explains why matching mail is not moved yet',async()=>{
+ const f=fixture({yearFolders:true});
+ f.api.addFolder('year-2025','2025','archive');
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));                                   /* redo att flyttas */
+ f.messages.set(2,oldMsg(2,2025,false));                                  /* oläst – väntar */
+ f.messages.set(3,{...oldMsg(3,2025,true),folder:{id:'year-2025',accountId:'a',name:'2025'}}); /* redan i årsmappen */
+ f.messages.set(4,{...oldMsg(4,2026,true)});                              /* matchar inte villkoret */
+ const r=await f.e.diagnose(C.validateRule(yearRule()));
+ assert.equal(r.matched,3,'tre mejl matchar årsvillkoret');
+ assert.equal(r.wouldMove,1);
+ assert.equal(r.waitingUnread,1);
+ assert.equal(r.alreadyInTarget,1);
+ assert.equal(f.e.pending.size,0,'diagnosen köar ingenting');
+ assert.equal(f.api.calls.length,0,'diagnosen flyttar ingenting');
+ assert.equal(f.e.fault,'');
+ assert.deepEqual(r.examples.map(e=>e.reason).sort(),['move','target','unread']);
+});
+
+test('diagnose works even when the engine is paused or in test mode',async()=>{
+ const f=fixture({yearFolders:true,dryRun:true});
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ f.e.config.paused=true;
+ const r=await f.e.diagnose(C.validateRule(yearRule()));
+ assert.equal(r.wouldMove,1,'diagnosen räknar även när bevakningen är pausad');
+ assert.equal(r.paused,true);
+ assert.equal(r.dryRun,true);
+ assert.equal(r.engineEnabled,false);
+});
+
+test('diagnose reports already queued mail separately',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ await f.e.catchUp('years');
+ const r=await f.e.diagnose(C.validateRule(yearRule()));
+ assert.equal(r.alreadyQueued,1);
+ assert.equal(r.wouldMove,0);
+});
+
+test('year template rule uses the rolling year condition',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([yearRule({conditions:[{field:'date',op:'beforeThisYear',value:''}]})]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ f.messages.set(2,oldMsg(2,2027,true));
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1,'bara tidigare år arkiveras');
+ assert.equal(f.e.recordList()[0].target,'year-2025');
+ assert.equal(f.e.fault,'');
+});
+
 test('shouldOpenWindow suppresses popups during a batch sweep',()=>{
  assert.equal(C.shouldOpenWindow({action:'window',pending:1,sweeping:0,openWindow:true}),true);
  assert.equal(C.shouldOpenWindow({action:'window',pending:1,sweeping:1,openWindow:true}),false);

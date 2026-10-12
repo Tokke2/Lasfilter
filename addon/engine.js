@@ -12,7 +12,7 @@ class Engine {
   this.folderCache=new Map();this.cacheStats={hits:0,misses:0,empty:0};
   /* Årsmappar: mål som Arkiv/<år> hittas eller skapas en gång och återanvänds. */
   this.yearFolderIds=new Map();this.yearCreated=0;
-  this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;
+  this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;this.lastSweep=null;
  }
  /* Anropas när nya mejl kommer in, lässtatus ändras, mejl flyttas eller regler
     ändras – då är den sparade mappbilden inte längre pålitlig. */
@@ -274,6 +274,60 @@ class Engine {
   if(this.blocked())this.fault='uncertain_move';
   await this.persist();this.log('restored',this.pending.size);this.change();if(this.pending.size)this.hooks.kick?.();
  }
+ /* Regelns kontomappar. Målmapparna (grundmål och fördelningar) utesluts för
+    svep; diagnosen tar med dem för att kunna förklara var mejlen ligger. */
+ async ruleFolders(rule,{excludeTargets=true}={}){
+  const accounts=await this.api.accounts.list(true);
+  let account;
+  if(rule.scope==='account')account=accounts.find(a=>a.id===rule.sourceAccount);
+  else{const src=await this.api.folders.get(rule.source,false);account=accounts.find(a=>a.id===src?.accountId);}
+  if(!account)throw new C.RuleError('unsafe_folder');
+  const excluded=excludeTargets?new Set([rule.target,...(rule.branches||[]).map(b=>b.target)]):new Set();
+  const folders=[],seen=new Set();
+  const walk=f=>{if(!f||seen.has(f.id))return;seen.add(f.id);if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
+  walk(account.rootFolder);for(const f of account.folders||[])walk(f);
+  return {account,excluded,folders};
+ }
+ /* Läsbar diagnos: varför flyttas inte mejlen? Rör ingenting – köar inte, skapar
+    inga mappar och ändrar ingen status. Kan köras i testläge och vid paus. */
+ async diagnose(rule){
+  const out={ruleId:rule.id,ruleName:rule.name,readFilter:this.ruleMode(rule),yearFolders:rule.yearFolders===true,
+   folders:0,scanned:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,matched:0,wouldMove:0,waitingUnread:0,
+   alreadyInTarget:0,alreadyQueued:0,examples:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
+   moveMode:this.config.moveMode,paused:this.config.paused,fault:this.fault};
+  const {folders}=await this.ruleFolders(rule,{excludeTargets:false});
+  out.folders=folders.length;
+  const example=(m,reason)=>{if(out.examples.length<C.LIMITS.examples)out.examples.push({reason,subject:(m.subject||'').slice(0,120),domain:C.email(m.author).split('@')[1]||''});};
+  for(const folder of folders){
+   const info=await this.folderInfo(folder.id);
+   if(info&&info.total===0){out.emptyFolders++;continue;}
+   let page=null;
+   try{
+    page=await this.withTimeout(this.api.messages.query({folderId:folder.id}),this.hooks.queryTimeout??10000);
+    out.searchedFolders++;
+    for(;;){
+     for(const m of page.messages||[]){
+      if(out.scanned>=C.LIMITS.diagnose)break;
+      out.scanned++;
+      if(!C.match(rule,m,false,true))continue;
+      out.matched++;
+      const fk=C.fingerprint(m);
+      if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id)){out.alreadyQueued++;example(m,'queued');continue;}
+      const target=await this.resolveTarget(rule,m,{create:false});
+      if(!target||target===m.folder.id){out.alreadyInTarget++;example(m,'target');continue;}
+      if(!this.ruleAllows(rule,m,false)){out.waitingUnread++;example(m,'unread');continue;}
+      out.wouldMove++;example(m,'move');
+     }
+     if(!page.id||out.scanned>=C.LIMITS.diagnose)break;
+     page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
+    }
+   }catch(error){
+    out.skippedFolders++;this.debug('diagnos_query_failed error_type='+(error?.name||'Error'));
+   }finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
+  }
+  this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
+  return out;
+ }
  async sweepRule(rule,{includeInboxUnread=false}={}){
   if(!this.enabled())throw new C.RuleError('paused');
   if(!rule||!rule.enabled)throw new C.RuleError('disabled');
@@ -281,15 +335,7 @@ class Engine {
   try{
    const rf=this.ruleMode(rule);
    const direct=rf==='both'||rf==='unread'||(rf==='default'&&this.config.moveMode==='direct');
-   const accounts=await this.api.accounts.list(true);
-   let account;
-   if(rule.scope==='account')account=accounts.find(a=>a.id===rule.sourceAccount);
-   else{const src=await this.api.folders.get(rule.source,false);account=accounts.find(a=>a.id===src?.accountId);}
-   if(!account)throw new C.RuleError('unsafe_folder');
-   const excluded=new Set([rule.target,...(rule.branches||[]).map(b=>b.target)]);
-   const folders=[],seen=new Set();
-   const walk=f=>{if(!f||seen.has(f.id))return;seen.add(f.id);if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
-   walk(account.rootFolder);for(const f of account.folders||[])walk(f);
+   const {account,excluded,folders}=await this.ruleFolders(rule);
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0;
    for(const folder of folders){
     if(!this.enabled())break;
@@ -369,6 +415,7 @@ class Engine {
  }
  async sweepAll(){
   if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};}
+  this.lastSweep=this.now();
   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0;
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;

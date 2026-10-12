@@ -86,10 +86,11 @@
           <span class="run-label" data-i18n="runLabel">FLYTTSTATUS</span>
           <strong id="runTitle">Kontrollerar tillägget…</strong>
           <p id="runText">Läser in regler och bevakningsläge.</p>
+          <p class="run-auto" id="autoRunInfo"></p>
         </div>
         <div class="run-actions">
           <button id="clearFault" class="button primary" data-i18n="clearFaultBtn" hidden>Rensa spärr och fortsätt</button>
-          <button id="sweepNow" class="button primary">Kör kontroll nu</button>
+          <button id="sweepNow" class="button primary">Kör alla regler nu</button>
           <button id="showActivity" class="button secondary" data-i18n="showActivityBtn">Visa aktivitet</button>
         </div>
       </section>
@@ -113,6 +114,7 @@
                 <button id="newFromSelected" type="button" class="button small primary" data-i18n="newFromSelectedBtn">✉ Ny från markerat mejl</button>
                 <button id="newRule" type="button" class="button small secondary" data-i18n="newRuleBtn">＋ Ny tom regel</button>
                 <button id="newFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
+                <button id="runAllRulesBtn" type="button" class="button small primary" data-i18n="runAllRulesBtn">▶ Kör alla regler nu</button>
               </div>
             </div>
 
@@ -286,8 +288,10 @@
               </div>
 
               <div id="testResult" class="test-result" hidden role="status"></div>
+              <div id="diagnosePanel" class="diagnose-panel" hidden role="status" aria-live="polite"></div>
               <div class="form-actions">
                 <button id="test" type="button" class="button secondary" data-i18n="testBtn">▷ Kontrollera</button>
+                <button id="diagnoseBtn" type="button" class="button secondary" data-i18n="diagnoseBtn">🔎 Varför flyttas inte mejlen?</button>
                 <button id="save" type="submit" class="button primary" data-i18n="saveBtn">Spara automatisk flytt</button>
                 <button id="saveAsNew" type="button" class="button secondary" data-i18n="saveAsNewBtn">＋ Spara som ny regel</button>
                 <button id="saveAndNew" type="button" class="button secondary" data-i18n="saveAndNewBtn">＋ Spara & ny tom</button>
@@ -380,10 +384,10 @@
             <p class="muted" data-i18n="unreadNote">Du kan även styra direkt på varje filter om olästa mejl ska flyttas och om de ska öppnas i nytt fönster.</p>
             <label class="toggle-label">
               <input id="hourly" type="checkbox">
-              <span data-i18n="hourlyLabel">Skanna hela kontot automatiskt</span>
+              <span data-i18n="hourlyLabel">Kör alla regler automatiskt (rekommenderas)</span>
             </label>
             <label class="field">
-              <span data-i18n="sweepMinutesLabel">Intervall i minuter (steg om 15)</span>
+              <span data-i18n="sweepMinutesLabel">Hur ofta alla regler körs (minuter, steg om 15 – 60 = en gång i timmen)</span>
               <input id="sweepMinutes" type="number" min="15" max="1440" step="15" value="60">
             </label>
             <label class="toggle-label">

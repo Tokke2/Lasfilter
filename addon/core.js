@@ -1,7 +1,7 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,yearFolders:12});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,yearFolders:12,diagnose:20000,examples:5});
 /* Vilka fält och jämförelser som är tillåtna. Textfälten jämförs som text,
    storlek i kB och datum som dagar eller årtal. */
 const FIELD_OPS=Object.freeze({
@@ -11,7 +11,7 @@ const FIELD_OPS=Object.freeze({
  recipient:['contains','equals','starts','ends'],
  cc:['contains','equals','starts','ends'],
  size:['larger','smaller'],
- date:['older','newer','before','after']
+ date:['older','newer','before','after','beforeThisYear','afterThisYear']
 });
 class RuleError extends Error { constructor(code){super(code);this.code=code;} }
 const fail=code=>{throw new RuleError(code);};
@@ -61,11 +61,14 @@ function validateCondition(c){
   if(!Number.isSafeInteger(kb)||kb<1||kb>1048576)fail('bad_value');
   value=String(kb);
  }else if(c.field==='date'){
-  const n=typeof c.value==='number'?c.value:Number(String(c.value??'').trim());
-  if(c.op==='older'||c.op==='newer'){
-   if(!Number.isSafeInteger(n)||n<1||n>36500)fail('bad_value');
-  }else if(!Number.isSafeInteger(n)||n<1970||n>9999)fail('bad_value');
-  value=String(n);
+  if(c.op==='beforeThisYear'||c.op==='afterThisYear'){value='';}
+  else{
+   const n=typeof c.value==='number'?c.value:Number(String(c.value??'').trim());
+   if(c.op==='older'||c.op==='newer'){
+    if(!Number.isSafeInteger(n)||n<1||n>36500)fail('bad_value');
+   }else if(!Number.isSafeInteger(n)||n<1970||n>9999)fail('bad_value');
+   value=String(n);
+  }
  }else{
   value=text(c.value,LIMITS.value,'bad_value');if(c.field==='domain')value=domain(value);
  }
@@ -132,6 +135,8 @@ function condHit(c,values,now=Date.now()){
   if(c.op==='older')return date<now-n*86400000;
   if(c.op==='newer')return date>now-n*86400000;
   const year=new Date(date).getFullYear();
+  if(c.op==='beforeThisYear')return year<new Date(now).getFullYear();
+  if(c.op==='afterThisYear')return year>new Date(now).getFullYear();
   return c.op==='before'?year<n:year>n;
  }
  const hay=norm(values[c.field]),needle=norm(c.value);if(!hay||!needle)return false;

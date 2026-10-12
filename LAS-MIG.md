@@ -57,9 +57,26 @@ Mallen **📦 Arkivera äldre än 90 dagar** gör samma sak men med rullande fö
 | **Till (mottagare)** | innehåller / är lika med / börjar med / slutar med | `faktura@` |
 | **Kopia (Cc)** | innehåller / är lika med / börjar med / slutar med | `ekonomi@` |
 | **Storlek** | är större än / är mindre än (kB) | större än 500 |
-| **Datum** | är äldre än / är nyare än (dagar) samt är före år / är efter år | före 2026 |
+| **Datum** | är äldre än / är nyare än (dagar) samt är före år / är efter år / är före innevarande år / är efter innevarande år | före 2026 |
 
-Storlek och datum skrivs som tal (kB respektive dagar eller årtal) och valideras innan regeln sparas. Åldersvillkoren räknas mot tiden för svepet, så *äldre än 90 dagar* glider framåt av sig själv.
+Storlek och datum skrivs som tal (kB respektive dagar eller årtal) och valideras innan regeln sparas. Åldersvillkoren räknas mot tiden för svepet, så *äldre än 90 dagar* glider framåt av sig själv. Villkoren **Är före/efter innevarande år** behöver inget värde alls: de jämförs med kalenderns innevarande år vid varje körning, så en regel för "tidigare år" fortsätter att stämma även nästa år i stället för att fastna på ett årtal.
+
+## Kör alla regler – och se varför mejlen inte flyttas
+
+Du behöver inte vänta på nästa automatiska körning eller på att nya mejl kommer in:
+
+- **▶ Kör alla regler nu** (knappen högst upp i regellistan, och *Kör alla regler nu* under **Flyttstatus**) sveper igenom alla aktiva regler direkt och berättar exakt vad som hände: hur många mejl som granskades, hur många mappar som gick snabbt via cachen, hur många som matchade samt hur många som köades eller väntar till nästa körning. Inkommande mejl bevakas precis som vanligt under tiden.
+- **🔎 Varför flyttas inte mejlen?** (i regelredigeraren) är en **läsbar diagnos** av just den regel du har öppen. Ingenting flyttas, ingenting köas och den fungerar även när bevakningen är pausad eller står i **Testläge**. Panelen svarar i klartext:
+  - *redo* – antalet mejl som matchar och flyttas vid nästa körning,
+  - *olästa och väntar* – matchande mejl som står på **Endast lästa mejl** och därför väntar tills du har läst dem,
+  - *redan i målmappen* (eller i sin årsmapp),
+  - *redan hanterade* – mejl som redan köats eller flyttats,
+  - samt upp till fem exempelrader med ämne och avsändardomän.
+  Avslutningsvis påminner panelen om regeln står i Testläge, om tillägget är pausat/ stoppat eller om motorn har en fellåsning.
+
+### Automatiskt varje timme – med bevakning kvar
+
+**Kör alla regler automatiskt (rekommenderas)** under **Inställningar → Avancerat** kör samma svep automatiskt med valfritt intervall (steg om 15 minuter, standard **60 minuter = en gång i timmen**). Detta är *utöver* den händelsestyrda bevakningen: nya mejl som kommer in till Inkorgen hanteras direkt när de anländer, och olästa mejl som du just har läst flyttas så snart de har lämnat visningen. Intervallsvepet fångar upp allt övrigt – till exempel mejl som legat i andra mappar, mejl som blev lästa i ett annat program och årsarkivsregler vid årsskiftet. Statusraden under **Flyttstatus** visar när nästa automatiska körning sker och att inkommande mejl bevakas hela tiden.
 
 ## Design, språk och årstider
 
@@ -107,12 +124,15 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, sju 1-klicksmallar (inkl. årsarkiv), egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
 - **Fler villkor:** Till, Kopia (Cc), Storlek (kB) och Datum (dagar eller årtal) utöver avsändare, domän och ämne.
 - **Årsarkiv:** flytta tidigare års mejl till egna årsmappar (`Arkiv/2025`) som skapas automatiskt, med olästa mejl kvar tills de är lästa.
+- **Kör alla regler nu:** en knapp sveper igenom alla aktiva regler direkt och rapporterar granskade mejl, cachade mappar, matchningar och köade flyttar.
+- **Varför flyttas inte mejlen?:** läsbar diagnos per regel som förklarar om mejlen väntar på att bli lästa, redan ligger i målmappen, redan är hanterade eller inte matchar villkoren – med exempelrader och påminnelse om Testläge/paus.
+- **Automatiskt varje timme:** standardintervallet är 60 minuter och körs vid sidan av den händelsestyrda bevakningen av inkommande mejl. Statusraden visar nästa automatiska körning.
 - **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.
 
 ## Nyheter i 1.3
 
 - **Målmapp i vilket konto som helst:** du kan nu välja en målmapp i ett annat konto än källmappen, till exempel flytta från IMAP-inkorgen till ett lokalt arkivkonto. Tillägget kontrollerar fortfarande att källmappen tillåter borttagning och att målmappen tillåter mottagning innan något köas, och loopkontrollen gäller som tidigare. Skanningen av befintliga mejl rör fortfarande bara det konto regeln läser från.
-- **Timvis automatisk flytt:** alternativet *Flytta automatiskt varje timme* sveper igenom aktiva regler en gång i timmen. Standard är på. I testläge räknas träffarna som prov och inget flyttas.
+- **Timvis automatisk flytt:** alternativet *Kör alla regler automatiskt* sveper igenom aktiva regler en gång i timmen (valfritt intervall i steg om 15 minuter, standard 60). Standard är på, och bevakningen av inkommande mejl fortsätter samtidigt. I testläge räknas träffarna som prov och inget flyttas.
 - **Direktläge, även för olästa:** i inställningarna kan du byta flyttsätt från *När mejlet är läst och stängt* till *Direkt, även olästa*. I direktläge flyttas nya matchande mejl så fort de anländer, utan att vänta på att du läser dem.
 - **Tydlig indikator:** när ett oläst mejl flyttas i direktläge öppnas det automatiskt i ett eget fönster, så att du ser vad som flyttades och kan läsa det där. Stäng fönstret när du är klar; mejlet ligger redan i målmappen. Indikatorn kan stängas av, men direktläget rekommenderas inte utan den.
 - **Snabbtangent för svep:** *Ctrl+Shift+L* kör ett svep direkt. Ändra tangenten under Verktyg → Tillägg → Hantera tilläggssnabbkommandon i Thunderbird.

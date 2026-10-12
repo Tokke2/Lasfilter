@@ -1,6 +1,6 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null};
 const SEASONS=['spring','summer','autumn','winter'];
 App.season=()=>{
  const pref=App.prefs.season;
@@ -38,7 +38,25 @@ App.log=(name,count=0,detail='')=>{
 // skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
 App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
-App.scheduleSweep=()=>{clearInterval(App.sweepTimer);if(!App.engine?.config.hourly)return;App.sweepTimer=setInterval(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'intervall_svep_misslyckades')),App.engine.config.sweepMinutes*60000);};
+App.runAllRules=async()=>{
+ const e=App.engine;if(!e)throw new C.RuleError('internal_error');
+ if(e.sweeping>0)return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,busy:true};
+ for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
+ if(e.pending.size)App.kick();
+ const result=await e.sweepAll();
+ for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
+ App.kick();
+ await Promise.race([e.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
+ App.lastAutoSweep=Date.now();
+ App.changed();
+ return result;
+};
+App.scheduleSweep=()=>{
+ clearInterval(App.sweepTimer);
+ const e=App.engine;
+ if(!e?.config.hourly)return;
+ App.sweepTimer=setInterval(()=>{App.runAllRules().catch(()=>App.log('error',0,'intervall_svep_misslyckades'));},e.config.sweepMinutes*60000);
+};
 App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
   const e=App.engine;if(!e)return;
@@ -148,6 +166,8 @@ App.snapshot=()=>{
  const e=App.engine;
  return {config:e.config,prefs:App.prefs,stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
    fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
+   lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
+   enabledRules:e.config.rules.filter(r=>r.enabled).length,
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),logs:App.logs};
 };
 App.mutate=fn=>{
@@ -251,14 +271,10 @@ App.handle=async msg=>{
    await Promise.race([App.engine.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
    return r;
   }
-  case 'sweepNow':{
-   for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
-   if(App.engine.pending.size)App.kick();
-   const r=await App.engine.sweepAll();
-   for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
-   App.kick();
-   await Promise.race([App.engine.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
-   return r;
+  case 'sweepNow':return App.runAllRules();
+  case 'diagnose':{
+   const rule=C.validateRule(msg.rule);
+   return App.engine.diagnose(rule);
   }
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
@@ -378,8 +394,8 @@ App.ready=(async()=>{
  }catch{}
  App.timer=setInterval(()=>App.engine.tick().catch(()=>App.fail('internal_error')),2000);App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
- if(App.engine.enabled()&&!App.engine.config.dryRun&&App.engine.config.rules.some(r=>r.enabled)&&(needResweep||App.engine.config.hourly)){
-  setTimeout(()=>{if(App.engine?.enabled()&&!App.engine.config.dryRun&&App.engine.config.rules.some(r=>r.enabled))App.engine.sweepAll().catch(()=>App.log('error',0,'startsvep_misslyckades'));},needResweep?500:3000);
+ if(App.engine.enabled()&&App.engine.config.rules.some(r=>r.enabled)&&(needResweep||App.engine.config.hourly)){
+  setTimeout(()=>{if(App.engine?.enabled()&&App.engine.config.rules.some(r=>r.enabled))App.runAllRules().catch(()=>App.log('error',0,'startsvep_misslyckades'));},needResweep?500:3000);
  }
 })().catch(()=>{
  if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});

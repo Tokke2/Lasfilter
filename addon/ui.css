@@ -2065,3 +2065,92 @@ hr {
   margin: 4px 0 0;
   font-size: 0.78rem;
 }
+
+/* Automatisk körning i flyttstatusen */
+.run-auto {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* 🔎 Diagnos: varför flyttas inte mejlen? */
+.diagnose-panel {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--season-accent, var(--accent));
+  border-radius: 10px;
+  background: var(--season-soft, var(--accent-soft));
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.diagnose-panel.error {
+  border-left-color: #ac3434;
+  background: #fbeceb;
+}
+
+.diagnose-panel > strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.diagnose-panel .muted {
+  font-size: 0.8rem;
+  margin: 4px 0 8px;
+}
+
+.diagnose-list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 0.84rem;
+}
+
+.diagnose-list li {
+  margin: 2px 0;
+}
+
+.diagnose-ok::marker {
+  color: #2c776c;
+}
+
+.diagnose-wait::marker {
+  color: #c28a24;
+}
+
+.diagnose-examples {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 0.8rem;
+}
+
+.diagnose-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.diagnose-reason {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--season-accent, var(--accent));
+}
+
+.diagnose-subject {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.diagnose-domain {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.diagnose-warn {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #a4602a;
+}

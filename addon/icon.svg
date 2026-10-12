@@ -1,1 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="17" fill="#173d45"/><path d="M15 21h34v23H15z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="m16 23 16 12 16-12" fill="none" stroke="#fff" stroke-width="3"/><circle cx="47" cy="44" r="12" fill="#66d9ae"/><path d="m41 44 4 4 7-8" fill="none" stroke="#15383a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b5e55"/>
+      <stop offset="55%" stop-color="#133b43"/>
+      <stop offset="100%" stop-color="#0d262d"/>
+    </linearGradient>
+    <linearGradient id="env" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#dff2ec"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4ee6b1"/>
+      <stop offset="100%" stop-color="#1fa97c"/>
+    </linearGradient>
+  </defs>
+  <!-- App Badge Background -->
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <rect x="3" y="3" width="122" height="122" rx="27" fill="none" stroke="#7fd8ba" stroke-opacity="0.28" stroke-width="2"/>
+  <!-- Back Folder Tab -->
+  <path d="M22 34c0-5.5 4.5-10 10-10h22l8 8h34c5.5 0 10 4.5 10 10v44c0 5.5-4.5 10-10 10H32c-5.5 0-10-4.5-10-10V34z" fill="#256f65" opacity="0.55"/>
+  <!-- Envelope Body -->
+  <rect x="18" y="36" width="76" height="54" rx="10" fill="url(#env)" stroke="#103138" stroke-width="3"/>
+  <!-- Envelope Flap -->
+  <path d="M21 40l35 26 35-26" fill="none" stroke="#175c53" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Filter / Sort Lines on Envelope -->
+  <path d="M30 74h26M30 81h18" stroke="#175c53" stroke-width="4" stroke-linecap="round" opacity="0.65"/>
+  <!-- Mint Sort & Read Check Badge -->
+  <circle cx="92" cy="86" r="24" fill="#0f2b31"/>
+  <circle cx="92" cy="86" r="21" fill="url(#badge)"/>
+  <path d="M81 86l7.5 7.5L104 78" fill="none" stroke="#0b2822" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

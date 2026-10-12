@@ -70,7 +70,7 @@ test('ambiguous restore skipped',async()=>{const f=fixture();await f.e.enqueue(m
 test('old rule version not restored',async()=>{const f=fixture();await f.e.enqueue(msg());const g=fixture();g.e.config.rulesVersion=9;await g.e.restore(f.e.recordList());assert.equal(g.e.pending.size,0);});
 test('restore unknown metadata skipped',async()=>{const f=fixture();await f.e.restore([{key:'fake',stage:'pending'}]);assert.equal(f.e.records.size,0);});
 test('rule edit clears queued jobs and dry-run done markers',async()=>{const f=fixture({dryRun:true});await f.ready();assert(f.e.done.size);await f.e.clearPending();assert.equal(f.e.done.size,0);assert(await f.e.enqueue(msg()));});
-test('queue bound defers safely without stopping monitoring',async()=>{const f=fixture();for(let i=1;i<=501;i++)await f.e.enqueue(msg(i));assert.equal(f.e.records.size,500);assert.equal(f.e.fault,'');});
+test('queue bound defers safely without stopping monitoring',async()=>{const f=fixture();for(let i=1;i<=101;i++)await f.e.enqueue(msg(i));assert.equal(C.LIMITS.queue,100);assert.equal(f.e.records.size,100);assert.equal(f.e.fault,'');});
 
 test('old rule generation never executed from live queue',async()=>{const f=fixture();await f.e.enqueue(msg());f.e.config.rulesVersion++;await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);assert.equal(f.e.pending.size,0);});
 test('cannot clear journal during preparation',async()=>{const f=fixture();await f.e.enqueue(msg());f.e.records.values().next().value.stage='attempted';f.e.busy=true;assert.equal(f.e.blocked(),0);await assert.rejects(f.e.clearBlocked(),e=>e.code==='operation_running');assert.equal(f.e.records.size,1);});
@@ -114,3 +114,168 @@ test('old config enables automatic text log on migration',()=>{const raw=C.defau
 test('error diagnostics survive log cleaning',()=>{const e=C.event('error',0,Date.now(),'motor_stoppad code=sweep_error');assert.equal(C.cleanLogs([e])[0].data.detail,'motor_stoppad code=sweep_error');});
 test('sweep interval accepts 15 minute steps',()=>{assert.equal(C.config({...C.defaults(),sweepMinutes:15}).sweepMinutes,15);assert.throws(()=>C.config({...C.defaults(),sweepMinutes:20}));});
 test('new unread inbox mail moves directly even in read mode',async()=>{const f=fixture();const incoming={...msg(5),read:false};f.messages.clear();f.messages.set(5,incoming);assert.equal(await f.e.newInboxMessages([incoming]),1);await f.e.tick();assert.equal(f.e.stats.moved,1);});
+test('onMoved confirms move when Thunderbird recalculates message size in target folder',async()=>{
+ const f=fixture();
+ f.api.messages.move=async(ids,target)=>{
+  const old=structuredClone(f.messages.get(ids[0])),m={...old,id:ids[0]+1000,size:old.size+47,folder:{id:target,accountId:'a'}};
+  f.messages.delete(ids[0]);f.messages.set(m.id,m);
+  await f.e.onMoved({messages:[old]},{messages:[m]});
+ };
+ await f.ready();
+ assert.equal(f.e.stats.moved,1);assert.equal(f.e.fault,'');assert.equal(f.e.blocked(),0);
+});
+test('IMAP move without onMoved event is confirmed via folder verification',async()=>{
+ const f=fixture();
+ f.api.messages.move=async(ids,target)=>{
+  const old=structuredClone(f.messages.get(ids[0])),m={...old,id:ids[0]+1000,size:old.size+12,folder:{id:target,accountId:'a'}};
+  f.messages.delete(ids[0]);f.messages.set(m.id,m);
+ };
+ await f.ready();
+ assert.equal(f.e.stats.moved,1);assert.equal(f.e.fault,'');assert.equal(f.e.blocked(),0);
+});
+test('restore automatically clears attempted record when message is already in target',async()=>{
+ const f=fixture({noAck:true});await f.ready();assert.equal(f.e.blocked(),1);
+ const g=fixture();
+ const old=g.messages.get(1);g.messages.delete(1);g.messages.set(1001,{...old,id:1001,size:old.size+32,folder:{id:'archive',accountId:'a'}});
+ await g.e.restore(f.e.recordList());
+ assert.equal(g.e.blocked(),0);assert.equal(g.e.fault,'');
+});
+test('sweepAll picks up unread matching mail in real inbox when newInboxDirect is enabled',async()=>{
+ const f=fixture();
+ f.api.accounts.list=async()=>[{id:'a',rootFolder:{id:'root',accountId:'a',isRoot:true,subFolders:[{id:'inbox',accountId:'a',name:'Inkorg',specialUse:['inbox']},{id:'archive',accountId:'a',name:'Arkiv',specialUse:[]}]}}];
+ f.messages.clear();f.messages.set(9117,{...msg(9117),read:false});
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);await f.e.tick();assert.equal(f.e.stats.moved,1);
+});
+test('vanished message in queue is dropped without stopping engine',async()=>{
+ const f=fixture();await f.e.enqueue(msg(1));await f.e.tick();
+ f.messages.delete(1);f.advance();await f.e.tick();
+ assert.equal(f.e.fault,'');assert.equal(f.e.pending.size,0);
+});
+test('rule readFilter supports read, unread, both and default',()=>{
+ for(const rf of ['default','read','unread','both'])assert.equal(C.validateRule({...base(),readFilter:rf}).readFilter,rf);
+ assert.throws(()=>C.validateRule({...base(),readFilter:'invalid'}));
+});
+test('rule with readFilter=both moves both unread and read mail immediately',async()=>{
+ const f=fixture();f.e.config.rules=C.validateRules([{...base(),id:'r-both',readFilter:'both'}]);
+ const unreadMsg={...msg(10),read:false};
+ const readMsg={...msg(11),read:true};
+ f.messages.clear();f.messages.set(10,unreadMsg);f.messages.set(11,readMsg);
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,2);
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,2);
+});
+test('rule with readFilter=unread moves only unread mail and skips read mail',async()=>{
+ const f=fixture();f.e.config.newInboxDirect=false;f.e.config.rules=C.validateRules([{...base(),id:'r-unread',readFilter:'unread'}]);
+ const unreadMsg={...msg(20),read:false};
+ const readMsg={...msg(21),read:true};
+ f.messages.clear();f.messages.set(20,unreadMsg);f.messages.set(21,readMsg);
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.messages.get(21)?.folder.id,'inbox');
+});
+test('rule with readFilter=read skips unread mail even when newInboxDirect is enabled',async()=>{
+ const f=fixture();f.e.config.newInboxDirect=true;f.e.config.rules=C.validateRules([{...base(),id:'r-read',readFilter:'read'}]);
+ const unreadMsg={...msg(30),read:false};
+ f.messages.clear();f.messages.set(30,unreadMsg);
+ assert.equal(await f.e.newInboxMessages([unreadMsg]),0);
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,0);
+ f.messages.set(30,{...unreadMsg,read:true});
+ await f.e.readChanged(f.messages.get(30),{read:true},{read:false});
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+});
+test('multiple rules with different readFilter settings route unread and read mail to separate folders',async()=>{
+ const f=fixture();
+ f.e.config.newInboxDirect=false;
+ f.e.config.rules=C.validateRules([
+  {...base(),id:'r1',name:'Olästa fakturor',target:'brt',readFilter:'unread'},
+  {...base(),id:'r2',name:'Lästa fakturor',target:'archive',readFilter:'read'}
+ ]);
+ const mUnread={...msg(40),read:false};
+ const mRead={...msg(41),read:true};
+ f.messages.clear();f.messages.set(40,mUnread);f.messages.set(41,mRead);
+ await f.e.sweepAll();
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.e.stats.moved,2);
+ const movedFolders=[...f.messages.values()].map(m=>m.folder.id).sort();
+ assert.deepEqual(movedFolders,['archive','brt']);
+});
+test('rule unreadAction supports default, keep, window and read',()=>{
+ for(const ua of ['default','keep','window','read'])assert.equal(C.validateRule({...base(),unreadAction:ua}).unreadAction,ua);
+ assert.throws(()=>C.validateRule({...base(),unreadAction:'invalid'}));
+});
+test('tick processes pending messages even when an unloaded background tab hangs in getDisplayedMessages',async()=>{
+ const f=fixture();
+ f.e.hooks.displayTimeout=20;
+ f.api.messageDisplay.getDisplayedMessages=async id=>{if(id===8)return new Promise(()=>{});return [];};
+ await f.ready();
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.e.fault,'');
+});
+test('tick processes pending messages even when sweeping counter is non-zero',async()=>{
+ const f=fixture({moveMode:'direct'});
+ await f.e.enqueue(msg(1));
+ f.e.sweeping=1;
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+});
+test('sweepRule silently skips already queued messages without spamming debug log',async()=>{
+ const f=fixture({moveMode:'direct'});
+ f.messages.clear();f.messages.set(5,msg(5));
+ await f.e.catchUp('rule1');
+ f.debugs.length=0;
+ await f.e.catchUp('rule1');
+ assert.equal(f.debugs.filter(d=>d.includes('redan hanterad eller köad')).length,0);
+});
+test('sweepRule deduplicates folders when both rootFolder and folders are populated and moves on first tick',async()=>{
+ const f=fixture();
+ const sub=[{id:'inbox',accountId:'a',name:'Inkorg',specialUse:['inbox']},{id:'archive',accountId:'a',name:'Arkiv',specialUse:[]}];
+ f.api.accounts.list=async()=>[{id:'a',rootFolder:{id:'root',accountId:'a',isRoot:true,subFolders:sub},folders:sub}];
+ f.messages.clear();f.messages.set(5,msg(5));
+ const r=await f.e.catchUp('rule1');
+ assert.equal(r.searchedFolders,1);
+ assert.equal(r.queued,1);
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+});
+test('unmovable subfolder message from sweep is dropped without stopping other queued messages',async()=>{
+ const f=fixture();
+ f.api.folders.getFolderCapabilities=async id=>({canAddMessages:true,canDeleteMessages:id!=='sub1'});
+ f.messages.clear();
+ f.messages.set(8,{...msg(8),folder:{id:'sub1',accountId:'a'}});
+ f.messages.set(9,{...msg(9),folder:{id:'inbox',accountId:'a'}});
+ await f.e.catchUp('rule1');
+ await f.e.tick();
+ assert.equal(f.e.fault,'');
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.e.stats.skipped,1);
+});
+test('sweepRule moves messages concurrently while building the queue and drains when reaching 100 in queue',async()=>{
+ const f=fixture();
+ delete f.e.hooks.ackTimeout;
+ f.messages.clear();
+ let movedDuringEnqueue=0;
+ const origMove=f.api.messages.move;
+ f.api.messages.move=async(ids,target,opts)=>{
+  if(f.e.sweeping>0)movedDuringEnqueue++;
+  return origMove(ids,target,opts);
+ };
+ for(let i=1;i<=125;i++)f.messages.set(i,msg(i));
+ const r=await f.e.catchUp('rule1');
+ await f.e.tick();
+ assert.equal(r.queued,125);
+ assert.equal(r.deferred,0);
+ assert.ok(movedDuringEnqueue>0,'moves should happen concurrently while sweepRule is still building the queue');
+ assert.equal(f.e.stats.moved,125);
+ assert.equal(f.e.pending.size,0);
+});
+
+
+
+
+

@@ -1,8 +1,17 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:''},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map()};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map()};
 App.write=fn=>{const p=App.writeChain.then(fn);App.writeChain=p.catch(()=>{});return p;};
-App.persistWork=()=>App.write(()=>B.storage.local.set({work:App.engine.recordList()}));
+App.persistPending=null;
+App.persistWork=()=>{
+ if(!App.persistPending){
+  App.persistPending=App.write(async()=>{
+   App.persistPending=null;
+   await B.storage.local.set({work:App.engine.recordList()});
+  });
+ }
+ return App.persistPending;
+};
 App.writeTextLog=async()=>{
  if(!App.engine?.config.fileLog)return;
  const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
@@ -19,7 +28,7 @@ App.log=(name,count=0,detail='')=>{
 // Behåll alltid det första, mest specifika felet. Händelselyssnare ska inte
 // skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
-App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},50);};
+App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
 App.scheduleSweep=()=>{clearInterval(App.sweepTimer);if(!App.engine?.config.hourly)return;App.sweepTimer=setInterval(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'intervall_svep_misslyckades')),App.engine.config.sweepMinutes*60000);};
 App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
@@ -40,17 +49,32 @@ App.folderList=async()=>{
  return items;
 };
 App.captureTab=async tab=>{if(tab?.type==='mail')App.mailTab=tab.id;};
-App.openUnread=async id=>{
+App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
+ if(!Number.isSafeInteger(id)&&targetFolderId&&headerMessageId){
+  await new Promise(r=>setTimeout(r,350));
+  const found=await App.engine?.findByHeader(targetFolderId,headerMessageId);
+  if(Number.isSafeInteger(found?.id))id=found.id;
+ }
+ if(!Number.isSafeInteger(id))return;
+ const rule=App.engine?.config.rules.find(r=>r.id===ruleId);
+ const action=rule?.unreadAction||'default';
+ if(action==='read'){
+  for(const delay of [150,800])setTimeout(()=>B.messages.update(id,{read:true}).catch(()=>{}),delay);
+  return;
+ }
+ const shouldOpenWindow=(action==='window'||(action==='default'&&App.engine?.config.openWindow!==false))&&(App.engine?.pending.size||0)<=3;
  App.keepUnread.set(id,Date.now()+30000);
- try{await B.messageDisplay.open({messageId:id,location:'window'});}catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
+ if(shouldOpenWindow){
+  try{await B.messageDisplay.open({messageId:id,location:'window'});}catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
+ }
  for(const delay of [250,1000,3000])setTimeout(()=>B.messages.update(id,{read:false}).catch(()=>App.log('error',0,'aterstall_olast_misslyckades')),delay);
  setTimeout(()=>App.keepUnread.delete(id),30000);
 };
 App.onNewMail=async(folder,list)=>{
- await App.ready;if(![...(folder?.specialUse||[]),folder?.type].includes('inbox')||!App.engine.config.newInboxDirect)return;
+ await App.ready;if(![...(folder?.specialUse||[]),folder?.type].includes('inbox'))return;
  let page=list,all=[];
  for(;;){all.push(...(page?.messages||[]));if(!page?.id)break;page=await B.messages.continueList(page.id);}
- await App.engine.newInboxMessages(all);App.kick();
+ await App.engine.newInboxMessages(all);setTimeout(()=>App.kick(),800);
 };
 App.selected=async()=>{
  let id=App.mailTab;
@@ -84,6 +108,58 @@ App.save=async(next,{backup=false,discard=false}={})=>{
 };
 App.checkRevision=rev=>{if(rev!==App.engine.config.revision)throw new C.RuleError('stale_config');};
 App.checkRules=async rules=>{for(const r of rules){await App.engine.validateRuleFolders(r);for(const b of r.branches||[])await App.engine.validateRuleFolders({...r,target:b.target});}};
+App.extractImportedRules=(backup,currentFolders=[],existingRules=[])=>{
+ let rawRules=null;
+ if(Array.isArray(backup))rawRules=backup;
+ else if(backup&&typeof backup==='object'){
+  if(backup.format!==undefined&&!['lasfilter-rules','sortbro-rules'].includes(backup.format))throw new C.RuleError('bad_schema');
+  if(backup.version!==undefined&&backup.version!==1)throw new C.RuleError('bad_schema');
+  if(Array.isArray(backup.rules))rawRules=backup.rules;
+  else if(Array.isArray(backup.config?.rules))rawRules=backup.config.rules;
+  else if(Array.isArray(backup.conditions))rawRules=[backup];
+ }
+ if(!Array.isArray(rawRules))throw new C.RuleError('bad_schema');
+ const folderById=new Map(currentFolders.map(f=>[f.id,f]));
+ const hintById=new Map((Array.isArray(backup?.folders)?backup.folders:[]).filter(f=>f&&f.id).map(f=>[f.id,f]));
+ const resolveFolderId=id=>{
+  if(typeof id!=='string'||!id.trim())return id;
+  if(!currentFolders.length||folderById.has(id))return id;
+  const hint=hintById.get(id);
+  if(hint){
+   const byLabel=currentFolders.find(f=>f.label===hint.label)||currentFolders.find(f=>f.name===hint.name&&f.accountName===hint.accountName)||currentFolders.find(f=>f.name===hint.name);
+   if(byLabel)return byLabel.id;
+  }
+  const tail=decodeURIComponent(id.split('/').pop()||'').trim().toLowerCase();
+  if(tail){
+   const byTail=currentFolders.find(f=>(f.name||'').toLowerCase()===tail||(f.label||'').toLowerCase()===id.toLowerCase());
+   if(byTail)return byTail.id;
+  }
+  return id;
+ };
+ const usedIds=new Set(existingRules.map(r=>r.id));
+ return rawRules.map((raw,idx)=>{
+  if(!raw||typeof raw!=='object')throw new C.RuleError('bad_rule');
+  let id=typeof raw.id==='string'&&/^[a-zA-Z0-9_-]+$/.test(raw.id.trim())?raw.id.trim().slice(0,80):'rule-'+Date.now()+'-'+(idx+1);
+  while(usedIds.has(id))id=(id.slice(0,70)+'-'+(idx+1)+'-'+Math.random().toString(36).slice(2,6));
+  usedIds.add(id);
+  const scope=raw.scope==='account'?'account':'folder';
+  let source=resolveFolderId(raw.source||'');
+  let target=resolveFolderId(raw.target||'');
+  let sourceAccount=typeof raw.sourceAccount==='string'?raw.sourceAccount.trim():'';
+  if(scope==='account'){
+   if(currentFolders.length&&!currentFolders.some(f=>f.accountId===sourceAccount)){
+    const tFolder=folderById.get(target)||currentFolders[0];
+    if(tFolder)sourceAccount=tFolder.accountId;
+   }
+   if(!source||!folderById.has(source)){
+    const accFolder=currentFolders.find(f=>f.accountId===sourceAccount&&f.id!==target)||currentFolders.find(f=>f.accountId===sourceAccount)||currentFolders[0];
+    if(accFolder&&!source)source=accFolder.id;
+   }
+  }
+  const branches=(Array.isArray(raw.branches)?raw.branches:[]).map(b=>b&&typeof b==='object'?{...b,target:resolveFolderId(b.target||'')}:b);
+  return {...raw,id,scope,source,sourceAccount,target,match:raw.match||'all',enabled:raw.enabled!==false,readFilter:raw.readFilter||'default',unreadAction:raw.unreadAction||'default',branches};
+ });
+};
 App.handle=async msg=>{
  await App.ready;
  if(!msg||typeof msg.type!=='string')throw new C.RuleError('bad_request');
@@ -98,13 +174,30 @@ App.handle=async msg=>{
    const r=C.validateRule(msg.rule),m=await App.selected();const matches=C.match(r,m,true,true);
    let reason='no_match';
    if(matches){
-    reason=!r.enabled?'disabled':m.read!==true?'unread':(await e.displayed()).has(m.id)?'displayed':'eligible';
-    await e.pair(r);
+    const rf=r.readFilter||'default';
+    const allowUnread=rf==='both'||rf==='unread'||(rf==='default'&&e.config.moveMode==='direct');
+    const onlyUnread=rf==='unread';
+    reason=!r.enabled?'disabled':(onlyUnread&&m.read===true)?'already_read':(!allowUnread&&m.read!==true)?'unread':(!allowUnread&&(await e.displayed()).has(m.id))?'displayed':'eligible';
+    await e.validateRuleFolders(r);
    }
    App.log('simulated',1);return {matches,reason,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&m.folder?.id!==r.source)};
   }
-  case 'catchUp':return App.engine.catchUp(msg.ruleId);
-  case 'sweepNow':return App.engine.sweepAll();
+  case 'catchUp':{
+   const r=await App.engine.catchUp(msg.ruleId);
+   for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
+   App.kick();
+   await Promise.race([App.engine.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
+   return r;
+  }
+  case 'sweepNow':{
+   for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
+   if(App.engine.pending.size)App.kick();
+   const r=await App.engine.sweepAll();
+   for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
+   App.kick();
+   await Promise.race([App.engine.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
+   return r;
+  }
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean')throw new C.RuleError('bad_schema');
@@ -116,9 +209,14 @@ App.handle=async msg=>{
   });
   case 'queueSelected':{
    if(!e.enabled())throw new C.RuleError('paused');
-   const m=await App.selected();if(!m.read)throw new C.RuleError('unread');
-   if(!C.firstMatch(e.config.rules,m))throw new C.RuleError('no_match');
-   const queued=await e.enqueue(m);return {queued};
+   const m=await App.selected();
+   const rule=e.firstMatchingRule(m,{allowUnread:true});
+   if(!rule){
+    if(C.firstMatch(e.config.rules,m))throw new C.RuleError(m.read?'already_read':'unread');
+    throw new C.RuleError('no_match');
+   }
+   const direct=e.ruleDirect(rule,m.read!==true);
+   const queued=await e.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:m.read!==true,notify:direct&&m.read!==true});return {queued};
   }
   case 'saveRules':return App.mutate(async()=>{
    App.checkRevision(msg.revision);const rules=C.validateRules(msg.rules);await App.checkRules(rules);
@@ -128,18 +226,25 @@ App.handle=async msg=>{
   case 'setMode':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    if(typeof msg.paused!=='boolean'||typeof msg.dryRun!=='boolean')throw new C.RuleError('bad_request');
-   if(e.blocked()&&!msg.paused)throw new C.RuleError('uncertain_move');
+   if(e.blocked()&&!msg.paused)await e.clearBlocked();
    const changing=msg.dryRun!==e.config.dryRun;
    await App.save({...e.config,paused:msg.paused,dryRun:msg.dryRun,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(changing?1:0)},{discard:changing});
-   e.fault='';App.log('settings_saved');return App.snapshot();
+   e.fault='';App.log('settings_saved');if(e.pending.size)App.kick();return App.snapshot();
   });
-  case 'export':return {format:'lasfilter-rules',version:1,exported:new Date().toISOString(),rules:e.config.rules};
+  case 'export':{
+   const folderHints=(await App.folderList().catch(()=>[])).map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
+   return {format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:e.config.rules,folders:folderHints};
+  }
   case 'exportLog':return {format:'lasfilter-technical-log',version:1,events:C.cleanLogs(App.logs)};
   case 'import':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
-   if(!msg.backup||msg.backup.format!=='lasfilter-rules'||msg.backup.version!==1)throw new C.RuleError('bad_schema');
-   const rules=C.validateRules(msg.backup.rules);await App.checkRules(rules);
-   await App.save({...e.config,rules,paused:true,dryRun:true,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+   const currentFolders=await App.folderList().catch(()=>[]);
+   const baseRules=msg.merge===true?e.config.rules:[];
+   const normalized=App.extractImportedRules(msg.backup,currentFolders,baseRules);
+   const combined=msg.merge===true?[...baseRules,...normalized]:normalized;
+   const rules=C.validateRules(combined);await App.checkRules(rules);
+   const pauseOnImport=!msg.keepMode;
+   await App.save({...e.config,rules,paused:pauseOnImport?true:e.config.paused,dryRun:pauseOnImport?true:e.config.dryRun,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
    App.log('rules_saved',rules.length);return App.snapshot();
   });
   case 'restoreBackup':return App.mutate(async()=>{
@@ -148,12 +253,13 @@ App.handle=async msg=>{
    await App.save({...e.config,rules,paused:true,dryRun:true,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
    App.log('backup_restored',rules.length);return App.snapshot();
   });
-  case 'clearBlocked':return App.mutate(async()=>{await e.clearBlocked();await App.save({...e.config,paused:true,revision:e.config.revision+1});return App.snapshot();});
+  case 'clearBlocked':return App.mutate(async()=>{await e.clearBlocked();await App.save({...e.config,paused:false,revision:e.config.revision+1});App.log('settings_saved');return App.snapshot();});
   case 'prefs':{
    const p=msg.prefs||{},next={...App.prefs};
    if(['system','light','dark'].includes(p.theme))next.theme=p.theme;
    if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)next.fontSize=p.fontSize;
    if(typeof p.lastRule==='string'&&p.lastRule.length<=80)next.lastRule=p.lastRule;
+   if(['sv','en'].includes(p.lang))next.lang=p.lang;
    await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;return next;
   }
   default:throw new C.RuleError('bad_request');
@@ -174,12 +280,42 @@ App.ready=(async()=>{
  if(['system','light','dark'].includes(p.theme))App.prefs.theme=p.theme;
  if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)App.prefs.fontSize=p.fontSize;
  if(typeof p.lastRule==='string'&&p.lastRule.length<=80)App.prefs.lastRule=p.lastRule;
+ if(['sv','en'].includes(p.lang))App.prefs.lang=p.lang;
  App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
   notify:App.openUnread});
+ let needResweep=false;
  if(fault){App.engine.fault=fault;App.log('error');}
- else await App.engine.restore(data.work||[]);
+ else{
+  const rawWork=Array.isArray(data.work)?data.work:[];
+  const staleAttempted=rawWork.filter(r=>r?.stage==='attempted');
+  const pendingWork=rawWork.filter(r=>r?.stage!=='attempted');
+  for(const r of staleAttempted.slice(0,15)){
+   if(r?.target&&r?.headerMessageId){
+    const inTarget=await App.engine.findByHeader(r.target,r.headerMessageId);
+    if(inTarget&&typeof r.key==='string'){App.engine.done.add(r.key);if(C.fingerprint(inTarget))App.engine.done.add(C.fingerprint(inTarget));}
+   }
+  }
+  if(staleAttempted.length)App.log('debug',staleAttempted.length,'tidigare flyttsparr rensad vid start');
+  if(pendingWork.length>20)needResweep=true;
+  await App.engine.restore(pendingWork.slice(0,20));
+ }
  App.log('start');App.changed();
+ try{
+  const uiUrl=B.runtime.getURL('ui.html');
+  const tabs=await B.tabs.query({});
+  const uiTabs=(tabs||[]).filter(t=>typeof t.url==='string'&&t.url.startsWith(uiUrl));
+  if(uiTabs.length){
+   const keep=uiTabs.find(t=>t.active)||uiTabs[0];
+   App.uiTab=keep.id;
+   for(const t of uiTabs)if(t.id!==keep.id)B.tabs.remove(t.id).catch(()=>{});
+   B.tabs.reload(keep.id).catch(()=>{});
+  }
+ }catch{}
  App.timer=setInterval(()=>App.engine.tick().catch(()=>App.fail('internal_error')),2000);App.scheduleSweep();
+ if(App.engine.pending.size)App.kick();
+ if(App.engine.enabled()&&!App.engine.config.dryRun&&App.engine.config.rules.some(r=>r.enabled)&&(needResweep||App.engine.config.hourly)){
+  setTimeout(()=>{if(App.engine?.enabled()&&!App.engine.config.dryRun&&App.engine.config.rules.some(r=>r.enabled))App.engine.sweepAll().catch(()=>App.log('error',0,'startsvep_misslyckades'));},needResweep?500:3000);
+ }
 })().catch(()=>{
  if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});
  App.engine.stop('storage_error');
@@ -195,7 +331,10 @@ B.runtime.onMessage.addListener((msg,sender)=>{
 });
 B.messages.onUpdated.addListener((m,props,old)=>App.ready.then(async()=>{
  const until=App.keepUnread.get(m.id)||0;
- if(until>Date.now()&&props.read===true){await B.messages.update(m.id,{read:false});App.log('debug',0,'olast_status_aterstalld');return;}
+ if(until>Date.now()){
+  if(props.read===true){await B.messages.update(m.id,{read:false}).catch(()=>{});App.log('debug',0,'olast_status_aterstalld');}
+  return;
+ }
  if(until)App.keepUnread.delete(m.id);
  await App.engine.readChanged(m,props,old);
 }).catch(()=>App.fail('internal_error')));
@@ -210,7 +349,11 @@ B.commands.onCommand.addListener(cmd=>{
  if(cmd==='open_ui')B.tabs.query({active:true,currentWindow:true}).then(tabs=>App.open(tabs[0])).catch(()=>App.log('error',0,'oppna_granssnitt_misslyckades'));
 });
 B.folders.onFolderInfoChanged.addListener(()=>{
- if(!App.engine||App.engine.config.moveMode!=='direct')return;
+ if(!App.engine)return;
+ if(App.engine.pending.size){App.kick();return;}
+ if(App.engine.config.moveMode!=='direct'||App.engine.busy||App.engine.sweeping)return;
  clearTimeout(App.sweepDebounce);
- App.sweepDebounce=setTimeout(()=>App.engine.sweepAll().catch(()=>App.log('error',0,'direkt_svep_misslyckades')),3000);
+ App.sweepDebounce=setTimeout(()=>{
+  if(App.engine&&!App.engine.busy&&!App.engine.sweeping&&!App.engine.pending.size)App.engine.sweepAll().catch(()=>App.log('error',0,'direkt_svep_misslyckades'));
+ },10000);
 });

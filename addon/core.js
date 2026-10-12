@@ -1,7 +1,7 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:500,logs:5000});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000});
 class RuleError extends Error { constructor(code){super(code);this.code=code;} }
 const fail=code=>{throw new RuleError(code);};
 const norm=s=>String(s??'').normalize('NFKC').toLocaleLowerCase('sv-SE');
@@ -23,9 +23,11 @@ function email(author){
 function validateRule(raw){
  if(!raw||typeof raw!=='object')fail('bad_rule');
  const scope=raw.scope===undefined?'folder':raw.scope;if(!['folder','account'].includes(scope))fail('bad_rule');
+ const readFilter=raw.readFilter===undefined?'default':raw.readFilter;if(!['default','read','unread','both'].includes(readFilter))fail('bad_rule');
+ const unreadAction=raw.unreadAction===undefined?'default':raw.unreadAction;if(!['default','keep','window','read'].includes(unreadAction))fail('bad_rule');
  const r={id:text(raw.id,80,'bad_id'),name:text(raw.name,100,'bad_name'),enabled:raw.enabled===true,
   source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(raw.sourceAccount,2048,'choose_source'):'',scope,
-  target:text(raw.target,2048,'choose_target'),match:raw.match};
+  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction};
  if(!/^[a-zA-Z0-9_-]+$/.test(r.id))fail('bad_id');
  if(r.scope==='folder'&&r.source===r.target)fail('same_folder');
  if(!['all','any'].includes(r.match))fail('bad_match');

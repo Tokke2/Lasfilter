@@ -13,6 +13,26 @@ function fixture(options={}){
   if(options.noAck)return;const old=structuredClone(messages.get(ids[0])),m={...old,id:ids[0]+1000,folder:{id:target,accountId:'a'}};messages.delete(ids[0]);messages.set(m.id,m);
   await engine.onMoved({messages:[old]},{messages:[m]});
  }},calls:[]};
+ if(options.yearFolders){
+  /* Riktigt mappträd så att årsmappar (Arkiv/<år>) kan hittas och skapas. */
+  const tree=new Map();
+  const add=(id,name,parentId,extra={})=>tree.set(id,{id,accountId:'a',name,parentId,...extra});
+  add('root','Rot',null);add('inbox','Inkorg','root',{specialUse:['inbox']});add('archive','Arkiv','root');
+  add('other','Annan','root');add('brt','Brt','root');add('third','Tredje','root');add('sub1','Sub1','other');
+  const shape=id=>[...tree.values()].filter(f=>f.parentId===id).map(f=>({id:f.id,accountId:f.accountId,name:f.name,specialUse:f.specialUse||[],subFolders:shape(f.id)}));
+  api.addFolder=add;
+  api.created=[];
+  api.folders.get=async(id,includeSub)=>{
+   const node=tree.get(id)||{id,accountId:'a',name:id};
+   return {id:node.id,accountId:node.accountId,name:node.name,specialUse:node.specialUse||[],...(includeSub?{subFolders:[...tree.values()].filter(f=>f.parentId===id).map(f=>({id:f.id,accountId:f.accountId,name:f.name,specialUse:f.specialUse||[]}))}:{})};
+  };
+  api.folders.create=async(parentId,name)=>{
+   if(options.createReject)throw Error('mappen kunde inte skapas');
+   const id='year-'+name;add(id,name,parentId);api.created.push({parentId,name,id});
+   return {id,accountId:'a',name,specialUse:[]};
+  };
+  api.accounts.list=async()=>[{id:'a',rootFolder:{id:'root',accountId:'a',isRoot:true,name:'Rot',subFolders:shape('root')}}];
+ }
  if(options.folderInfo)api.folders.getFolderInfo=async id=>{const list=[...messages.values()].filter(m=>m.folder?.id===id);return {totalMessageCount:list.length,unreadMessageCount:list.filter(m=>m.read!==true).length};};
  if(options.folderInfoReject)api.folders.getFolderInfo=async()=>{throw Error('folder info offline');};
  if(options.folderInfo){const queryInfo=api.folders.getFolderInfo;const queries=[];api.infoCalls=queries;api.folders.getFolderInfo=async id=>{queries.push(id);return queryInfo(id);};}
@@ -371,6 +391,160 @@ test('suggestFrom groups inbox mail by domain and ignores covered domains',()=>{
  assert.deepEqual(covered.map(s=>s.domain),['klarna.se']);
  assert.equal(C.suggestFrom(list,{minCount:2,limit:1}).length,1);
  assert.deepEqual(C.suggestFrom(null),[]);
+});
+
+/* ===== Årsmappar: arkivera tidigare år i Arkiv/<år>, aldrig olästa ===== */
+const yearRule=over=>({...base(),id:'years',name:'Årsarkiv',target:'archive',match:'all',readFilter:'read',yearFolders:true,
+ conditions:[{field:'date',op:'before',value:'2026'}],...over});
+const oldMsg=(id,year,read=true)=>({...msg(id),read,date:new Date(year+'-04-02T08:00:00Z')});
+const folderOf=(f,headerMessageId)=>[...f.messages.values()].find(m=>m.headerMessageId===headerMessageId)?.folder?.id;
+
+test('date before year matches previous years but not the current one',()=>{
+ const r=C.validateRule({...base(),conditions:[{field:'date',op:'before',value:'2026'}]});
+ const at=y=>({...msg(),date:new Date(y+'-06-01T00:00:00Z')});
+ assert.equal(C.match(r,at(2025)),true);
+ assert.equal(C.match(r,at(2023)),true);
+ assert.equal(C.match(r,at(2026)),false);
+});
+
+test('date older and newer count days from now',()=>{
+ const now=Date.parse('2026-10-12T00:00:00Z');
+ const older=C.validateRule({...base(),conditions:[{field:'date',op:'older',value:'90'}]});
+ const newer=C.validateRule({...base(),conditions:[{field:'date',op:'newer',value:'30'}]});
+ const days=n=>({...msg(),date:new Date(now-n*86400000)});
+ assert.equal(C.match(older,days(91),false,false,now),true);
+ assert.equal(C.match(older,days(89),false,false,now),false);
+ assert.equal(C.match(newer,days(10),false,false,now),true);
+ assert.equal(C.match(newer,days(40),false,false,now),false);
+ assert.equal(C.match(older,{...msg(),date:'inte-ett-datum'}),false);
+});
+
+test('size conditions use kilobytes and recipients are matched',()=>{
+ const big=C.validateRule({...base(),conditions:[{field:'size',op:'larger',value:'100'}]});
+ const small=C.validateRule({...base(),conditions:[{field:'size',op:'smaller',value:'100'}]});
+ assert.equal(C.match(big,{...msg(),size:200*1024}),true);
+ assert.equal(C.match(big,{...msg(),size:99*1024}),false);
+ assert.equal(C.match(small,{...msg(),size:50*1024}),true);
+ assert.equal(C.match(big,{...msg(),size:undefined}),false);
+ const to=C.validateRule({...base(),conditions:[{field:'recipient',op:'contains',value:'faktura@'}]});
+ assert.equal(C.match(to,{...msg(),recipients:['Faktura <faktura@x.se>']}),true);
+ assert.equal(C.match(to,{...msg(),recipients:['annan@x.se']}),false);
+ const cc=C.validateRule({...base(),conditions:[{field:'cc',op:'contains',value:'ekonomi@'}]});
+ assert.equal(C.match(cc,{...msg(),ccList:['Ekonomi <ekonomi@x.se>']}),true);
+ assert.equal(C.match(cc,{...msg(),ccList:[]}),false);
+});
+
+for(const bad of [{field:'size',op:'contains',value:'5'},{field:'size',op:'larger',value:'0'},{field:'size',op:'larger',value:'abc'},
+ {field:'date',op:'equals',value:'2025'},{field:'date',op:'before',value:'20'},{field:'date',op:'older',value:'0'},
+ {field:'recipient',op:'older',value:'5'},{field:'unknown',op:'contains',value:'x'}])test('reject condition '+JSON.stringify(bad),()=>assert.throws(()=>C.validateRule({...base(),conditions:[bad]})));
+
+test('yearFolders flag is validated as a boolean',()=>{
+ assert.equal(C.validateRule({...yearRule()}).yearFolders,true);
+ assert.equal(C.validateRule({...base(),yearFolders:'ja'}).yearFolders,false);
+ assert.equal(C.validateRule(base()).yearFolders,false);
+ assert.equal(C.yearOf(oldMsg(1,2025)),2025);
+ assert.equal(C.yearFolderName(oldMsg(1,2024)),'2024');
+ assert.equal(C.yearFolderName({date:'trasigt'}),'');
+});
+
+test('year archive moves last year read mail into Arkiv/<year> and leaves unread and current year',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ f.messages.set(2,oldMsg(2,2025,false));
+ f.messages.set(3,oldMsg(3,2026,true));
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);
+ assert.ok(f.api.created.some(c=>c.parentId==='archive'&&c.name==='2025'),'årsmappen 2025 skapas under Arkiv');
+ assert.equal(f.e.recordList()[0].target,'year-2025');
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(folderOf(f,'fake-1@example.invalid'),'year-2025');
+ assert.equal(folderOf(f,'fake-2@example.invalid'),'inbox','oläst mejl väntar');
+ assert.equal(folderOf(f,'fake-3@example.invalid'),'inbox','årets mejl arkiveras inte');
+ assert.equal(f.e.fault,'');
+});
+
+test('unread mail is archived only after it is read',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(2,oldMsg(2,2025,false));
+ await f.e.sweepAll();
+ assert.equal(f.e.pending.size,0);
+ f.messages.get(2).read=true;
+ await f.e.readChanged(f.messages.get(2),{read:true},{read:false});
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(folderOf(f,'fake-2@example.invalid'),'year-2025');
+});
+
+test('year archive reuses an existing year folder and creates no duplicate',async()=>{
+ const f=fixture({yearFolders:true});
+ f.api.addFolder('year-2024','2024','archive');
+ f.e.config.rules=C.validateRules([yearRule({conditions:[{field:'date',op:'before',value:'2026'}]})]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2024,true));
+ const first=await f.e.sweepAll();
+ f.messages.set(1,oldMsg(1,2024,true));
+ const second=await f.e.sweepAll();
+ assert.deepEqual(f.api.created,[],'ingen ny mapp skapas när årsmappen finns');
+ assert.ok(first.cachedFolders+first.emptyFolders>=0);
+ assert.equal(f.e.recordList().at(-1)?.target,'year-2024');
+ assert.equal(second.queued,0,'redan köat mejl köas inte om');
+});
+
+test('mail already inside its year folder is not queued again',async()=>{
+ const f=fixture({yearFolders:true});
+ f.api.addFolder('year-2025','2025','archive');
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,{...oldMsg(1,2025,true),folder:{id:'year-2025',accountId:'a',name:'2025'}});
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,0);
+ assert.equal(f.e.pending.size,0);
+ assert.equal(f.e.fault,'');
+});
+
+test('year archive falls back to the plain target folder when creation is denied',async()=>{
+ const f=fixture({yearFolders:true,createReject:true});
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ const r=await f.e.sweepAll();
+ assert.equal(r.queued,1);
+ assert.equal(f.e.recordList()[0].target,'archive');
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(folderOf(f,'fake-1@example.invalid'),'archive');
+ assert.equal(f.e.fault,'');
+});
+
+test('restored year folder job survives a restart when the year folder exists',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([yearRule()]);
+ f.messages.clear();
+ f.messages.set(1,oldMsg(1,2025,true));
+ await f.e.sweepAll();
+ const records=f.e.recordList();
+ const g=fixture({yearFolders:true});
+ g.e.config.rules=C.validateRules([yearRule()]);
+ g.messages.clear();
+ /* Samma Message-ID som i journalen – det är så återställningen hittar mejlet. */
+ g.messages.set(77,{...oldMsg(77,2025,true),headerMessageId:records[0].headerMessageId});
+ await g.api.folders.create('archive','2025');
+ await g.e.restore(records);
+ assert(g.e.pending.has(77),'jobbet återställs när årsmappen finns');
+ await g.e.tick();g.advance();await g.e.tick();
+ assert.equal(folderOf(g,records[0].headerMessageId),'year-2025');
+});
+
+test('year folder limit guards against runaway folder creation',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=C.validateRules([yearRule({conditions:[{field:'date',op:'older',value:'1'}]})]);
+ f.messages.clear();
+ for(let i=1;i<=20;i++)f.messages.set(i,{...msg(i),date:new Date((2000+i)+'-04-02T08:00:00Z')});
+ await f.e.sweepAll();
+ assert.ok(f.api.created.length<=C.LIMITS.yearFolders,'högst '+C.LIMITS.yearFolders+' årsmappar skapas per session');
+ assert.equal(f.e.fault,'');
 });
 
 test('shouldOpenWindow suppresses popups during a batch sweep',()=>{

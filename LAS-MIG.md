@@ -39,6 +39,28 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 - **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.
 - **Högerklicksmeny på mejl:** *SortBro: Skapa filter från detta mejl…* öppnar SortBro med en ny regel förifylld från mejlet (avsändardomän, adress eller ämne). Regeln sparas först när du själv trycker Spara.
 
+## Årsarkiv: arkivera tidigare år i egna årsmappar
+
+Mallen **🗓️ Arkivera föregående år** bygger en regel som flyttar allt som är äldre än innevarande år till en egen årsmapp under målmappen – precis som ett arkiv med `Arkiv/2023`, `Arkiv/2024`, `Arkiv/2025`:
+
+1. Välj kontot och tryck på mallen. Regelnamn, villkor (**Datum · Är före år · innevarande år**) och kryssrutan **Lägg varje år i en egen årsmapp** fylls i automatiskt, och en mapp som heter *Arkiv*/*Archive* väljs som målmapp om den finns.
+2. Regeln står på **Endast lästa mejl**. Olästa mejl arkiveras därför **inte** ännu – de ligger kvar i Inkorgen och flyttas till sin årsmapp först när du har läst dem och lämnat dem (minst två sekunder utan visning).
+3. Saknas årsmappen skapas den automatiskt i målmappen (`Arkiv/2025`) när det första mejlet ska dit. Högst tolv årsmappar skapas per session; går det inte att skapa används den vanliga målmappen i stället och inget mejl tappas bort.
+4. Årsmappen återanvänds när den finns, och mejl som redan ligger i rätt årsmapp köas aldrig om.
+
+Mallen **📦 Arkivera äldre än 90 dagar** gör samma sak men med rullande fönster (*Datum · Är äldre än 90 dagar*), också den med årsmappar och endast lästa mejl.
+
+### Nya villkor i regler
+
+| Fält | Jämförelser | Exempel |
+|---|---|---|
+| **Till (mottagare)** | innehåller / är lika med / börjar med / slutar med | `faktura@` |
+| **Kopia (Cc)** | innehåller / är lika med / börjar med / slutar med | `ekonomi@` |
+| **Storlek** | är större än / är mindre än (kB) | större än 500 |
+| **Datum** | är äldre än / är nyare än (dagar) samt är före år / är efter år | före 2026 |
+
+Storlek och datum skrivs som tal (kB respektive dagar eller årtal) och valideras innan regeln sparas. Åldersvillkoren räknas mot tiden för svepet, så *äldre än 90 dagar* glider framåt av sig själv.
+
 ## Design, språk och årstider
 
 - **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
@@ -82,7 +104,9 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Smart mapp-cache:** tomma mappar och mappar som är oförändrade sedan förra svepet utan träffar hoppas över på under 1 ms i stället för att skannas om. Cachen invalideras vid nya mejl, ändrad lässtatus, genomförd flytt och regeländring, så inget kan missas.
 - **Säker IMAP-flytt:** progressiv verifiering via flytthändelsen och kontroll i mål- och källmapp. Gamla osäkra försök rensas vid omstart och ger inga falska `uncertain_move`-stopp.
 - **Inget popup-kaos vid mass-svep:** under ett pågående svep, eller när kön redan är lång, öppnas aldrig nya fönster – mejlen flyttas och behålls bara som olästa.
-- **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, 1-klicksmallar, egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
+- **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, sju 1-klicksmallar (inkl. årsarkiv), egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
+- **Fler villkor:** Till, Kopia (Cc), Storlek (kB) och Datum (dagar eller årtal) utöver avsändare, domän och ämne.
+- **Årsarkiv:** flytta tidigare års mejl till egna årsmappar (`Arkiv/2025`) som skapas automatiskt, med olästa mejl kvar tills de är lästa.
 - **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.
 
 ## Nyheter i 1.3

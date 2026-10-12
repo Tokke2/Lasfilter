@@ -332,6 +332,28 @@ const I18N={
   seasonGreetingAutumn:'Ha en fin höstdag! 🍂',
   seasonGreetingWinter:'Ha en fin vinterdag! ❄️',
   seasonChanged:'Årstidstema uppdaterat.',
+  optRecipient:'Till (mottagare)',
+  optCc:'Kopia (Cc)',
+  optSize:'Storlek',
+  optDate:'Datum',
+  opLarger:'Är större än',
+  opSmaller:'Är mindre än',
+  opOlder:'Är äldre än',
+  opNewer:'Är nyare än',
+  opBeforeYear:'Är före år',
+  opAfterYear:'Är efter år',
+  condPlaceholderSize:'Antal kB, t.ex. 500',
+  condPlaceholderDate:'Antal dagar eller årtal, t.ex. 90 eller 2025',
+  condPlaceholderRecipient:'t.ex. faktura@ eller min adress',
+  condPlaceholderCc:'t.ex. ekonomi@',
+  ruleYearFoldersLabel:'Lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)',
+  yearFoldersNote:'Årsmappen skapas automatiskt när den behövs. Välj Endast lästa mejl nedan om olästa mejl ska vänta tills du har läst dem.',
+  yearFoldersShort:'🗓️ årsmappar',
+  tagYearFolders:'🗓️ årsmappar',
+  tplYearArchive:'Arkivera föregående år',
+  tplOlder90:'Arkivera äldre än 90 dagar',
+  tplNameYearArchive:'Årsarkiv – tidigare år',
+  tplNameOlder90:'Arkiv – äldre än 90 dagar',
   templateLabel:'1-klicksmallar:',
   tplInvoice:'Fakturor & Kvitton',
   tplOrder:'Order & Leverans',
@@ -754,6 +776,28 @@ const I18N={
   seasonGreetingAutumn:'Have a lovely autumn day! 🍂',
   seasonGreetingWinter:'Have a lovely winter day! ❄️',
   seasonChanged:'Season theme updated.',
+  optRecipient:'To (recipient)',
+  optCc:'Cc (copy)',
+  optSize:'Size',
+  optDate:'Date',
+  opLarger:'Is larger than',
+  opSmaller:'Is smaller than',
+  opOlder:'Is older than',
+  opNewer:'Is newer than',
+  opBeforeYear:'Is before year',
+  opAfterYear:'Is after year',
+  condPlaceholderSize:'Number of kB, e.g. 500',
+  condPlaceholderDate:'Number of days or a year, e.g. 90 or 2025',
+  condPlaceholderRecipient:'e.g. invoice@ or my address',
+  condPlaceholderCc:'e.g. finance@',
+  ruleYearFoldersLabel:'Put each year in its own year folder under the target folder (e.g. Archive/2025)',
+  yearFoldersNote:'The year folder is created automatically when needed. Choose Read emails only below if unread emails should wait until you have read them.',
+  yearFoldersShort:'🗓️ year folders',
+  tagYearFolders:'🗓️ year folders',
+  tplYearArchive:'Archive previous years',
+  tplOlder90:'Archive older than 90 days',
+  tplNameYearArchive:'Year archive – previous years',
+  tplNameOlder90:'Archive – older than 90 days',
   templateLabel:'One-click templates:',
   tplInvoice:'Invoices & receipts',
   tplOrder:'Orders & deliveries',
@@ -905,18 +949,14 @@ function applyLanguage(lang){
  for(const row of $('conditions')?.children||[]){
   const f=row.children[0],op=row.children[1],val=row.children[2];
   const fVal=f.value,opVal=op.value;
-  for(const o of f.options){if(o.value==='domain')o.textContent=T('optDomain');if(o.value==='sender')o.textContent=T('optSender');if(o.value==='subject')o.textContent=T('optSubject');}
-  f.value=fVal;
-  for(const o of op.options){if(o.value==='equals')o.textContent=T('opEquals');if(o.value==='contains')o.textContent=T('opContains');if(o.value==='starts')o.textContent=T('opStarts');if(o.value==='ends')o.textContent=T('opEnds');}
-  op.value=opVal;val.placeholder=T('condPlaceholder');
+  fillFieldSelect(f,fVal);fillOpSelect(op,fVal,opVal);
+  val.placeholder=condPlaceholderFor(fVal);
  }
  for(const row of $('branches')?.children||[]){
   const f=row.children[0],op=row.children[1],val=row.children[2],trg=row.children[3];
   const fVal=f.value,opVal=op.value,tVal=trg.value;
-  for(const o of f.options){if(o.value==='domain')o.textContent=T('optDomain');if(o.value==='sender')o.textContent=T('optSender');if(o.value==='subject')o.textContent=T('optSubject');}
-  f.value=fVal;
-  for(const o of op.options){if(o.value==='equals')o.textContent=T('opEquals');if(o.value==='contains')o.textContent=T('opContains');if(o.value==='starts')o.textContent=T('opStarts');if(o.value==='ends')o.textContent=T('opEnds');}
-  op.value=opVal;val.placeholder=T('branchPlaceholder');
+  fillFieldSelect(f,fVal);fillOpSelect(op,fVal,opVal);
+  val.placeholder=T('branchPlaceholder');
   if(trg.options[0])trg.options[0].textContent=T('chooseTarget');
   trg.value=tVal;
  }
@@ -1061,7 +1101,9 @@ const TEMPLATES={
  order:{name:'tplNameOrder',match:'any',conditions:[['subject','contains','order'],['subject','contains','leverans'],['subject','contains','försändelse']],hints:['order','leverans','inköp','buy']},
  nyhetsbrev:{name:'tplNameNews',match:'any',conditions:[['subject','contains','nyhetsbrev'],['subject','contains','newsletter'],['sender','contains','newsletter']],hints:['nyhetsbrev','news','webb','info']},
  system:{name:'tplNameSystem',match:'any',conditions:[['sender','contains','noreply'],['sender','contains','no-reply'],['subject','contains','notis']],hints:['notis','system','support','drift']},
- bokforing:{name:'tplNameBookkeeping',match:'any',conditions:[['subject','contains','bokföring'],['subject','contains','verifikation'],['subject','contains','moms']],hints:['bokför','ekonomi','redovisning']}
+ bokforing:{name:'tplNameBookkeeping',match:'any',conditions:[['subject','contains','bokföring'],['subject','contains','verifikation'],['subject','contains','moms']],hints:['bokför','ekonomi','redovisning']},
+ arsarkiv:{name:'tplNameYearArchive',match:'any',conditions:[['date','before',String(new Date().getFullYear())]],hints:['arkiv','archive'],readFilter:'read',yearFolders:true},
+ aldre90:{name:'tplNameOlder90',match:'any',conditions:[['date','older','90']],hints:['arkiv','archive'],readFilter:'read',yearFolders:true}
 };
 function applyTemplate(key){
  const template=TEMPLATES[key];if(!template)return;
@@ -1071,8 +1113,9 @@ function applyTemplate(key){
  if($('match'))$('match').value=template.match;
  const box=$('conditions');if(box){box.replaceChildren();for(const [field,op,value] of template.conditions)addCondition({field,op,value});}
  if($('branches'))$('branches').replaceChildren();
- if($('ruleReadFilter'))$('ruleReadFilter').value=($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both';
+ if($('ruleReadFilter'))$('ruleReadFilter').value=template.readFilter||(($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both');
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=($('quickOpenWindow')&&$('quickOpenWindow').checked)?'window':'keep';
+ if($('ruleYearFolders'))$('ruleYearFolders').checked=template.yearFolders===true;
  if(!$('source')?.value){const first=accounts()[0];if(first)accountOptions(first.id);}
  const auto=folders.find(f=>{const n=C.norm((f.name||'')+' '+(f.label||''));return template.hints.some(h=>n.includes(C.norm(h)));});
  if($('target'))targetOptions(auto?.id||$('target').value||'');
@@ -1160,7 +1203,7 @@ function ruleTagText(rule){
  const scopeText=rule.scope==='account'?T('scopeAccount'):T('scopeFolder');
  const rf=rule.readFilter||'default';
  const modeText=rf==='read'?T('tagRead'):rf==='both'?T('tagBoth'):rf==='unread'?T('tagUnread'):T('tagDefault');
- return scopeText+' · '+modeText;
+ return scopeText+' · '+modeText+(rule.yearFolders?' · '+T('tagYearFolders'):'');
 }
 function renderRules(){
  const list=$('ruleList');list.replaceChildren();const search=C.norm($('ruleSearch').value);
@@ -1250,28 +1293,66 @@ function targetOptions(value=''){
   selectOptions($('quickTarget'),folders,T('chooseTarget'),qVal||value||'');
  }
 }
+/* Villkorsfält: text, mottagare, storlek i kB och datum (dagar eller årtal). */
+const CONDITION_FIELDS=[['domain','optDomain'],['sender','optSender'],['subject','optSubject'],['recipient','optRecipient'],['cc','optCc'],['size','optSize'],['date','optDate']];
+const OPERATOR_LABELS={equals:'opEquals',contains:'opContains',starts:'opStarts',ends:'opEnds',larger:'opLarger',smaller:'opSmaller',older:'opOlder',newer:'opNewer',before:'opBeforeYear',after:'opAfterYear'};
+const isNumericField=field=>field==='size'||field==='date';
+function condPlaceholderFor(field){
+ if(field==='size')return T('condPlaceholderSize');
+ if(field==='date')return T('condPlaceholderDate');
+ if(field==='recipient')return T('condPlaceholderRecipient');
+ if(field==='cc')return T('condPlaceholderCc');
+ return T('condPlaceholder');
+}
+function fillFieldSelect(select,value){
+ select.replaceChildren();
+ for(const [v,key] of CONDITION_FIELDS){const o=el('option','',T(key));o.value=v;select.append(o);}
+ select.value=CONDITION_FIELDS.some(([v])=>v===value)?value:CONDITION_FIELDS[0][0];
+}
+function fillOpSelect(select,field,value){
+ const ops=(C.FIELD_OPS&&C.FIELD_OPS[field])||['equals'];
+ select.replaceChildren();
+ for(const v of ops){const o=el('option','',T(OPERATOR_LABELS[v]||v));o.value=v;select.append(o);}
+ select.value=ops.includes(value)?value:ops[0];
+}
+function syncConditionInput(input,field,op,value){
+ if(isNumericField(field)){
+  input.type='number';input.removeAttribute('maxlength');
+  if(field==='size'){input.min='1';input.max='1048576';}
+  else if(op==='older'||op==='newer'){input.min='1';input.max='36500';}
+  else{input.min='1970';input.max='9999';}
+  input.step='1';
+ }else{
+  input.type='text';input.maxLength=256;
+  input.removeAttribute('min');input.removeAttribute('max');input.removeAttribute('step');
+ }
+ input.placeholder=condPlaceholderFor(field);
+ if(value!==undefined&&input.value!==value)input.value=value;
+}
 function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},target:''}){
  if($('branches').children.length>=8){toast(T('maxBranches'));return;}
  const row=el('div','branch-row'),field=el('select'),op=el('select'),value=el('input'),target=el('select'),remove=el('button','remove-condition','×');
- field.setAttribute('aria-label','Fördelningsfält');op.setAttribute('aria-label','Fördelningsjämförelse');value.setAttribute('aria-label','Fördelningsvärde');value.maxLength=256;value.required=true;value.placeholder=T('branchPlaceholder');target.setAttribute('aria-label','Fördelningsmålmapp');remove.type='button';remove.title='Ta bort fördelning';remove.setAttribute('aria-label','Ta bort fördelning');
- for(const [v,t] of [['subject',T('optSubject')],['sender',T('optSender')],['domain',T('optDomain')]]){const x=el('option','',t);x.value=v;field.append(x);}field.value=b.condition.field;
- function operators(val){op.replaceChildren();for(const [v,t] of [['contains',T('opContains')],['equals',T('opEquals')],['starts',T('opStarts')],['ends',T('opEnds')]]){if(field.value==='domain'&&v!=='equals')continue;const x=el('option','',t);x.value=v;op.append(x);}op.value=[...op.options].some(o=>o.value===val)?val:'contains';}
- operators(b.condition.op);value.value=b.condition.value;
+ field.setAttribute('aria-label','Fördelningsfält');op.setAttribute('aria-label','Fördelningsjämförelse');value.setAttribute('aria-label','Fördelningsvärde');value.required=true;target.setAttribute('aria-label','Fördelningsmålmapp');remove.type='button';remove.title='Ta bort fördelning';remove.setAttribute('aria-label','Ta bort fördelning');
+ fillFieldSelect(field,b.condition.field);fillOpSelect(op,b.condition.field,b.condition.op);
+ syncConditionInput(value,b.condition.field,op.value,String(b.condition.value??''));
  selectOptions(target,folders,T('chooseTarget'),b.target);
- field.addEventListener('change',()=>{operators(op.value);dirty=true;});remove.addEventListener('click',()=>{row.remove();dirty=true;});
+ field.addEventListener('change',()=>{fillOpSelect(op,field.value,'');syncConditionInput(value,field.value,op.value,'');dirty=true;});
+ op.addEventListener('change',()=>{syncConditionInput(value,field.value,op.value,value.value);dirty=true;});
+ remove.addEventListener('click',()=>{row.remove();dirty=true;});
  row.append(field,op,value,target,remove);$('branches').append(row);
 }
 function addCondition(c={field:'domain',op:'equals',value:''}){
  if($('conditions').children.length>=8){toast(T('maxConditions'));return;}
  const row=el('div','condition-row'),field=el('select'),op=el('select'),value=el('input'),remove=el('button','remove-condition','×');
- field.setAttribute('aria-label','Villkorsfält');op.setAttribute('aria-label','Jämförelse');value.setAttribute('aria-label','Villkorsvärde');value.maxLength=256;value.required=true;value.placeholder=T('condPlaceholder');remove.type='button';remove.title='Ta bort villkor';remove.setAttribute('aria-label','Ta bort villkor');
- for(const [v,t] of [['domain',T('optDomain')],['sender',T('optSender')],['subject',T('optSubject')]]){const x=el('option','',t);x.value=v;field.append(x);}field.value=c.field;
- function operators(val){op.replaceChildren();for(const [v,t] of [['equals',T('opEquals')],['contains',T('opContains')],['starts',T('opStarts')],['ends',T('opEnds')]]){if(field.value==='domain'&&v!=='equals')continue;const x=el('option','',t);x.value=v;op.append(x);}op.value=[...op.options].some(o=>o.value===val)?val:'equals';}
- operators(c.op);value.value=c.value;
- field.addEventListener('change',()=>{operators(op.value);dirty=true;});remove.addEventListener('click',()=>{if($('conditions').children.length===1){toast(T('minConditions'));return;}row.remove();dirty=true;});
+ field.setAttribute('aria-label','Villkorsfält');op.setAttribute('aria-label','Jämförelse');value.setAttribute('aria-label','Villkorsvärde');value.required=true;remove.type='button';remove.title='Ta bort villkor';remove.setAttribute('aria-label','Ta bort villkor');
+ fillFieldSelect(field,c.field);fillOpSelect(op,c.field,c.op);
+ syncConditionInput(value,c.field,op.value,String(c.value??''));
+ field.addEventListener('change',()=>{fillOpSelect(op,field.value,'');syncConditionInput(value,field.value,op.value,'');dirty=true;});
+ op.addEventListener('change',()=>{syncConditionInput(value,field.value,op.value,value.value);dirty=true;});
+ remove.addEventListener('click',()=>{if($('conditions').children.length===1){toast(T('minConditions'));return;}row.remove();dirty=true;});
  row.append(field,op,value,remove);$('conditions').append(row);
 }
-function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',
+function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',yearFolders:$('ruleYearFolders')?.checked===true,
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.children[3].value}))});}
 /* Enkel regel-export använder samma validerade utkast som sparningen. */
@@ -1282,6 +1363,7 @@ function loadRule(id='',presetAccount=''){
  $('match').value=rule?.match||'all';
  if($('ruleReadFilter'))$('ruleReadFilter').value=rule?.readFilter||'default';
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=rule?.unreadAction||'default';
+ if($('ruleYearFolders'))$('ruleYearFolders').checked=rule?.yearFolders===true;
  updateReadPolicy();
  const ruleAccount=rule?(rule.sourceAccount||folders.find(f=>f.id===rule.source)?.accountId||''):(presetAccount||accounts()[0]?.id||'');
  accountOptions(ruleAccount);targetOptions(rule?.target||'');

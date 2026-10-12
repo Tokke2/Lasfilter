@@ -2050,3 +2050,18 @@ hr {
   --art-fg: #2f6d54;
   --art-sun: #d8e6f2;
 }
+
+/* Arkivruta: årsmappar (Arkiv/<år>) */
+.archive-box {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--season-accent, var(--accent));
+  border-radius: 10px;
+  background: var(--season-soft, var(--accent-soft));
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.archive-box .muted {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+}

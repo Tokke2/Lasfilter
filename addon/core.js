@@ -1,7 +1,18 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,yearFolders:12});
+/* Vilka fält och jämförelser som är tillåtna. Textfälten jämförs som text,
+   storlek i kB och datum som dagar eller årtal. */
+const FIELD_OPS=Object.freeze({
+ sender:['contains','equals','starts','ends'],
+ domain:['equals'],
+ subject:['contains','equals','starts','ends'],
+ recipient:['contains','equals','starts','ends'],
+ cc:['contains','equals','starts','ends'],
+ size:['larger','smaller'],
+ date:['older','newer','before','after']
+});
 class RuleError extends Error { constructor(code){super(code);this.code=code;} }
 const fail=code=>{throw new RuleError(code);};
 const norm=s=>String(s??'').normalize('NFKC').toLocaleLowerCase('sv-SE');
@@ -27,7 +38,7 @@ function validateRule(raw){
  const unreadAction=raw.unreadAction===undefined?'default':raw.unreadAction;if(!['default','keep','window','read'].includes(unreadAction))fail('bad_rule');
  const r={id:text(raw.id,80,'bad_id'),name:text(raw.name,100,'bad_name'),enabled:raw.enabled===true,
   source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(raw.sourceAccount,2048,'choose_source'):'',scope,
-  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction};
+  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction,yearFolders:raw.yearFolders===true};
  if(!/^[a-zA-Z0-9_-]+$/.test(r.id))fail('bad_id');
  if(r.scope==='folder'&&r.source===r.target)fail('same_folder');
  if(!['all','any'].includes(r.match))fail('bad_match');
@@ -42,9 +53,22 @@ function validateRule(raw){
  return r;
 }
 function validateCondition(c){
- if(!c||!['sender','domain','subject'].includes(c.field))fail('bad_field');
- if(!['contains','equals','starts','ends'].includes(c.op)||(c.field==='domain'&&c.op!=='equals'))fail('bad_operator');
- let value=text(c.value,LIMITS.value,'bad_value');if(c.field==='domain')value=domain(value);
+ if(!c||!Object.hasOwn(FIELD_OPS,c.field))fail('bad_field');
+ if(!FIELD_OPS[c.field].includes(c.op))fail('bad_operator');
+ let value;
+ if(c.field==='size'){
+  const kb=typeof c.value==='number'?c.value:Number(String(c.value??'').trim());
+  if(!Number.isSafeInteger(kb)||kb<1||kb>1048576)fail('bad_value');
+  value=String(kb);
+ }else if(c.field==='date'){
+  const n=typeof c.value==='number'?c.value:Number(String(c.value??'').trim());
+  if(c.op==='older'||c.op==='newer'){
+   if(!Number.isSafeInteger(n)||n<1||n>36500)fail('bad_value');
+  }else if(!Number.isSafeInteger(n)||n<1970||n>9999)fail('bad_value');
+  value=String(n);
+ }else{
+  value=text(c.value,LIMITS.value,'bad_value');if(c.field==='domain')value=domain(value);
+ }
  return {field:c.field,op:c.op,value};
 }
 function validateRules(raw){
@@ -93,21 +117,39 @@ function suggestFrom(messages,{rules=[],limit=8,minCount=2}={}){
  return [...groups.values()].filter(g=>g.count>=minCount).sort((a,b)=>b.count-a.count||a.domain.localeCompare(b.domain,'sv')).slice(0,limit)
   .map(g=>({domain:g.domain,count:g.count,subject:g.subjects[0]||'',sender:[...g.senders.entries()].sort((a,b)=>b[1]-a[1])[0][0]}));
 }
-function valuesFor(message){const address=email(message.author);return {sender:address,domain:address.split('@')[1]||'',subject:typeof message.subject==='string'?message.subject.slice(0,20000):''};}
-function condHit(c,values){
+function listOf(value){return Array.isArray(value)?value.filter(v=>typeof v==='string').join(' '):typeof value==='string'?value:'';}
+function valuesFor(message){const address=email(message.author);return {sender:address,domain:address.split('@')[1]||'',subject:typeof message.subject==='string'?message.subject.slice(0,20000):'',
+ recipient:listOf(message.recipients),cc:[listOf(message.ccList),listOf(message.bccList)].filter(Boolean).join(' '),
+ size:Number.isSafeInteger(message.size)?message.size:null,date:Number.isFinite(+new Date(message.date))?+new Date(message.date):null};}
+function condHit(c,values,now=Date.now()){
+ if(c.field==='size'){
+  const size=values.size;if(!Number.isFinite(size))return false;
+  const bytes=Number(c.value)*1024;return c.op==='larger'?size>bytes:size<bytes;
+ }
+ if(c.field==='date'){
+  const date=values.date;if(!Number.isFinite(date))return false;
+  const n=Number(c.value);
+  if(c.op==='older')return date<now-n*86400000;
+  if(c.op==='newer')return date>now-n*86400000;
+  const year=new Date(date).getFullYear();
+  return c.op==='before'?year<n:year>n;
+ }
  const hay=norm(values[c.field]),needle=norm(c.value);if(!hay||!needle)return false;
  if(c.op==='equals')return hay===needle;if(c.op==='contains')return hay.includes(needle);
  if(c.op==='starts')return hay.startsWith(needle);return hay.endsWith(needle);
 }
-function match(rule,message,includeDisabled=false,ignoreSource=false){
+function match(rule,message,includeDisabled=false,ignoreSource=false,now=Date.now()){
  if(!rule.enabled&&!includeDisabled)return false;
  if(!ignoreSource){
   const inSource=rule.scope==='account'?message.folder?.accountId===rule.sourceAccount:message.folder?.id===rule.source;
   if(!inSource)return false;
  }
- const values=valuesFor(message);const hits=rule.conditions.map(c=>condHit(c,values));
+ const values=valuesFor(message);const hits=rule.conditions.map(c=>condHit(c,values,now));
  return rule.match==='all'?hits.every(Boolean):hits.some(Boolean);
 }
+/* Årsmappar: meddelandets år, används för mål som Arkiv/2025. */
+function yearOf(message){const t=+new Date(message?.date);return Number.isFinite(t)?new Date(t).getFullYear():null;}
+function yearFolderName(message){const y=yearOf(message);return y?String(y):'';}
 function targetFor(rule,message){
  const values=valuesFor(message);
  for(const b of rule.branches||[])if(condHit(b.condition,values))return b.target;
@@ -144,6 +186,6 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,yearOf,yearFolderName};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

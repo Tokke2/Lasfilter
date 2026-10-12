@@ -10,6 +10,8 @@ class Engine {
   /* Smart mapp-cache: tomma mappar och oförändrade mappar utan träffar hoppas
      över på under 1 ms i stället för att skannas om varje svep. */
   this.folderCache=new Map();this.cacheStats={hits:0,misses:0,empty:0};
+  /* Årsmappar: mål som Arkiv/<år> hittas eller skapas en gång och återanvänds. */
+  this.yearFolderIds=new Map();this.yearCreated=0;
   this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;
  }
  /* Anropas när nya mejl kommer in, lässtatus ändras, mejl flyttas eller regler
@@ -78,6 +80,38 @@ class Engine {
    unread:m.read!==true,rulesVersion:this.config.rulesVersion,stage:'pending',created:this.now()};
  }
  ruleMode(rule){return rule?.readFilter||'default';}
+ /* Årsmappar: målet blir <regelns mapp>/<årtal>, t.ex. Arkiv/2025. Mappen
+    återanvänds om den finns och skapas annars en gång (högst LIMITS.yearFolders
+    per session). Går det inte att skapa används regelns vanliga målmapp. */
+ async resolveTarget(rule,message,{create=true}={}){
+  const base=C.targetFor(rule,message);
+  if(!rule?.yearFolders)return base;
+  const year=C.yearFolderName(message);
+  if(!year)return base;
+  const key=base+'\0'+year;
+  if(this.yearFolderIds.has(key))return this.yearFolderIds.get(key);
+  let folderId='';
+  try{
+   const parent=await this.withTimeout(this.api.folders.get(base,true),5000);
+   const child=(parent?.subFolders||[]).find(f=>f&&f.id&&String(f.name||'')===year);
+   if(child?.id)folderId=child.id;
+   else if(create&&typeof this.api.folders?.create==='function'&&this.yearCreated<C.LIMITS.yearFolders){
+    const made=await this.withTimeout(this.api.folders.create(base,year),8000);
+    if(made?.id){folderId=made.id;this.yearCreated++;}
+   }
+  }catch{this.debug('arsmapp_kunde_inte_forberedas ar='+year);}
+  if(!folderId){this.debug('arsmapp_saknas ar='+year+' anvander_ordinarie_mal');return base;}
+  this.yearFolderIds.set(key,folderId);
+  return folderId;
+ }
+ sameTarget(rule,message){
+  if(!rule)return false;
+  if(rule.yearFolders){
+   const year=C.yearFolderName(message);
+   return year?String(message?.folder?.name||'')===year:message?.folder?.id===rule.target;
+  }
+  return message?.folder?.id===C.targetFor(rule,message);
+ }
  ruleAllows(rule,message,allowUnread=false){
   const rf=this.ruleMode(rule);
   if(rf==='unread')return message?.read!==true;
@@ -93,7 +127,7 @@ class Engine {
  }
  firstMatchingRule(message,{allowUnread=false,inboxArrival=false}={}){
   return this.config.rules.find(r=>{
-   if(!C.match(r,message)||message.folder?.id===C.targetFor(r,message))return false;
+   if(!C.match(r,message)||this.sameTarget(r,message))return false;
    const rf=this.ruleMode(r);
    if(inboxArrival){
     if(rf==='read')return message.read===true;
@@ -115,7 +149,7 @@ class Engine {
     if(!this.enabled())break;
     const rule=this.firstMatchingRule(m,{allowUnread:true,inboxArrival:true});if(!rule)continue;
     const direct=this.ruleDirect(rule,true);
-    if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:this.ruleAllows(rule,m,true),notify:direct}))queued++;
+    if(await this.enqueue(m,{rule,target:await this.resolveTarget(rule,m),allowUnread:this.ruleAllows(rule,m,true),notify:direct}))queued++;
    }
    this.debug('nyinkommet inkorg antal='+(messages?.length||0)+' koade='+queued);return queued;
   }finally{this.sweeping--;if(!this.sweeping&&this.pending.size)this.hooks.kick?.();}
@@ -127,7 +161,7 @@ class Engine {
    await this.dropId(m.id);
    if(!this.enabled())return false;
    const unreadRule=this.config.rules.find(r=>r.readFilter==='unread'&&C.match(r,m)&&m.folder?.id!==C.targetFor(r,m));
-   if(unreadRule)return this.enqueue(m,{rule:unreadRule,target:C.targetFor(unreadRule,m),allowUnread:true,notify:true});
+   if(unreadRule)return this.enqueue(m,{rule:unreadRule,target:await this.resolveTarget(unreadRule,m),allowUnread:true,notify:true});
    return false;
   }
   if(changed.read!==true||old.read===true||!this.enabled())return false;
@@ -140,7 +174,9 @@ class Engine {
   this.stats.checks++;
   const rule=candidateRule;if(!rule){this.debug('kö avvisad id='+message.id+' ingen regel matchar avsendar doman='+((C.email(message.author)||'').split('@')[1]||'okand'));return false;}
   const notify=forced?.notify===true||['both','unread'].includes(rule.readFilter);
-  const record=this.makeRecord(message,rule,forced?forced.target:C.targetFor(rule,message),forced?message.folder.id:null,notify);
+  const target=forced?forced.target:await this.resolveTarget(rule,message);
+  if(!target||target===message.folder.id){this.debug('kö avvisad id='+message.id+' mejlet ligger redan i målmappen');return false;}
+  const record=this.makeRecord(message,rule,target,forced?message.folder.id:null,notify);
   if(!record){this.log('skipped',1);this.debug('kö avvisad id='+message.id+' saknar fingeravtryck (Message-ID/datum/storlek)');return false;}
   if(this.done.has(record.key)||this.records.has(record.key)||this.pending.has(message.id)){this.debug('kö avvisad id='+message.id+' redan hanterad eller köad');return false;}
   if(this.records.size>=C.LIMITS.queue){this.debug('kö full: meddelandet lämnas till nästa automatiska svep');return false;}
@@ -230,7 +266,8 @@ class Engine {
     const m=found[0],rule=this.config.rules.find(x=>x.id===r.ruleId&&x.enabled),first=C.firstMatch(this.config.rules,m);
     if(first&&first.id!==r.ruleId)continue;
     const rf=this.ruleMode(rule),allowUnread=notify||['both','unread'].includes(rf)||this.config.moveMode==='direct';
-    if((!allowUnread&&m.read!==true)||(rf==='unread'&&m.read===true)||m.folder?.id!==r.source||C.fingerprint(m)!==r.key||!rule||!C.match(rule,m,false,true)||C.targetFor(rule,m)!==r.target)continue;
+    const expected=rule?await this.resolveTarget(rule,m,{create:false}):'';
+    if((!allowUnread&&m.read!==true)||(rf==='unread'&&m.read===true)||m.folder?.id!==r.source||C.fingerprint(m)!==r.key||!rule||!C.match(rule,m,false,true)||expected!==r.target)continue;
     r.notify=notify;this.records.set(r.key,r);this.pending.set(m.id,{id:m.id,record:r,persisted:true,hiddenSince:null});
    }catch{this.log('error');}
   }
@@ -288,6 +325,8 @@ class Engine {
        if(rf==='unread'&&m.read===true)continue;
        if(!folderDirect&&m.read!==true)continue;
        if(!C.match(rule,m,false,true))continue;
+       const target=await this.resolveTarget(rule,m);
+       if(!target||target===m.folder.id)continue;
        const fk=C.fingerprint(m);
        if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id))continue;
        if(this.records.size>=C.LIMITS.queue){
@@ -301,7 +340,7 @@ class Engine {
         }
         if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
        }
-       if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true})){
+       if(await this.enqueue(m,{rule,target,allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true})){
         queued++;
         if(this.hooks.ackTimeout===undefined&&!this.config.dryRun){
          if(!this.busy)this.tick().catch(()=>{});
@@ -404,7 +443,8 @@ class Engine {
    const rule=this.config.rules.find(r=>r.id===job.record.ruleId);
    const rf=this.ruleMode(rule);
    const allowUnread=job.record.notify||rf==='both'||rf==='unread'||this.config.moveMode==='direct';
-   if((rf==='unread'&&m.read===true)||(m.read!==true&&!allowUnread)||m.folder?.id!==job.record.source||C.fingerprint(m)!==job.record.key||!rule||!C.match(rule,m,false,true)||C.targetFor(rule,m)!==job.record.target){this.debug('jobb '+job.id+' slappt: villkor/kalla/ fingeravtryck stammer inte langre');await this.dropId(job.id);return;}
+   const expected=rule?await this.resolveTarget(rule,m,{create:false}):'';
+   if((rf==='unread'&&m.read===true)||(m.read!==true&&!allowUnread)||m.folder?.id!==job.record.source||C.fingerprint(m)!==job.record.key||!rule||!C.match(rule,m,false,true)||expected!==job.record.target){this.debug('jobb '+job.id+' slappt: villkor/kalla/ fingeravtryck stammer inte langre');await this.dropId(job.id);return;}
    // Kontrollera den faktiska källan och det faktiska målet. Detta är viktigt
    // för svep från undermappar, fördelningsmål och flyttar mellan konton.
    const pairKey=job.record.source+'\0'+job.record.target;
@@ -430,8 +470,9 @@ class Engine {
    }
    let latest;try{latest=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet forsvann fore flytt');await this.dropId(job.id);return;}
    const visible=direct?new Set():await this.currentDisplayed(batchState);
+   const expectedLatest=await this.resolveTarget(rule,latest,{create:false});
    if(!this.enabled()||epoch!==this.epoch||(rf==='unread'&&latest.read===true)||(latest.read!==true&&!allowUnread)||latest.folder?.id!==job.record.source||
-      C.fingerprint(latest)!==job.record.key||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||C.targetFor(rule,latest)!==job.record.target){
+      C.fingerprint(latest)!==job.record.key||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||expectedLatest!==job.record.target){
     if(job.record.rulesVersion===this.config.rulesVersion){this.debug('jobb '+job.id+' vantar: last/visas/utanfor kalla just nu');job.record.stage='pending';job.hiddenSince=null;}
     else{this.records.delete(job.record.key);this.pending.delete(job.id);}
     await this.persist();return;

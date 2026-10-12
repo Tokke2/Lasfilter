@@ -778,14 +778,24 @@ p {
 
 .card-foot {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 14px 20px 10px;
   border-top: 1px solid var(--line);
   margin-top: 10px;
 }
 
+.json-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .file-label {
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
 }
 
 .priority-note {

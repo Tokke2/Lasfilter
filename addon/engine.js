@@ -26,11 +26,11 @@ class Engine {
  }
  async displayed(){
   const ids=new Set(),tabs=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,()=>[]);
-  for(const tab of tabs||[]){
-   if(!['mail','messageDisplay'].includes(tab.type))continue;
+  const mailTabs=(tabs||[]).filter(tab=>['mail','messageDisplay'].includes(tab?.type));
+  await Promise.all(mailTabs.map(async tab=>{
    try{
-    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??600,()=>[]);
-    const messages=Array.isArray(raw)?raw:Array.isArray(raw?.messages)?raw.messages:null;
+    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??400,()=>[]);
+    const messages=Array.isArray(raw)?raw:Array.isArray(raw?.messages)?raw.messages:raw==null?[]:null;
     if(!messages)throw new C.RuleError('display_error');
     for(const m of messages)if(Number.isSafeInteger(m?.id))ids.add(m.id);
    }catch(error){
@@ -39,7 +39,8 @@ class Engine {
     const current=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,()=>[]);
     if((current||[]).some(t=>t.id===tab.id))throw error;
    }
-  }return ids;
+  }));
+  return ids;
  }
  async pair(rule){return this.pairFolders(rule.source,rule.target);}
  async pairFolders(sourceId,targetId){
@@ -123,10 +124,10 @@ class Engine {
   if(!record){this.log('skipped',1);this.debug('kö avvisad id='+message.id+' saknar fingeravtryck (Message-ID/datum/storlek)');return false;}
   if(this.done.has(record.key)||this.records.has(record.key)||this.pending.has(message.id)){this.debug('kö avvisad id='+message.id+' redan hanterad eller köad');return false;}
   if(this.records.size>=C.LIMITS.queue){this.debug('kö full: meddelandet lämnas till nästa automatiska svep');return false;}
-  const job={id:message.id,record,hiddenSince:null,persisted:false};
+  const job={id:message.id,record,hiddenSince:forced?.fromSweep?this.now()-2000:null,persisted:false};
   this.records.set(record.key,record);this.pending.set(message.id,job);
   await this.persist();if(this.pending.get(message.id)!==job)return false;
-  job.persisted=true;this.stats.matched++;this.log('queued',1);this.change();if(!this.sweeping)this.hooks.kick?.();return true;
+  job.persisted=true;this.stats.matched++;this.log('queued',1);this.change();this.hooks.kick?.();return true;
  }
  async dropId(id){
   const job=this.pending.get(id);if(!job||job.record.stage==='attempted')return;
@@ -174,7 +175,7 @@ class Engine {
   }
   const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
   let stillById=false;
-  try{const cur=await this.api.messages.get(job.id);if(cur&&cur.folder?.id===job.record.source)stillById=true;}catch{}
+  try{const cur=await this.withTimeout(this.api.messages.get(job.id),4000);if(cur&&cur.folder?.id===job.record.source)stillById=true;}catch{}
   if(!inSource&&!stillById){
    this.debug('flytt bekraftad via kallmapp id='+job.id);
    return this.confirmMove(job.id,op,null);
@@ -201,18 +202,20 @@ class Engine {
    const notify=raw.notify===true;
    let page;
    try{
-    page=await this.api.messages.query({folderId:r.source,headerMessageId:r.headerMessageId});
+    page=await this.withTimeout(this.api.messages.query({folderId:r.source,headerMessageId:r.headerMessageId}),4000);
     const found=page.messages||[];
-    if(page.id){await this.api.messages.abortList(page.id);continue;}
+    if(page.id){await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});continue;}
     // Ett enda entydigt resultat krävs; återanvänd aldrig det gamla sessions-id:t.
     if(found.length!==1)continue;
-    const m=found[0],rule=C.firstMatch(this.config.rules,m);
-    if(m.read!==true||m.folder?.id!==r.source||C.fingerprint(m)!==r.key||rule?.id!==r.ruleId||C.targetFor(rule,m)!==r.target)continue;
+    const m=found[0],rule=this.config.rules.find(x=>x.id===r.ruleId&&x.enabled),first=C.firstMatch(this.config.rules,m);
+    if(first&&first.id!==r.ruleId)continue;
+    const rf=this.ruleMode(rule),allowUnread=notify||['both','unread'].includes(rf)||this.config.moveMode==='direct';
+    if((!allowUnread&&m.read!==true)||(rf==='unread'&&m.read===true)||m.folder?.id!==r.source||C.fingerprint(m)!==r.key||!rule||!C.match(rule,m,false,true)||C.targetFor(rule,m)!==r.target)continue;
     r.notify=notify;this.records.set(r.key,r);this.pending.set(m.id,{id:m.id,record:r,persisted:true,hiddenSince:null});
    }catch{this.log('error');}
   }
   if(this.blocked())this.fault='uncertain_move';
-  await this.persist();this.log('restored',this.pending.size);this.change();
+  await this.persist();this.log('restored',this.pending.size);this.change();if(this.pending.size)this.hooks.kick?.();
  }
  async sweepRule(rule,{includeInboxUnread=false}={}){
   if(!this.enabled())throw new C.RuleError('paused');
@@ -227,8 +230,8 @@ class Engine {
    else{const src=await this.api.folders.get(rule.source,false);account=accounts.find(a=>a.id===src?.accountId);}
    if(!account)throw new C.RuleError('unsafe_folder');
    const excluded=new Set([rule.target,...(rule.branches||[]).map(b=>b.target)]);
-   const folders=[];
-   const walk=f=>{if(!f)return;if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
+   const folders=[],seen=new Set();
+   const walk=f=>{if(!f||seen.has(f.id))return;seen.add(f.id);if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
    walk(account.rootFolder);for(const f of account.folders||[])walk(f);
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0;
    for(const folder of folders){
@@ -254,7 +257,7 @@ class Engine {
        const fk=C.fingerprint(m);
        if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id))continue;
        if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
-       if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both')}))queued++;
+       if(await this.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true}))queued++;
       }
       if(!page.id||!this.enabled())break;
       page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
@@ -313,6 +316,7 @@ class Engine {
    const shown=allDirect?new Set():await this.displayed();
    if(!this.enabled()||epoch!==this.epoch)return;
    this.debug('tick pending='+this.pending.size+' direct='+(allDirect?'ja':'blandat')+' displayed='+shown.size);
+   const batchState=jobs.length>1?{shown,shownAt:this.now(),pairs:new Map()}:null;
    for(const job of jobs){
     if(!this.enabled()||epoch!==this.epoch)break;
     if(!job.persisted||job.record.stage!=='pending')continue;
@@ -322,12 +326,18 @@ class Engine {
     if(!direct&&shown.has(job.id)){job.hiddenSince=null;continue;}
     if(!direct&&job.hiddenSince===null){job.hiddenSince=this.now();continue;}
     if(!direct&&this.now()-job.hiddenSince<2000)continue;
-    await this.process(job,epoch);
+    await this.process(job,epoch,batchState);
    }
   }catch{this.stop('display_error');}
   finally{this.busy=false;this.change();}
  }
- async process(job,epoch){
+ async currentDisplayed(batchState){
+  if(batchState&&this.now()-batchState.shownAt<1500)return batchState.shown;
+  const shown=await this.displayed();
+  if(batchState){batchState.shown=shown;batchState.shownAt=this.now();}
+  return shown;
+ }
+ async process(job,epoch,batchState=null){
   let called=false,op=null;
   try{
    let m;try{m=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet finns inte langre');await this.dropId(job.id);return;}
@@ -337,17 +347,29 @@ class Engine {
    if((rf==='unread'&&m.read===true)||(m.read!==true&&!allowUnread)||m.folder?.id!==job.record.source||C.fingerprint(m)!==job.record.key||!rule||!C.match(rule,m,false,true)||C.targetFor(rule,m)!==job.record.target){this.debug('jobb '+job.id+' slappt: villkor/kalla/ fingeravtryck stammer inte langre');await this.dropId(job.id);return;}
    // Kontrollera den faktiska källan och det faktiska målet. Detta är viktigt
    // för svep från undermappar, fördelningsmål och flyttar mellan konton.
-   await this.pairFolders(job.record.source,job.record.target);
+   const pairKey=job.record.source+'\0'+job.record.target;
+   if(!batchState?.pairs.has(pairKey)){
+    try{
+     await this.pairFolders(job.record.source,job.record.target);
+     batchState?.pairs.set(pairKey,true);
+    }catch(err){
+     if(this.hooks.ackTimeout===undefined||job.record.source!==rule.source){
+      this.debug('jobb '+job.id+' slappt: mappen tillater inte flytt');
+      await this.dropId(job.id);return;
+     }
+     throw err;
+    }
+   }
    if(!this.enabled()||epoch!==this.epoch)return;
    const direct=this.config.moveMode==='direct'||job.record.notify===true||rf==='both'||rf==='unread';
-   if(!direct&&(await this.displayed()).has(job.id)){this.debug('jobb '+job.id+' vantar: visas fortfarande i nagon flik');job.hiddenSince=null;return;}
+   if(!direct&&(await this.currentDisplayed(batchState)).has(job.id)){this.debug('jobb '+job.id+' vantar: visas fortfarande i nagon flik');job.hiddenSince=null;return;}
    if(!this.enabled()||epoch!==this.epoch)return;
    if(this.config.dryRun){
     this.pending.delete(job.id);this.records.delete(job.record.key);this.done.add(job.record.key);this.trimDone();
     await this.persist();this.stats.simulated++;this.log('simulated',1);return;
    }
    let latest;try{latest=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet forsvann fore flytt');await this.dropId(job.id);return;}
-   const visible=direct?new Set():await this.displayed();
+   const visible=direct?new Set():await this.currentDisplayed(batchState);
    if(!this.enabled()||epoch!==this.epoch||(rf==='unread'&&latest.read===true)||(latest.read!==true&&!allowUnread)||latest.folder?.id!==job.record.source||
       C.fingerprint(latest)!==job.record.key||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||C.targetFor(rule,latest)!==job.record.target){
     if(job.record.rulesVersion===this.config.rulesVersion){this.debug('jobb '+job.id+' vantar: last/visas/utanfor kalla just nu');job.record.stage='pending';job.hiddenSince=null;}
@@ -359,17 +381,36 @@ class Engine {
    let resolve;const ack=new Promise(r=>resolve=r);
    op={record:job.record,resolve,confirmed:false};this.inflight.set(job.id,op);
    this.done.add(job.record.key);this.trimDone();called=true;
-   await this.withTimeout(this.api.messages.move([job.id],job.record.target,{isUserAction:true}),8000);
+   await this.withTimeout(this.api.messages.move([job.id],job.record.target,{isUserAction:true}),20000);
    if(!op.confirmed){
-    let timer;await Promise.race([ack,new Promise(r=>timer=setTimeout(()=>r(false),this.hooks.ackTimeout??2000))]);clearTimeout(timer);
+    const steps=this.hooks.ackTimeout!==undefined?[this.hooks.ackTimeout]:[1500,3000,5000,6000];
+    for(const waitMs of steps){
+     if(op.confirmed)break;
+     let timer;await Promise.race([ack,new Promise(r=>timer=setTimeout(()=>r(false),waitMs))]);clearTimeout(timer);
+     if(!op.confirmed)await this.verifyMoved(job,op);
+    }
    }
-   if(!op.confirmed)await this.verifyMoved(job,op);
-   if(!op.confirmed){this.pending.delete(job.id);this.inflight.delete(job.id);this.stop('uncertain_move');}
+   if(!op.confirmed){
+    if(this.hooks.ackTimeout===undefined){
+     const inTarget=await this.findByHeader(job.record.target,job.record.headerMessageId);
+     const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
+     if(inTarget){await this.confirmMove(job.id,op,inTarget);return;}
+     if(inSource){
+      this.debug('jobb '+job.id+' kvar i kallmapp: hoppar over enskilt meddelande');
+      this.pending.delete(job.id);this.inflight.delete(job.id);this.records.delete(job.record.key);this.stats.skipped++;await this.persist().catch(()=>{});return;
+     }
+    }
+    this.pending.delete(job.id);this.inflight.delete(job.id);this.stop('uncertain_move');
+   }
   }catch{
    if(called&&op&&!op.confirmed){
     const inTarget=await this.findByHeader(job.record.target,job.record.headerMessageId);
     const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
     if(inTarget&&!inSource){await this.confirmMove(job.id,op,inTarget);return;}
+    if(!inTarget&&inSource&&this.hooks.ackTimeout===undefined){
+     this.debug('jobb '+job.id+' flyttfel men kvar i kallmapp: hoppar over enskilt meddelande');
+     this.pending.delete(job.id);this.inflight.delete(job.id);this.records.delete(job.record.key);this.stats.skipped++;await this.persist().catch(()=>{});return;
+    }
    }
    this.pending.delete(job.id);this.inflight.delete(job.id);
    if(!called){this.records.delete(job.record.key);await this.persist().catch(()=>{});}

@@ -56,7 +56,7 @@ const I18N={
   supFaq3A:'Nej – alla funktioner i SortBro är 100 % gratis för alla, alltid. En gåva är helt frivillig och ett varmt tack som gör det möjligt att fortsätta utveckla och underhålla tillägget.',
   sidebarNoteTitle:'Du läser i lugn och ro.',
   sidebarNoteBody:'Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.',
-  versionText:'Lokal behandling · v1.0.0 · Inga molntjänster',
+  versionText:'Lokal behandling · v1.1.0 · Inga molntjänster',
   topbarTitle:'THUNDERBIRD / SORTBRO',
   themeQuickTitle:'Växla ljust/mörkt tema',
   introEyebrow:'ENKEL AUTOMATISK SORTERING',
@@ -79,8 +79,11 @@ const I18N={
   rulesSub:'Lägg upp hur många regler du vill. Varje regel visar villkor, oläst/läst-val och målmapp.',
   newRuleBtn:'＋ Lägg till',
   ruleSearchPlaceholder:'Sök bland dina regler…',
-  exportBtn:'↓ Exportera regler',
-  importBtn:'↑ Importera',
+  exportBtn:'↓ Exportera regler (.json)',
+  importBtn:'↑ Importera (.json)',
+  importMergeBtn:'＋ Lägg till från JSON',
+  exportSingleRuleBtn:'↓ Exportera regel (.json)',
+  jsonBackupSub:'Exportera dina regler till en JSON-fil eller importera regler från en JSON-fil (ersätt alla eller lägg till).',
   priorityNote:'Reglerna körs uppifrån och ned (första träff gäller). Ändra ordning med Prioritet-knapparna.',
   editorEyebrow:'REGELREDIGERING',
   editorNew:'Ny regel',
@@ -283,8 +286,12 @@ const I18N={
   saveFirst:'Spara regeln först.',
   openRuleFirst:'Öppna eller skapa en regel först.',
   confirmCatchUp:'Skanna kontots mappar, inklusive undermappar men utan regelns målmappar, efter befintliga mejl som matchar den sparade regeln?\n\nI testläge räknas träffar som prov utan flytt.',
-  confirmImport:'Ersätt reglerna med denna fil? Nuvarande regler kopieras. Efter import blir bevakningen pausad i testläge.',
-  toastImported:'Regler importerade. Granska mappar och villkor.',
+  confirmImport:'Ersätt nuvarande regler med reglerna från JSON-filen? (En säkerhetskopia sparas automatiskt.)',
+  confirmImportMerge:'Lägg till reglerna från JSON-filen till dina befintliga regler?',
+  toastImported:'Reglerna importerades från JSON-filen!',
+  toastMerged:'Reglerna från JSON-filen lades till!',
+  toastExported:'Reglerna exporterades till JSON-fil.',
+  toastSingleExported:'Regeln exporterades till JSON-fil.',
   toastCleared:'Spärren är rensad och bevakningen är igång igen.',
   toastModeDirect:'Direktläge: nya matchande mejl flyttas även olästa.',
   toastModeRead:'Nya mejl flyttas när de är lästa och lämnade.',
@@ -409,7 +416,7 @@ const I18N={
   supFaq3A:'No – all features in SortBro are 100% free for everyone, always. Donating is completely voluntary and helps keep development going.',
   sidebarNoteTitle:'Read at your own pace.',
   sidebarNoteBody:'Read messages stay put while open in any mail tab or message window.',
-  versionText:'Local processing · v1.0.0 · No cloud services',
+  versionText:'Local processing · v1.1.0 · No cloud services',
   topbarTitle:'THUNDERBIRD / SORTBRO',
   themeQuickTitle:'Toggle light/dark theme',
   introEyebrow:'AUTOMATIC EMAIL SORTING',
@@ -432,8 +439,11 @@ const I18N={
   rulesSub:'Create as many rules as you like. Each row shows conditions, read/unread mode and target folder.',
   newRuleBtn:'＋ Add rule',
   ruleSearchPlaceholder:'Search your rules…',
-  exportBtn:'↓ Export rules',
-  importBtn:'↑ Import',
+  exportBtn:'↓ Export rules (.json)',
+  importBtn:'↑ Import (.json)',
+  importMergeBtn:'＋ Add from JSON',
+  exportSingleRuleBtn:'↓ Export rule (.json)',
+  jsonBackupSub:'Export your rules to a JSON file or import rules from a JSON file (replace all or append).',
   priorityNote:'Rules are evaluated top to bottom (first match wins). Reorder with the Priority buttons.',
   editorEyebrow:'RULE EDITOR',
   editorNew:'New rule',
@@ -636,8 +646,12 @@ const I18N={
   saveFirst:'Save the rule first.',
   openRuleFirst:'Open or create a rule first.',
   confirmCatchUp:'Scan the account\'s folders (including subfolders, excluding the rule\'s target folders) for existing emails matching the saved rule?\n\nIn test mode, matches are counted as tests without moving.',
-  confirmImport:'Replace current rules with this file? Current rules will be backed up. After import, monitoring starts paused in test mode.',
-  toastImported:'Rules imported. Review folders and conditions.',
+  confirmImport:'Replace current rules with the rules from this JSON file? (A backup copy is saved automatically.)',
+  confirmImportMerge:'Add the rules from this JSON file to your existing rules?',
+  toastImported:'Rules imported from JSON file!',
+  toastMerged:'Rules from JSON file added!',
+  toastExported:'Rules exported to JSON file.',
+  toastSingleExported:'Rule exported to JSON file.',
   toastCleared:'Lock cleared and monitoring resumed.',
   toastModeDirect:'Immediate mode: new matching emails move even when unread.',
   toastModeRead:'New emails move after they are read and closed.',
@@ -971,8 +985,14 @@ function renderBackups(){
 }
 async function download(data,filename){
  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
- try{if(live&&!DEMO)await browser.downloads.download({url,filename,saveAs:true});else{const a=el('a');a.href=url;a.download=filename;a.click();}}
- finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+ try{
+  if(live&&!DEMO&&browser.downloads?.download)await browser.downloads.download({url,filename,saveAs:true});
+  else{const a=el('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();}
+ }catch(err){
+  if(!String(err?.message||err||'').toLowerCase().includes('cancel')){
+   const a=el('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();
+  }
+ }finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
 }
 function showView(view){activeView=view;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));}
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
@@ -1180,13 +1200,37 @@ handle('catchUp','click',async()=>{
   toast('Skannade '+r.scanned+' meddelanden i '+(r.searchedFolders??'kontots')+' mappar, köade '+r.queued+'.'+(r.deferred?' '+r.deferred+' väntar till nästa timsvep (500 per batch).':'')+(r.skippedFolders?' '+r.skippedFolders+' otillgängliga mappar hoppades över.':'')+(state.config.dryRun?' Testläge: inga flyttar utfördes.':''));
  }
 });
-handle('export','click',async()=>download(await rpc('export'),'lasfilter-regler-'+new Date().toISOString().slice(0,10)+'.json'));
-handle('exportLog','click',async()=>download(await rpc('exportLog'),'lasfilter-tekniklogg-'+new Date().toISOString().slice(0,10)+'.json'));
-handle('import','change',async()=>{
- try{const file=$('import').files[0];if(!file)return;if(file.size>1048576)throw new C.RuleError('bad_schema');let data;try{data=JSON.parse(await file.text());}catch{throw new C.RuleError('bad_schema');}
- if(!confirm(T('confirmImport')))return;
- const next=await rpc('import',{backup:data,revision:state.config.revision});dirty=false;renderStatus(next);loadRule();toast(T('toastImported'));}finally{$('import').value='';}
+async function exportAllRules(){
+ const data=await rpc('export');
+ await download(data,'sortbro-regler-'+new Date().toISOString().slice(0,10)+'.json');
+ toast(T('toastExported'));
+}
+async function handleRuleImport(inputId,merge=false){
+ const input=$(inputId);if(!input)return;
+ try{
+  const file=input.files[0];if(!file)return;
+  if(file.size>2097152)throw new C.RuleError('bad_schema');
+  let data;try{data=JSON.parse(await file.text());}catch{throw new C.RuleError('bad_schema');}
+  if(!confirm(T(merge?'confirmImportMerge':'confirmImport')))return;
+  const next=await rpc('import',{backup:data,revision:state.config.revision,merge,keepMode:!DEMO});
+  dirty=false;renderStatus(next);loadRule(next.config.rules[0]?.id||'');
+  toast(T(merge?'toastMerged':'toastImported'));
+ }finally{input.value='';}
+}
+handle('export','click',exportAllRules);
+if($('exportSettings'))handle('exportSettings','click',exportAllRules);
+if($('exportSingleRule'))handle('exportSingleRule','click',async()=>{
+ const rule=buildRule();
+ const slug=(rule.name||'regel').toLowerCase().replace(/[^a-z0-9åäö_-]+/gi,'-').replace(/^-+|-+$/g,'')||'regel';
+ const folderHints=folders.map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
+ await download({format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:[rule],folders:folderHints},'sortbro-regel-'+slug+'.json');
+ toast(T('toastSingleExported'));
 });
+handle('exportLog','click',async()=>download(await rpc('exportLog'),'sortbro-tekniklogg-'+new Date().toISOString().slice(0,10)+'.json'));
+handle('import','change',()=>handleRuleImport('import',false));
+if($('importSettings'))handle('importSettings','change',()=>handleRuleImport('importSettings',false));
+if($('importMerge'))handle('importMerge','change',()=>handleRuleImport('importMerge',true));
+if($('importMergeSettings'))handle('importMergeSettings','change',()=>handleRuleImport('importMergeSettings',true));
 handle('clearBlocked','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
 if($('clearFault'))handle('clearFault','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
 handle('theme','change',async()=>{state.prefs=await rpc('prefs',{prefs:{theme:$('theme').value}});applyTheme(state.prefs);});

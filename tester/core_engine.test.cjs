@@ -232,6 +232,30 @@ test('sweepRule silently skips already queued messages without spamming debug lo
  await f.e.catchUp('rule1');
  assert.equal(f.debugs.filter(d=>d.includes('redan hanterad eller köad')).length,0);
 });
+test('sweepRule deduplicates folders when both rootFolder and folders are populated and moves on first tick',async()=>{
+ const f=fixture();
+ const sub=[{id:'inbox',accountId:'a',name:'Inkorg',specialUse:['inbox']},{id:'archive',accountId:'a',name:'Arkiv',specialUse:[]}];
+ f.api.accounts.list=async()=>[{id:'a',rootFolder:{id:'root',accountId:'a',isRoot:true,subFolders:sub},folders:sub}];
+ f.messages.clear();f.messages.set(5,msg(5));
+ const r=await f.e.catchUp('rule1');
+ assert.equal(r.searchedFolders,1);
+ assert.equal(r.queued,1);
+ await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+});
+test('unmovable subfolder message from sweep is dropped without stopping other queued messages',async()=>{
+ const f=fixture();
+ f.api.folders.getFolderCapabilities=async id=>({canAddMessages:true,canDeleteMessages:id!=='sub1'});
+ f.messages.clear();
+ f.messages.set(8,{...msg(8),folder:{id:'sub1',accountId:'a'}});
+ f.messages.set(9,{...msg(9),folder:{id:'inbox',accountId:'a'}});
+ await f.e.catchUp('rule1');
+ await f.e.tick();
+ assert.equal(f.e.fault,'');
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.e.stats.skipped,1);
+});
+
 
 
 

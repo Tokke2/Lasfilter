@@ -32,7 +32,7 @@
         <strong data-i18n="sidebarNoteTitle">Du läser i lugn och ro.</strong>
         <p data-i18n="sidebarNoteBody">Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.</p>
       </div>
-      <div class="version" data-i18n="versionText">Lokal behandling · v1.0.0 · Inga molntjänster</div>
+      <div class="version" data-i18n="versionText">Lokal behandling · v1.1.0 · Inga molntjänster</div>
     </aside>
 
     <main>
@@ -105,8 +105,9 @@
             </label>
             <div id="ruleList" class="rule-list"></div>
             <div class="card-foot">
-              <button id="export" class="text-button" data-i18n="exportBtn">↓ Exportera regler</button>
-              <label class="text-button file-label"><span data-i18n="importBtn">↑ Importera</span><input id="import" type="file" accept=".json,application/json" hidden></label>
+              <button id="export" type="button" class="button small secondary" data-i18n="exportBtn">↓ Exportera regler (.json)</button>
+              <label class="button small secondary file-label"><span data-i18n="importBtn">↑ Importera (.json)</span><input id="import" type="file" accept=".json,application/json" hidden></label>
+              <label class="button small secondary file-label"><span data-i18n="importMergeBtn">＋ Lägg till från JSON</span><input id="importMerge" type="file" accept=".json,application/json" hidden></label>
             </div>
             <p class="priority-note" data-i18n="priorityNote">Reglerna körs uppifrån och ned (första träff gäller). Ändra ordning med Prioritet-knapparna.</p>
           </section>
@@ -227,6 +228,7 @@
                 <button id="up" type="button" class="text-button" data-i18n="upBtn">↑ Prioritet</button>
                 <button id="down" type="button" class="text-button" data-i18n="downBtn">↓ Prioritet</button>
                 <button id="duplicate" type="button" class="text-button" data-i18n="duplicateBtn">⧉ Duplicera regel</button>
+                <button id="exportSingleRule" type="button" class="text-button" data-i18n="exportSingleRuleBtn">↓ Exportera regel (.json)</button>
                 <button id="delete" type="button" class="text-button danger" data-i18n="deleteBtn">Ta bort regel</button>
               </div>
             </form>
@@ -329,6 +331,13 @@
 
           <div class="card settings-card">
             <h2 data-i18n="backupsTitle">Regelkopior & säkerhet</h2>
+            <p data-i18n="jsonBackupSub">Exportera dina regler till en JSON-fil eller importera regler från en JSON-fil (ersätt alla eller lägg till).</p>
+            <div class="json-backup-actions">
+              <button id="exportSettings" type="button" class="button small secondary" data-i18n="exportBtn">↓ Exportera regler (.json)</button>
+              <label class="button small secondary file-label"><span data-i18n="importBtn">↑ Importera (.json)</span><input id="importSettings" type="file" accept=".json,application/json" hidden></label>
+              <label class="button small secondary file-label"><span data-i18n="importMergeBtn">＋ Lägg till från JSON</span><input id="importMergeSettings" type="file" accept=".json,application/json" hidden></label>
+            </div>
+            <hr>
             <p data-i18n="backupsSub">De fem senaste regelversionerna sparas automatiskt. Återställning startar pausad i testläge.</p>
             <div id="backupList"></div>
             <hr>

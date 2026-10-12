@@ -21,9 +21,15 @@ globalThis.LasDemo=(()=>{
    case 'setMode':state.config.paused=m.paused;state.config.dryRun=m.dryRun;state.config.revision++;state.queued=0;data=state;break;
    case 'queueSelected':data={queued:true};state.queued++;break;
    case 'catchUp':data={scanned:5,queued:2};state.queued+=2;break;
-   case 'export':data={format:'lasfilter-rules',version:1,rules:state.config.rules};break;
+   case 'export':data={format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:state.config.rules,folders};break;
    case 'exportLog':data={format:'lasfilter-technical-log',version:1,events:state.logs};break;
-   case 'import':if(m.backup?.format!=='lasfilter-rules'||m.backup.version!==1)throw new LasCore.RuleError('bad_schema');saveRules(m.backup.rules);state.config.paused=true;state.config.dryRun=true;data=state;break;
+   case 'import':{
+    const b=m.backup;
+    const rawRules=Array.isArray(b)?b:Array.isArray(b?.rules)?b.rules:Array.isArray(b?.config?.rules)?b.config.rules:Array.isArray(b?.conditions)?[b]:null;
+    if(!rawRules||(b&&!Array.isArray(b)&&b.format!==undefined&&!['lasfilter-rules','sortbro-rules'].includes(b.format)))throw new LasCore.RuleError('bad_schema');
+    const combined=m.merge===true?[...state.config.rules,...rawRules]:rawRules;
+    saveRules(combined);state.config.paused=true;state.config.dryRun=true;data=state;break;
+   }
    case 'restoreBackup':if(!snapshots[m.index])throw new LasCore.RuleError('bad_request');saveRules(snapshots[m.index].rules);state.config.paused=true;state.config.dryRun=true;data=state;break;
    case 'clearBlocked':data=state;break;
    case 'sweepNow':data={scanned:6,queued:2};state.queued+=2;break;

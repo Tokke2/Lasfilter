@@ -416,7 +416,7 @@ const I18N={
   supFaq3A:'No – all features in SortBro are 100% free for everyone, always. Donating is completely voluntary and helps keep development going.',
   sidebarNoteTitle:'Read at your own pace.',
   sidebarNoteBody:'Read messages stay put while open in any mail tab or message window.',
-  versionText:'Local processing · v1.1.0 · No cloud services',
+  versionText:'Local processing · v1.0.0 · No cloud services',
   topbarTitle:'THUNDERBIRD / SORTBRO',
   themeQuickTitle:'Toggle light/dark theme',
   introEyebrow:'AUTOMATIC EMAIL SORTING',

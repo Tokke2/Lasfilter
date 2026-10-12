@@ -683,6 +683,25 @@ test('diagnose explains why matching mail is not moved yet',async()=>{
  assert.deepEqual(r.examples.map(e=>e.reason).sort(),['move','target','unread']);
 });
 
+test('diagnosen visar vad som ligger i mapparna när inget matchar regeln',async()=>{
+ const f=fixture();
+ const rule=C.validateRule(base());
+ f.e.config.rules=[rule];
+ f.messages.clear();
+ f.messages.set(1,{...msg(1),folder:{id:'inbox',accountId:'a'},author:'WordPress <wordpress@limoeurope.com>',subject:'Wordfence activity for 12 oct, 2026 on limoeurope.com'});
+ f.messages.set(2,{...msg(2),folder:{id:'sub1',accountId:'a'},author:'Någon <nagon@annat.se>',subject:'Hej'});
+ const r=await f.e.diagnose(rule);
+ assert.equal(r.scanned,2);
+ assert.equal(r.matched,0);
+ assert.equal(r.unmatched,2);
+ assert.equal(r.examples.length,0);
+ assert.equal(r.near.length,2,'exempel på vad som finns i mapparna');
+ assert.equal(r.near[0].inbox,true,'inkorgen visas först');
+ assert.equal(r.near[0].domain,'limoeurope.com');
+ assert.ok(r.near[0].subject.startsWith('Wordfence activity'));
+ assert.deepEqual(f.api.calls,[],'diagnosen flyttar fortfarande ingenting');
+});
+
 test('diagnose works even when the engine is paused or in test mode',async()=>{
  const f=fixture({yearFolders:true,dryRun:true});
  f.e.config.rules=C.validateRules([yearRule()]);

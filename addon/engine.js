@@ -115,6 +115,14 @@ class Engine {
   }
   return message?.folder?.id===C.targetFor(rule,message);
  }
+ /* Inkorgen känns igen på specialUse/type och i andra hand på namnet, så att
+    "nya mejl flyttas direkt" fungerar även när kontot inte märker ut mappen. */
+ inboxFolder(folder){
+  const uses=[...(folder?.specialUse||[]),folder?.type].map(x=>C.norm(String(x||'')));
+  if(uses.includes('inbox'))return true;
+  const name=C.norm(folder?.name||'');
+  return name==='inkorg'||name==='inbox';
+ }
  ruleAllows(rule,message,allowUnread=false){
   const rf=this.ruleMode(rule);
   if(rf==='unread')return message?.read!==true;
@@ -296,12 +304,17 @@ class Engine {
  async diagnose(rule){
   const out={ruleId:rule.id,ruleName:rule.name,readFilter:this.ruleMode(rule),yearFolders:rule.yearFolders===true,
    folders:0,scanned:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,matched:0,wouldMove:0,waitingUnread:0,
-   alreadyInTarget:0,alreadyQueued:0,examples:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
+   alreadyInTarget:0,alreadyQueued:0,unmatched:0,examples:[],near:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
    moveMode:this.config.moveMode,paused:this.config.paused,fault:this.fault};
   const {folders}=await this.ruleFolders(rule,{excludeTargets:false});
   out.folders=folders.length;
   const example=(m,reason)=>{if(out.examples.length<C.LIMITS.examples)out.examples.push({reason,subject:(m.subject||'').slice(0,120),domain:C.email(m.author).split('@')[1]||''});};
+  /* När inget matchar är det mest användbara att visa vad som faktiskt ligger i mapparna.
+     Inkorgen först, eftersom det är där användaren tittar. */
+  const nearInbox=[],nearOther=[];
+  const near=(m,isInbox)=>{const bucket=isInbox?nearInbox:nearOther;if(bucket.length<C.LIMITS.examples)bucket.push({subject:(m.subject||'').slice(0,120),domain:C.email(m.author).split('@')[1]||'',inbox:isInbox});};
   for(const folder of folders){
+   const isInbox=this.inboxFolder(folder);
    const info=await this.folderInfo(folder.id);
    if(info&&info.total===0){out.emptyFolders++;continue;}
    let page=null;
@@ -312,7 +325,7 @@ class Engine {
      for(const m of page.messages||[]){
       if(out.scanned>=C.LIMITS.diagnose)break;
       out.scanned++;
-      if(!C.match(rule,m,false,true))continue;
+      if(!C.match(rule,m,false,true)){out.unmatched++;near(m,isInbox);continue;}
       out.matched++;
       const fk=C.fingerprint(m);
       if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id)){out.alreadyQueued++;example(m,'queued');continue;}
@@ -328,7 +341,8 @@ class Engine {
     out.skippedFolders++;this.debug('diagnos_query_failed error_type='+(error?.name||'Error'));
    }finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
   }
-  this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
+  out.near=[...nearInbox,...nearOther].slice(0,C.LIMITS.examples);
+  this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' utan_traff='+out.unmatched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
   return out;
  }
  async sweepRule(rule,{includeInboxUnread=false}={}){
@@ -342,7 +356,7 @@ class Engine {
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
    for(const folder of folders){
     if(!this.enabled())break;
-    const isInbox=[...(folder.specialUse||[]),folder.type].includes('inbox');
+    const isInbox=this.inboxFolder(folder);
     const folderDirect=rf==='read'?false:rf==='both'||rf==='unread'?true:(direct||(includeInboxUnread&&this.config.newInboxDirect&&isInbox));
     // Mapp-cachen: hoppa över tomma mappar och mappar som är oförändrade sedan
     // förra svepet utan träffar. Invalideras vid nya mejl, lässtatus, flytt och

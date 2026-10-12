@@ -374,6 +374,8 @@ const I18N={
   diagnoseQueued:'{n} mejl är redan hanterade eller köade sedan tidigare.',
   diagnoseNoMatch:'Inga mejl matchar villkoren. Kontrollera fält, värde och konto – eller använd Kontrollera på ett markerat mejl.',
   diagnoseExamples:'Exempel på matchande mejl',
+  diagnoseNearTitle:'Så här ser mejlen i mapparna ut',
+  diagnoseNearNote:'Inget av dem matchar regelns villkor. Jämför ämne och avsändare med villkoren i steg 2 – ett kortare ämne, eller Avsändare (innehåller), fångar oftast fler mejl.',
   diagnoseFixUnread:'✔ Tillåt olästa mejl och flytta dem nu',
   diagnoseReasonMove:'flyttas',
   diagnoseReasonUnread:'oläst – väntar',
@@ -854,6 +856,8 @@ const I18N={
   diagnoseQueued:'{n} emails were already handled or queued earlier.',
   diagnoseNoMatch:'No emails match the conditions. Check field, value and account – or use Check on a selected email.',
   diagnoseExamples:'Examples of matching emails',
+  diagnoseNearTitle:'What the emails in your folders look like',
+  diagnoseNearNote:'None of them match the rule conditions. Compare subject and sender with the conditions in step 2 – a shorter subject, or Sender (contains), usually catches more emails.',
   diagnoseFixUnread:'✔ Allow unread emails and move them now',
   diagnoseReasonMove:'will move',
   diagnoseReasonUnread:'unread – waiting',
@@ -1788,6 +1792,18 @@ async function diagnoseCurrentRule(){
  const list=el('ul','diagnose-list');
  for(const [text,kind] of lines)list.append(el('li','diagnose-'+kind,text));
  panel.append(list);
+ if(r.matched===0&&r.near?.length){
+  const nearBox=el('div','diagnose-examples');
+  nearBox.append(el('strong','',T('diagnoseNearTitle')));
+  for(const ex of r.near){
+   const row=el('div','diagnose-row');
+   row.append(el('span','diagnose-subject',ex.subject||''));
+   if(ex.domain)row.append(el('span','diagnose-domain',ex.domain));
+   nearBox.append(row);
+  }
+  nearBox.append(el('p','muted',T('diagnoseNearNote')));
+  panel.append(nearBox);
+ }
  if(r.examples.length){
   const table=el('div','diagnose-examples');
   table.append(el('strong','',T('diagnoseExamples')));

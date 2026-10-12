@@ -35,11 +35,20 @@ globalThis.LasDemo=(()=>{
    ].filter(s=>!state.config.rules.some(r=>r.enabled&&r.conditions.some(c=>c.field==='domain'&&c.value===s.domain)));break;
    case 'diagnose':{
     const rule=LasCore.validateRule(m.rule),rows=state.config.rules.find(r=>r.id===rule.id);
+    const first=(rule.conditions||[])[0]||{};
+    /* Fiktivt exempel på en regel som inte matchar något alls (t.ex. "Wordfence" i ämnet). */
+    const nearMiss=String(first.value||'').toLowerCase().includes('wordfence');
     data={ruleId:rule.id,ruleName:rule.name,readFilter:rule.readFilter||'default',yearFolders:rule.yearFolders===true,
-     folders:4,scanned:37,searchedFolders:4,skippedFolders:0,emptyFolders:1,matched:9,wouldMove:rows?4:5,waitingUnread:3,
-     alreadyInTarget:2,alreadyQueued:0,engineEnabled:!state.config.paused,dryRun:state.config.dryRun,moveMode:state.moveMode,
+     folders:4,scanned:37,searchedFolders:4,skippedFolders:0,emptyFolders:1,
+     matched:nearMiss?0:9,
+     wouldMove:nearMiss?0:(rows?4:5),waitingUnread:nearMiss?0:3,
+     alreadyInTarget:nearMiss?0:2,alreadyQueued:0,unmatched:nearMiss?14:0,
+     engineEnabled:!state.config.paused,dryRun:state.config.dryRun,moveMode:state.moveMode,
      paused:state.config.paused,fault:state.fault||'',
-     examples:[{reason:'move',subject:'Faktura 1042 – fiktivt testmeddelande',domain:'fortnox.se'},
+     near:nearMiss?[{subject:'Wordfence activity for 12 oct, 2026 on limoeurope.com',domain:'limoeurope.com',inbox:true},
+      {subject:'Veckorapport för webbplatsen',domain:'limoeurope.com',inbox:true},
+      {subject:'Ny kommentar väntar på granskning',domain:'wordpress.org',inbox:false}]:[],
+     examples:nearMiss?[]:[{reason:'move',subject:'Faktura 1042 – fiktivt testmeddelande',domain:'fortnox.se'},
       {reason:'unread',subject:'Orderbekräftelse',domain:'klarna.se'},
       {reason:'target',subject:'Arkiv/2025',domain:'example.invalid'}]};break;
    }

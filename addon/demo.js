@@ -49,6 +49,7 @@ globalThis.LasDemo=(()=>{
       {subject:'Veckorapport för webbplatsen',domain:'limoeurope.com',inbox:true},
       {subject:'Ny kommentar väntar på granskning',domain:'wordpress.org',inbox:false}]:[],
      matchMode:rule.match==='any'?'any':'all',
+     anyMatched:nearMiss?3:(rule.match==='any'?9:0),
      /* Fiktiva siffror per villkor: första villkoret har 0 träffar och stoppar allt. */
      conditions:(rule.conditions||[]).map((c,i)=>({field:c.field,op:c.op,value:String(c.value??'').slice(0,40),hits:nearMiss?(i===0?0:12):(9-i*2)}))
      ,

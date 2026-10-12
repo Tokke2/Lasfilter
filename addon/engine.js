@@ -304,7 +304,7 @@ class Engine {
  async diagnose(rule){
   const out={ruleId:rule.id,ruleName:rule.name,readFilter:this.ruleMode(rule),yearFolders:rule.yearFolders===true,
    folders:0,scanned:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,matched:0,wouldMove:0,waitingUnread:0,
-   alreadyInTarget:0,alreadyQueued:0,unmatched:0,examples:[],near:[],conditions:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
+   alreadyInTarget:0,alreadyQueued:0,unmatched:0,anyMatched:0,examples:[],near:[],conditions:[],engineEnabled:this.enabled(),dryRun:this.config.dryRun,
    moveMode:this.config.moveMode,paused:this.config.paused,fault:this.fault};
   const {folders}=await this.ruleFolders(rule,{excludeTargets:false});
   out.folders=folders.length;
@@ -315,6 +315,8 @@ class Engine {
   const conds=(rule.conditions||[]).slice(0,8);
   const condHits=new Array(conds.length).fill(0);
   const hitsFor=m=>{for(let i=0;i<conds.length;i++)if(C.match({...rule,enabled:true,conditions:[conds[i]],match:'all'},m,false,true))condHits[i]++;};
+  /* Räknar även hur många mejl som skulle matcha om villkoren var ELLER i stället för OCH. */
+  const anyRule=(conds.length>1&&rule.match!=='any')?{...rule,match:'any',conditions:conds}:null;
   const nearInbox=[],nearOther=[];
   const near=(m,isInbox)=>{const bucket=isInbox?nearInbox:nearOther;if(bucket.length<C.LIMITS.examples)bucket.push({subject:(m.subject||'').slice(0,120),domain:C.email(m.author).split('@')[1]||'',inbox:isInbox});};
   for(const folder of folders){
@@ -330,6 +332,7 @@ class Engine {
       if(out.scanned>=C.LIMITS.diagnose)break;
       out.scanned++;
       hitsFor(m);
+      if(anyRule&&C.match(anyRule,m,false,true))out.anyMatched++;
       if(!C.match(rule,m,false,true)){out.unmatched++;near(m,isInbox);continue;}
       out.matched++;
       const fk=C.fingerprint(m);
@@ -349,7 +352,8 @@ class Engine {
   out.near=[...nearInbox,...nearOther].slice(0,C.LIMITS.examples);
   out.conditions=conds.map((c,i)=>({field:c.field,op:c.op,value:String(c.value??'').slice(0,40),hits:condHits[i]}));
   out.matchMode=rule.match==='any'?'any':'all';
-  this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' utan_traff='+out.unmatched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
+  if(out.matchMode==='any')out.anyMatched=out.matched;
+  this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' med_eller='+out.anyMatched+' utan_traff='+out.unmatched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
   return out;
  }
  async sweepRule(rule,{includeInboxUnread=false}={}){

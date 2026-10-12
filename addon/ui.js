@@ -381,6 +381,10 @@ const I18N={
   diagnoseCondNoValue:'inget värde',
   diagnoseCondDeadAll:'Regeln kräver att alla villkor stämmer, men {n} av dem har 0 träffar – därför flyttas ingenting. Ta bort villkoret eller byt till "minst ett av villkoren".',
   diagnoseCondDeadAny:'{n} villkor har 0 träffar. Med "minst ett av villkoren" räcker det att något av de andra stämmer.',
+  diagnoseAnyTitle:'Med "minst ett av villkoren" skulle {n} mejl matcha',
+  diagnoseAnyNote:'Villkoren ser ut som olika varianter av samma sorts mejl. Då ska de kopplas ihop med ELLER i stället för OCH: "minst ett av villkoren" flyttar ett mejl så snart något av villkoren stämmer.',
+  diagnoseFixAny:'✔ Byt till "minst ett av villkoren"',
+  diagnoseAnyDone:'Klart: regeln använder nu "minst ett av villkoren" och alla regler kördes.',
   diagnoseNearNote:'Inget av dem matchar regelns villkor. Jämför ämne och avsändare med villkoren i steg 2 – ett kortare ämne, eller Avsändare (innehåller), fångar oftast fler mejl.',
   diagnoseFixUnread:'✔ Tillåt olästa mejl och flytta dem nu',
   diagnoseReasonMove:'flyttas',
@@ -869,6 +873,10 @@ const I18N={
   diagnoseCondNoValue:'no value',
   diagnoseCondDeadAll:'The rule requires every condition to match, but {n} of them have 0 matches – that is why nothing moves. Remove that condition or switch to "at least one of the conditions".',
   diagnoseCondDeadAny:'{n} conditions have 0 matches. With "at least one of the conditions" it is enough that one of the others matches.',
+  diagnoseAnyTitle:'With "at least one of the conditions", {n} emails would match',
+  diagnoseAnyNote:'The conditions look like different variants of the same kind of email. Those should be joined with OR instead of AND: "at least one of the conditions" moves an email as soon as any one of them matches.',
+  diagnoseFixAny:'✔ Switch to "at least one of the conditions"',
+  diagnoseAnyDone:'Done: the rule now uses "at least one of the conditions" and all rules were run.',
   diagnoseNearNote:'None of them match the rule conditions. Compare subject and sender with the conditions in step 2 – a shorter subject, or Sender (contains), usually catches more emails.',
   diagnoseFixUnread:'✔ Allow unread emails and move them now',
   diagnoseReasonMove:'will move',
@@ -1820,6 +1828,26 @@ async function diagnoseCurrentRule(){
   const dead=r.conditions.filter(c=>!c.hits).length;
   if(r.matched===0&&dead)box.append(el('p','diagnose-warn',r.matchMode==='any'?T('diagnoseCondDeadAny').replace('{n}',dead):T('diagnoseCondDeadAll').replace('{n}',dead)));
   panel.append(box);
+ }
+ /* Regeln kräver alla villkor men villkoren är varianter av samma mejl: erbjud ELLER direkt. */
+ if(r.matchMode==='all'&&r.anyMatched>r.matched){
+  const fixBox=el('div','diagnose-any');
+  fixBox.append(el('strong','',T('diagnoseAnyTitle').replace('{n}',r.anyMatched)));
+  fixBox.append(el('p','muted',T('diagnoseAnyNote')));
+  const anyBtn=el('button','button small primary',T('diagnoseFixAny'));anyBtn.type='button';
+  anyBtn.addEventListener('click',async()=>{
+   anyBtn.disabled=true;
+   try{
+    if($('match')){$('match').value='any';$('match').dispatchEvent(new Event('change',{bubbles:true}));}
+    dirty=true;
+    await saveCurrentRule({});
+    await runAllRules();
+    await diagnoseCurrentRule();
+    toast(T('diagnoseAnyDone'));
+   }catch(err){anyBtn.disabled=false;alertError(err);}
+  });
+  fixBox.append(anyBtn);
+  panel.append(fixBox);
  }
  if(r.matched===0&&r.near?.length){
   const nearBox=el('div','diagnose-examples');

@@ -2192,3 +2192,14 @@ hr {
   color: #ac3434;
   font-weight: 700;
 }
+
+/* Diagnos: förslag att byta till ELLER */
+.diagnose-any {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.diagnose-any .button {
+  margin-top: 6px;
+}

@@ -697,7 +697,42 @@ test('diagnosen visar träffar per villkor så att ett dött villkor syns',async
  assert.equal(r.matchMode,'all');
  assert.deepEqual(r.conditions.map(c=>c.hits),[0,1,1]);
  assert.equal(r.conditions[0].field,'subject');
+ assert.equal(r.anyMatched,1,'med ELLER skulle mejlet matcha');
  assert.equal(f.e.fault,'');
+ assert.deepEqual(f.api.calls,[]);
+});
+
+test('diagnosen räknar mejl (inte villkor) som skulle matcha med ELLER',async()=>{
+ const f=fixture();
+ const rule=C.validateRule({...base(),match:'all',conditions:[
+  {field:'subject',op:'contains',value:'Wordfence'},
+  {field:'subject',op:'contains',value:'WordPress Alert'}]});
+ f.e.config.rules=[rule];
+ f.messages.clear();
+ /* Ett mejl stämmer på båda villkoren, ett bara på det första, ett på inget. */
+ f.messages.set(1,{...msg(1),subject:'Wordfence activity och WordPress Alert'});
+ f.messages.set(2,{...msg(2),subject:'Wordfence activity for 12 oct'});
+ f.messages.set(3,{...msg(3),subject:'Veckobrev från webbplatsen'});
+ const r=await f.e.diagnose(rule);
+ assert.equal(r.matched,1,'bara mejlet med båda orden klarar OCH');
+ assert.deepEqual(r.conditions.map(c=>c.hits),[2,1]);
+ assert.equal(r.anyMatched,2,'två unika mejl matchar minst ett villkor');
+ assert.equal(r.unmatched,2);
+ assert.deepEqual(f.api.calls,[]);
+});
+
+test('diagnosen visar samma siffra när regeln redan använder ELLER',async()=>{
+ const f=fixture();
+ const rule=C.validateRule({...base(),match:'any',conditions:[
+  {field:'subject',op:'contains',value:'Wordfence'},
+  {field:'subject',op:'contains',value:'WordPress Alert'}]});
+ f.e.config.rules=[rule];
+ f.messages.clear();
+ f.messages.set(1,{...msg(1),subject:'Wordfence activity for 12 oct'});
+ const r=await f.e.diagnose(rule);
+ assert.equal(r.matchMode,'any');
+ assert.equal(r.matched,1);
+ assert.equal(r.anyMatched,r.matched);
  assert.deepEqual(f.api.calls,[]);
 });
 

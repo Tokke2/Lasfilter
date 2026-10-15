@@ -271,6 +271,69 @@ test('villkor importeras in i en regel som redan finns',async()=>{
  assert.ok(app.logs.some(l=>l.event==='rules_saved'));
 });
 
+/* ===== Olästa mejl ska öppnas EFTER flytten – inte som en tom ruta ===== */
+function unreadEngine(app,over={}){
+ return fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'direct',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[{id:'r1',enabled:true,name:'Jetpack',unreadAction:'window'}]},
+  findByHeader:async()=>null,...over});
+}
+
+test('olästa mejlet öppnas först när det ligger i målmappen',async()=>{
+ const {app,tick,api}=await loadBackground();
+ inboxAccount(api);
+ let gets=0;
+ api.messages.get=async id=>{gets++;return {id,folder:{id:gets<3?'inbox':'fin'}};};
+ const opened=[];api.messageDisplay.open=async arg=>{opened.push(arg);};
+ api.messages.update=async()=>{};
+ unreadEngine(app);
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,7);
+ assert.equal(opened.length,1,'exakt ett fönster');
+ assert.equal(opened[0].messageId,7);
+ assert.equal(opened[0].location,'window');
+ assert.ok(gets>=3,'vi väntade tills mejlet syntes i målmappen (anrop: '+gets+')');
+});
+
+test('inget fönster alls om mejlet aldrig når målmappen',async()=>{
+ const {app,tick,api}=await loadBackground();
+ inboxAccount(api);
+ api.messages.get=async id=>({id,folder:{id:'inbox'}});
+ const opened=[];api.messageDisplay.open=async()=>{opened.push(1);};
+ unreadEngine(app,{findByHeader:async()=>null});
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,null);
+ assert.equal(opened.length,0,'hellre inget fönster än en tom ruta');
+ assert.ok(app.logs.some(l=>/kunde inte hittas i malmappen/.test(l.data?.detail||'')),'orsaken skrivs till loggen');
+});
+
+test('mejlet hittas via Message-ID när id:t bytts vid flytten',async()=>{
+ const {app,tick,api}=await loadBackground();
+ inboxAccount(api);
+ api.messages.get=async()=>{throw new Error('finns inte längre');};
+ const opened=[];api.messageDisplay.open=async arg=>{opened.push(arg);};
+ api.messages.update=async()=>{};
+ let lookups=0;
+ unreadEngine(app,{findByHeader:async(folder,header)=>{lookups++;return lookups<2?null:{id:99,folder:{id:folder},headerMessageId:header};}});
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,99,'öppnar id:t i målmappen, inte det gamla');
+ assert.equal(opened[0].messageId,99);
+});
+
+test('unreadAction=read markerar läst i målmappen och öppnar inget fönster',async()=>{
+ const {app,tick,api}=await loadBackground();
+ inboxAccount(api);
+ api.messages.get=async id=>({id,folder:{id:'fin'}});
+ const opened=[],updated=[];api.messageDisplay.open=async()=>{opened.push(1);};
+ api.messages.update=async(id,patch)=>{updated.push({id,patch});};
+ unreadEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'direct',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[{id:'r1',enabled:true,name:'Jetpack',unreadAction:'read'}]}});
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,7);
+ assert.equal(opened.length,0,'läsläget öppnar inget fönster');
+ await tick.flush(20);
+ assert.ok(updated.some(x=>x.id===7&&x.patch.read===true),'mejlet markeras läst');
+});
+
 test('importen vägrar dubbletter, tom text och okänd regel',async()=>{
  const {app,api}=await loadBackground();
  inboxAccount(api);

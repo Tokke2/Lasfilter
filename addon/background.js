@@ -219,28 +219,49 @@ App.quickRule=async(msg)=>{
  return {ruleId:rule.id,rule,condition:rule.conditions[0],target:{id:target.id,name:target.name||'',label:target.label||''},snapshot:App.snapshot()};
 };
 App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
- if(!Number.isSafeInteger(id)&&targetFolderId&&headerMessageId){
-  await new Promise(r=>setTimeout(r,350));
-  const found=await App.engine?.findByHeader(targetFolderId,headerMessageId);
-  if(Number.isSafeInteger(found?.id))id=found.id;
- }
- if(!Number.isSafeInteger(id))return;
  const rule=App.engine?.config.rules.find(r=>r.id===ruleId);
  const action=rule?.unreadAction||'default';
+ /* Mejlet ska ligga i målmappen innan fönstret öppnas. Öppnade vi id:t direkt efter
+    flytten visade Thunderbird en tom ruta, eftersom mejlet redan lämnat källmappen. */
+ const lookup=async()=>{
+  if(Number.isSafeInteger(id)){
+   try{
+    const cur=await B.messages.get(id);
+    if(!targetFolderId||cur?.folder?.id===targetFolderId)return id;
+   }catch{}
+  }
+  if(targetFolderId&&headerMessageId){
+   const found=await App.engine?.findByHeader(targetFolderId,headerMessageId);
+   if(Number.isSafeInteger(found?.id))return found.id;
+  }
+  return null;
+ };
+ let targetId=await lookup();
+ for(const delay of [300,700,1500,3000]){
+  if(Number.isSafeInteger(targetId))break;
+  await new Promise(r=>setTimeout(r,delay));
+  targetId=await lookup();
+ }
+ if(!Number.isSafeInteger(targetId)){
+  App.log('debug',0,'olasta mejlet kunde inte hittas i malmappen - fonstret oppnades inte');
+  return null;
+ }
  if(action==='read'){
-  for(const delay of [150,800])setTimeout(()=>B.messages.update(id,{read:true}).catch(()=>{}),delay);
-  return;
+  for(const delay of [150,800])setTimeout(()=>B.messages.update(targetId,{read:true}).catch(()=>{}),delay);
+  return targetId;
  }
  // Popup-skydd: under ett pågående mass-svep (eller när kön redan är lång)
  // öppnas aldrig nya fönster – mejlet behålls bara oläst.
  const sweeping=App.engine?.sweeping||0;
  const shouldOpenWindow=C.shouldOpenWindow({action,pending:App.engine?.pending.size||0,sweeping,fromSweep:sweeping>0,openWindow:App.engine?.config.openWindow!==false});
- App.keepUnread.set(id,Date.now()+30000);
+ App.keepUnread.set(targetId,Date.now()+30000);
  if(shouldOpenWindow){
-  try{await B.messageDisplay.open({messageId:id,location:'window'});}catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
- }
- for(const delay of [250,1000,3000])setTimeout(()=>B.messages.update(id,{read:false}).catch(()=>App.log('error',0,'aterstall_olast_misslyckades')),delay);
- setTimeout(()=>App.keepUnread.delete(id),30000);
+  try{await B.messageDisplay.open({messageId:targetId,location:'window'});}
+  catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
+ }else App.log('debug',0,'olasta mejlet behalls som olast: popup-skydd');
+ for(const delay of [250,1000,3000])setTimeout(()=>B.messages.update(targetId,{read:false}).catch(()=>App.log('error',0,'aterstall_olast_misslyckades')),delay);
+ setTimeout(()=>App.keepUnread.delete(targetId),30000);
+ return targetId;
 };
 App.onNewMail=async(folder,list)=>{
  await App.ready;if(![...(folder?.specialUse||[]),folder?.type].includes('inbox'))return;

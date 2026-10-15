@@ -228,8 +228,9 @@ class Engine {
   this.records.delete(op.record.key);this.pending.delete(id);this.inflight.delete(id);
   this.stats.moved++;this.log('moved',1);this.invalidateFolders();
   if(op.record.unread){
-   if(Number.isSafeInteger(after?.id))this.hooks.notify?.(after.id,op.record.ruleId);
-   else if(op.record.target&&op.record.headerMessageId)this.hooks.notify?.(null,op.record.ruleId,op.record.target,op.record.headerMessageId);
+   /* Målmapp och Message-ID följer alltid med: öppnaren väntar in mejlet där i
+      stället för att öppna ett id som redan lämnat källmappen (tom ruta). */
+   this.hooks.notify?.(Number.isSafeInteger(after?.id)?after.id:null,op.record.ruleId,op.record.target||'',op.record.headerMessageId||'');
   }
   op.resolve(true);await this.persist();this.change();return true;
  }

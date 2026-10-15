@@ -65,6 +65,7 @@ SortBro arkiverar **ingenting av sig självt**. Det finns ingen inbyggd årsarki
 Kryssrutan **Flytta även olästa mejl direkt** i steg 3 styr läsläget för regeln:
 
 - **Kryssad** → olästa mejl som matchar regeln flyttas **direkt**, utan att vänta på att bli lästa. Det gäller i alla mappar regeln söker i, inte bara i Inkorgen. Flytten sker omedelbart när mejlet kommer in eller vid nästa svep – och kryssrutan **Öppna flyttade olästa mejl i nytt fönster** avgör om ett oläst mejl också öppnas i ett fönster (annars ligger det kvar som oläst i målmappen).
+- **Fönstret öppnas först när mejlet ligger i målmappen.** SortBro väntar in flytten och letar upp mejlet i målmappen (via Message-ID om id:t bytts) innan fönstret öppnas – annars visade Thunderbird en tom ruta. Hittas mejlet inte där inom några sekunder öppnas **inget** fönster, och orsaken skrivs i loggen (`olasta mejlet kunde inte hittas i malmappen`). Det är alltid bättre än en tom ruta.
 - **Omarkerad** → olästa mejl ligger kvar och flyttas först när du har läst dem och lämnat dem (minst två sekunder utan visning i någon flik eller något fönster).
 
 Under **Avancerat: läsläge & olika mål beroende på ämne** finns samma sak som fyra läslägen: *enligt standard*, *endast lästa*, *både olästa och lästa* samt *endast olästa* – kryssrutan håller sig i synk med läget.
@@ -154,7 +155,7 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Regler och utbyte:** upp till 200 regler med direktkontroller per regelrad, snabbskapande, förslag från Inkorgen, sex 1-klicksmallar (inkl. 🗄️ Arkivera äldre mejl), egen mappskapning, högerklicksmeny samt JSON-export/import (ersätt eller lägg till) med automatisk mappmatchning.
 - **Fler villkor:** Till, Kopia (Cc), Storlek (kB) och Datum (dagar eller årtal) utöver avsändare, domän och ämne.
 - **Valfria årsmappar:** årsarkivering är inget förval utan en kryssruta per regel (avstängd som standard). Kryssar du i den hamnar tidigare års mejl i `Arkiv/2025` – annars flyttas mejlen till den målmapp du valt.
-- **Olästa mejl flyttas när rutan är kryssad:** *Flytta även olästa mejl direkt* gör att matchande olästa mejl flyttas med en gång i alla mappar, i stället för att vänta tills de är lästa.
+- **Olästa mejl flyttas när rutan är kryssad:** *Flytta även olästa mejl direkt* gör att matchande olästa mejl flyttas med en gång i alla mappar, i stället för att vänta tills de är lästa. Är *Öppna flyttade olästa mejl i nytt fönster* också kryssad öppnas mejlet **efter** flytten och alltid i målmappen – aldrig som en tom ruta.
 - **Kör alla regler nu:** en knapp sveper igenom alla aktiva regler direkt och rapporterar granskade mejl, cachade mappar, matchningar och köade flyttar.
 - **Snabbregeln (⚡ Skapa regel på tio sekunder):** klickbara förslag från Inkorgen (avsändare och ämnesord med antal), live-räkning av hur många mejl regeln träffar, en mening i klarspråk om vad regeln gör och två knappar – *Skapa regel* eller *Lägg till och flytta nu*. Villkoret räknas ut automatiskt: full domän/adress blir exakt träff, ett löst ord blir *innehåller*.
 - **Varför flyttas inte mejlen?:** läsbar diagnos per regel som förklarar om mejlen väntar på att bli lästa, redan ligger i målmappen, redan är hanterade eller inte matchar villkoren – med exempelrader och påminnelse om Testläge/paus.

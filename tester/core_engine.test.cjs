@@ -3,7 +3,7 @@ const C=require('../addon/core.js'),Engine=require('../addon/engine.js');
 const base=()=>({id:'rule1',name:'Fakturor',enabled:true,source:'inbox',target:'archive',match:'all',conditions:[{field:'domain',op:'equals',value:'example.se'},{field:'subject',op:'contains',value:'Faktura'}]});
 const msg=(id=1)=>({id,read:true,folder:{id:'inbox',accountId:'a'},author:'Anna <anna@example.se>',subject:'Faktura 1042',date:new Date('2026-10-08T08:00:00Z'),size:123,headerMessageId:'fake-'+id+'@example.invalid'});
 function fixture(options={}){
- const cfg={...C.defaults(),dryRun:options.dryRun??false,moveMode:options.moveMode||'read',rules:[base()]};let now=Date.UTC(2026,9,8,12);const messages=new Map([[1,msg()]]),shown=new Set(),logs=[],saved=[];let engine;const notifications=[],debugs=[];
+ const cfg={...C.defaults(),dryRun:options.dryRun??false,moveMode:options.moveMode||'read',rules:[base()]};let now=Date.UTC(2026,9,8,12);const messages=new Map([[1,msg()]]),shown=new Set(),logs=[],saved=[];let engine;const notifications=[],notifyArgs=[],debugs=[];
  const folderNode=(id,sub)=>({id,accountId:'a',name:id,specialUse:[],...(sub?{subFolders:sub}:{})});
  const api={tabs:{query:async()=>[{id:4,type:'mail'},{id:8,type:'messageDisplay'},{id:9,type:'content'}]},messageDisplay:{getDisplayedMessages:async id=>[...shown].filter(x=>id===4||options.otherTab&&id===8).map(id=>({id}))},
  accounts:{list:async()=>[{id:'a',rootFolder:{id:'root',accountId:'a',isRoot:true,subFolders:[folderNode('inbox'),folderNode('archive'),folderNode('other',[folderNode('sub1')]),folderNode('brt'),folderNode('third')]}},{id:'b',rootFolder:{id:'rootb',accountId:'b',isRoot:true,subFolders:[folderNode('binbox')]}}]},
@@ -36,8 +36,8 @@ function fixture(options={}){
  if(options.folderInfo)api.folders.getFolderInfo=async id=>{const list=[...messages.values()].filter(m=>m.folder?.id===id);return {totalMessageCount:list.length,unreadMessageCount:list.filter(m=>m.read!==true).length};};
  if(options.folderInfoReject)api.folders.getFolderInfo=async()=>{throw Error('folder info offline');};
  if(options.folderInfo){const queryInfo=api.folders.getFolderInfo;const queries=[];api.infoCalls=queries;api.folders.getFolderInfo=async id=>{queries.push(id);return queryInfo(id);};}
- engine=new Engine(api,cfg,{now:()=>now,ackTimeout:5,log:(n,c)=>logs.push(C.event(n,c,now)),notify:n=>notifications.push(n),debug:t=>debugs.push(t),persist:async()=>{if(options.persistReject)throw Error('disk SECRET');saved.push(structuredClone(engine.recordList()));}});
- return {e:engine,api,messages,shown,logs,saved,notifications,debugs,advance:(ms=2100)=>now+=ms,ready:async()=>{await engine.enqueue(messages.get(1));await engine.tick();now+=2100;await engine.tick();}};
+ engine=new Engine(api,cfg,{now:()=>now,ackTimeout:5,log:(n,c)=>logs.push(C.event(n,c,now)),notify:(...a)=>{notifications.push(a[0]);notifyArgs.push(a);},debug:t=>debugs.push(t),persist:async()=>{if(options.persistReject)throw Error('disk SECRET');saved.push(structuredClone(engine.recordList()));}});
+ return {e:engine,api,messages,shown,logs,saved,notifications,notifyArgs,debugs,advance:(ms=2100)=>now+=ms,ready:async()=>{await engine.enqueue(messages.get(1));await engine.tick();now+=2100;await engine.tick();}};
 }
 for(const [author,expected] of [['Anna <Anna@EXAMPLE.SE>','anna@example.se'],['anna@example.se','anna@example.se'],['"Anna, A" <a@example.se>','a@example.se'],['A <a@example.se>, B <b@example.se>',''],['"space name"@example.se',''],['not an address',''],['evil <a@example.se> <b@evil.invalid>','']])test('conservative sender '+author,()=>assert.equal(C.email(author),expected));
 test('IDN domains normalized',()=>assert.equal(C.domain('räksmörgås.se'),'xn--rksmrgs-5wao1o.se'));
@@ -116,6 +116,19 @@ test('catchUp paused rejected',async()=>{const f=fixture();f.e.config.paused=tru
 
 test('direct mode sweep queues unread matching mail with notify',async()=>{const f=fixture({moveMode:'direct'});f.messages.clear();f.messages.set(5,{...msg(5),read:false});const r=await f.e.catchUp('rule1');assert.equal(r.queued,1);assert.equal(f.e.recordList()[0].notify,true);});
 test('direct move opens notify window after confirmed move',async()=>{const f=fixture({moveMode:'direct'});f.messages.clear();f.messages.set(5,{...msg(5),read:false});await f.e.catchUp('rule1');await f.e.tick();f.advance();await f.e.tick();assert.equal(f.e.stats.moved,1);assert.deepEqual(f.notifications,[1005]);});
+test('notisen får alltid målmappen och Message-ID så öppnaren kan vänta in mejlet',async()=>{
+ const f=fixture({moveMode:'direct'});
+ f.messages.clear();
+ f.messages.set(5,{...msg(5),headerMessageId:'<nyckel@x>',read:false});
+ await f.e.catchUp('rule1');
+ await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.e.stats.moved,1);
+ assert.equal(f.notifyArgs.length,1);
+ assert.equal(f.notifyArgs[0][0],1005,'id:t i målmappen');
+ assert.equal(f.notifyArgs[0][1],'rule1');
+ assert.equal(f.notifyArgs[0][2],'archive','målmappen följer med');
+ assert.equal(f.notifyArgs[0][3],'<nyckel@x>','Message-ID följer med');
+});
 test('direct mode moves immediately even if message is displayed',async()=>{const f=fixture({moveMode:'direct'});f.shown.add(1);await f.e.enqueue(msg());await f.e.tick();assert.equal(f.e.stats.moved,1);});
 test('read mode sweep skips unread',async()=>{const f=fixture();f.messages.clear();f.messages.set(5,{...msg(5),read:false});const r=await f.e.catchUp('rule1');assert.equal(r.queued,0);});
 test('MV2 sweep uses unread false instead of invalid read query field',async()=>{const f=fixture();const queries=[],query=f.api.messages.query;f.api.messages.query=async q=>{queries.push({...q});return query(q);};await f.e.catchUp('rule1');assert.ok(queries.length);assert.ok(queries.every(q=>q.unread===false&&!('read' in q)));});

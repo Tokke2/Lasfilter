@@ -33,7 +33,14 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 
 ## Snabbare vägar till en färdig regel
 
-- **⚡ Snabbskapa nytt filter:** lägg till flera olika filter direkt ovanför regellistan utan att skriva över en befintlig regel. Kryssrutorna *Flytta olästa mejl* och *Öppna i nytt fönster* styr regeln direkt.
+- **⚡ Skapa regel på tio sekunder (snabbregeln):** den enklaste vägen till en färdig regel, ovanför regellistan.
+  - **Klickbara förslag:** SortBro läser Inkorgen en gång och visar *Avsändare i Inkorgen* och *Ord i ämnesrader* med antal mejl. Ett klick fyller fälten – du behöver aldrig kunna en exakt adress. Återkommande avsändare och ord som redan har en regel föreslås aldrig.
+  - **Live-räkning:** så snart fältet har ett värde står det i klartext hur många mejl i Inkorgen regeln träffar **just nu** – *"3 mejl i Inkorgen matchar just nu"* – eller *"Inga mejl matchar just nu"* om något är felstavat. Ingenting sparas förrän du klickar.
+  - **Klarspråk i stället för villkor:** raden under målmappen skriver ut exakt vad regeln gör: *"Flytta mejl från klarna.se till Fakturor"*. Skriver du ett löst ord (t.ex. `klarna`) blir villkoret *avsändaren innehåller klarna*; skriver du en full domän (`klarna.se`) eller adress (`order@klarna.se`) blir det en exakt träff. Ämnesord blir alltid *innehåller*.
+  - **Ett klick till färdig regel:** **＋ Skapa regel** sparar regeln (och visar den i editorn), **⚡ Lägg till och flytta nu** sparar och kör den direkt mot Inkorgen.
+  - **＋ Ny mapp** föreslår ett mappnamn ur det du skrev: `klarna.se` → *Klarna*, `wordpress@limoeurope.com` → *Limoeurope*.
+  - Kryssrutorna *Flytta olästa mejl* (förkryssad) och *Öppna i nytt fönster* styr regeln direkt; årsmappar förblir avstängda som standard.
+  - Allt sker lokalt: förslagen bygger bara på avsändare, ämnesrader och antal – ingen mejltext lämnar datorn, och ingenting skapas utan ditt klick.
 - **✨ Föreslå regler från Inkorgen:** SortBro tittar lokalt i Inkorgen efter avsändardomäner som återkommer och visar dem som *förslag*. Inget skapas förrän du själv väljer målmapp och trycker **✓ Godkänn**. Avsändare som redan täcks av en aktiv regel föreslås aldrig.
 - **1-klicksmallar:** *Fakturor & Kvitton*, *Order & Leverans*, *Nyhetsbrev*, *System & Notiser* och *Bokföring* fyller i regelnamn och villkor. Om en mapp med passande namn finns väljs den automatiskt som mål; annars väljer du målmapp och sparar.
 - **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.
@@ -143,6 +150,7 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Valfria årsmappar:** årsarkivering är inget förval utan en kryssruta per regel (avstängd som standard). Kryssar du i den hamnar tidigare års mejl i `Arkiv/2025` – annars flyttas mejlen till den målmapp du valt.
 - **Olästa mejl flyttas när rutan är kryssad:** *Flytta även olästa mejl direkt* gör att matchande olästa mejl flyttas med en gång i alla mappar, i stället för att vänta tills de är lästa.
 - **Kör alla regler nu:** en knapp sveper igenom alla aktiva regler direkt och rapporterar granskade mejl, cachade mappar, matchningar och köade flyttar.
+- **Snabbregeln (⚡ Skapa regel på tio sekunder):** klickbara förslag från Inkorgen (avsändare och ämnesord med antal), live-räkning av hur många mejl regeln träffar, en mening i klarspråk om vad regeln gör och två knappar – *Skapa regel* eller *Lägg till och flytta nu*. Villkoret räknas ut automatiskt: full domän/adress blir exakt träff, ett löst ord blir *innehåller*.
 - **Varför flyttas inte mejlen?:** läsbar diagnos per regel som förklarar om mejlen väntar på att bli lästa, redan ligger i målmappen, redan är hanterade eller inte matchar villkoren – med exempelrader och påminnelse om Testläge/paus.
 - **Automatiskt varje timme:** standardintervallet är 60 minuter och körs vid sidan av den händelsestyrda bevakningen av inkommande mejl. Statusraden visar nästa automatiska körning.
 - **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.

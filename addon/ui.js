@@ -79,9 +79,25 @@ const I18N={
   rulesSub:'Lägg upp hur många regler du vill. Varje regel visar villkor, oläst/läst-val och målmapp.',
   newFromSelectedBtn:'✉ Ny från markerat mejl',
   newRuleBtn:'＋ Ny tom regel',
-  quickRuleTitle:'⚡ Snabbskapa nytt filter (lägg till flera olika direkt)',
+  quickRuleTitle:'⚡ Skapa regel på tio sekunder',
+  quickRuleHelp:'Klicka på en avsändare eller ett ämnesord – eller skriv själv. SortBro säger till hur många mejl i Inkorgen regeln träffar innan du sparar.',
+  quickHintsScan:'↻ Läs Inkorgen igen',
+  quickHintsSenders:'Avsändare i Inkorgen',
+  quickHintsWords:'Ord i ämnesrader',
+  quickHintsEmpty:'Inget att föreslå just nu – skriv en domän, en adress eller ett ord i fältet.',
+  quickMatch:'{n} mejl i Inkorgen matchar just nu',
+  quickMatchZero:'Inga mejl matchar just nu – kontrollera stavningen eller klicka på ett förslag ovan.',
+  quickMatchCounting:'Räknar i Inkorgen…',
+  quickSentence:'Flytta {what} till {target}',
+  quickPickTarget:'välj målmapp',
+  quickWhatDomain:'mejl från {v}',
+  quickWhatSender:'mejl där avsändaren innehåller {v}',
+  quickWhatSenderExact:'mejl från {v}',
+  quickWhatSubject:'mejl med "{v}" i ämnet',
+  quickAddRunBtn:'⚡ Lägg till och flytta nu',
+  quickRunToast:'Regeln skapades och kördes: {n} mejl granskade, {q} flyttade.',
   quickFetchBtn:'✉ Hämta från markerat mejl',
-  quickAddBtn:'＋ Lägg till filter',
+  quickAddBtn:'＋ Skapa regel',
   quickValuePlaceholder:'t.ex. fortnox.se, klarna.se eller Faktura…',
   ruleSearchPlaceholder:'Sök bland dina regler…',
   exportBtn:'↓ Exportera regler (.json)',
@@ -274,7 +290,7 @@ const I18N={
   defaultSenderFallback:'avsändaren',
   copySuffix:' (kopia)',
   toastFromSelected:'Hämtat från markerat mejl! Välj nu målmappen och tryck Spara.',
-  toastQuickAdded:'Nytt filter tillagt! Skriv eller hämta nästa mejl för att lägga till fler.',
+  toastQuickAdded:'Regeln skapades och ligger i listan. Kör den med ▶ Kör alla regler nu, eller lägg till nästa direkt.',
   testReasonNoMatch:'Villkoren matchar inte det markerade mejlet.',
   testReasonDisabled:'Villkoren matchar, men regeln är avstängd.',
   testReasonUnread:'Villkoren matchar, men mejlet är oläst. Ingen flytt får ske.',
@@ -571,9 +587,25 @@ const I18N={
   rulesSub:'Create as many rules as you like. Each row shows conditions, read/unread mode and target folder.',
   newFromSelectedBtn:'✉ New from selected email',
   newRuleBtn:'＋ New blank rule',
-  quickRuleTitle:'⚡ Quick-create filter (add multiple rules directly)',
+  quickRuleTitle:'⚡ Create a rule in ten seconds',
+  quickRuleHelp:'Click a sender or a subject word – or type it yourself. SortBro tells you how many Inbox emails the rule hits before you save.',
+  quickHintsScan:'↻ Read the Inbox again',
+  quickHintsSenders:'Senders in the Inbox',
+  quickHintsWords:'Words in subject lines',
+  quickHintsEmpty:'Nothing to suggest right now – type a domain, an address or a word in the field.',
+  quickMatch:'{n} emails in the Inbox match right now',
+  quickMatchZero:'No emails match right now – check the spelling or click a suggestion above.',
+  quickMatchCounting:'Counting in the Inbox…',
+  quickSentence:'Move {what} to {target}',
+  quickPickTarget:'choose a target folder',
+  quickWhatDomain:'emails from {v}',
+  quickWhatSender:'emails where the sender contains {v}',
+  quickWhatSenderExact:'emails from {v}',
+  quickWhatSubject:'emails with "{v}" in the subject',
+  quickAddRunBtn:'⚡ Add and move now',
+  quickRunToast:'Rule created and run: {n} emails checked, {q} moved.',
   quickFetchBtn:'✉ Fetch from selected email',
-  quickAddBtn:'＋ Add filter',
+  quickAddBtn:'＋ Create rule',
   quickValuePlaceholder:'e.g. fortnox.se, klarna.se or Invoice…',
   ruleSearchPlaceholder:'Search your rules…',
   exportBtn:'↓ Export rules (.json)',
@@ -766,7 +798,7 @@ const I18N={
   defaultSenderFallback:'sender',
   copySuffix:' (copy)',
   toastFromSelected:'Fetched from selected email! Now choose a target folder and click Save.',
-  toastQuickAdded:'New filter added! Enter or fetch your next email to add more.',
+  toastQuickAdded:'The rule was created and is in the list. Run it with ▶ Run all rules now, or add another right away.',
   testReasonNoMatch:'Conditions do not match the selected email.',
   testReasonDisabled:'Conditions match, but this rule is disabled.',
   testReasonUnread:'Conditions match, but the email is unread and this rule only moves read emails.',
@@ -1219,12 +1251,12 @@ function applyTemplate(key){
 }
 
 /* ===== ＋ Ny mapp ===== */
-function openFolderModal(presetAccountId){
+function openFolderModal(presetAccountId,suggestedName=''){
  const modal=$('folderModal');if(!modal)return;
  const parent=$('folderParent');
  if(parent)selectOptions(parent,folders,T('newFolderRoot'),'');
  if(!$('source')?.value&&presetAccountId)accountOptions(presetAccountId);
- if($('folderName'))$('folderName').value='';
+ if($('folderName'))$('folderName').value=(suggestedName||'').slice(0,64);
  modal.hidden=false;
  $('folderName')?.focus();
 }
@@ -1295,7 +1327,7 @@ function renderStatus(next){
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
- renderRules();renderActivity();renderBackups();renderSuggestions();
+ renderRules();renderActivity();renderBackups();renderSuggestions();quickHintsOnce();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
@@ -1707,40 +1739,144 @@ if($('quickFetchBtn'))handle('quickFetchBtn','click',async()=>{
  toast(T('toastFromSelected'));
 });
 
-async function createQuickRule(){
+/* ===== ⚡ Snabbregel: klickbara förslag, live-räkning och ett klick till färdig regel ===== */
+let quickHints=null,quickHintsAt=0,quickHintsLoading=false,quickHintsTried=false,quickPreviewTimer=null,quickPreviewSeq=0;
+
+function quickWords(cond){
+ if(!cond)return '';
+ const v=String(cond.value||'');
+ if(cond.field==='domain')return T('quickWhatDomain').replace('{v}',v);
+ if(cond.field==='subject')return T('quickWhatSubject').replace('{v}',v);
+ return T(cond.op==='equals'?'quickWhatSenderExact':'quickWhatSender').replace('{v}',v);
+}
+function quickTargetLabel(){
+ const id=$('quickTarget')?.value||'';
+ return id?(folders.find(f=>f.id===id)?.name||label(id)):'';
+}
+/* Förslag på mappnamn ur det man skrev: klarna.se -> Klarna, wordpress@limoeurope.com -> Limoeurope. */
+function quickFolderSuggestion(){
+ const raw=($('quickValue')?.value||'').trim();
+ if(!raw)return '';
+ const word=(raw.includes('@')?raw.split('@')[1]||'':raw);
+ const first=word.split(/[.\-_/\s]+/).filter(Boolean)[0]||word;
+ const clean=first.replace(/[^A-Za-zÅÄÖåäö0-9]/g,'');
+ if(!clean)return '';
+ return (clean.charAt(0).toLocaleUpperCase('sv-SE')+clean.slice(1)).slice(0,64);
+}
+function renderQuickHints(){
+ const box=$('quickChips');if(!box)return;
+ box.replaceChildren();
+ if(!quickHints)return;
+ const senders=quickHints.senders||[],words=quickHints.words||[];
+ if(!senders.length&&!words.length){box.append(el('p','quick-hint-empty',T('quickHintsEmpty')));return;}
+ const group=(title,items,kind)=>{
+  if(!items.length)return;
+  const wrap=el('div','quick-chip-group');
+  wrap.append(el('span','quick-chip-title',title));
+  const row=el('div','quick-chip-row');
+  for(const it of items){
+   const value=kind==='word'?(it.word||''):(it.domain||'');
+   if(!value)continue;
+   const chip=el('button','quick-chip',value);chip.type='button';
+   if(it.subject)chip.title=it.subject;
+   chip.append(el('span','quick-chip-count',String(it.count||0)));
+   chip.addEventListener('click',()=>{
+    if($('quickField'))$('quickField').value=kind==='word'?'subject':'domain';
+    if($('quickValue'))$('quickValue').value=value;
+    updateQuickPreview().catch(()=>{});
+    $('quickTarget')?.focus();
+   });
+   row.append(chip);
+  }
+  if(row.children.length)wrap.append(row);
+  return wrap;
+ };
+ const s=group(T('quickHintsSenders'),senders,'sender');
+ const w=group(T('quickHintsWords'),words,'word');
+ if(s)box.append(s);
+ if(w)box.append(w);
+}
+async function loadQuickHints(force=false){
+ if(quickHintsLoading)return quickHints;
+ if(!force&&quickHints&&Date.now()-quickHintsAt<120000)return quickHints;
+ quickHintsLoading=true;
+ const btn=$('quickHintsBtn');if(btn)btn.disabled=true;
+ try{
+  quickHints=await rpc('inboxHints');
+  quickHintsAt=Date.now();
+  renderQuickHints();
+ }catch(err){
+  if(force)alertError(err);
+ }finally{
+  quickHintsLoading=false;if(btn)btn.disabled=false;
+ }
+ return quickHints;
+}
+/* Körs en gång efter första statusrenderingen – inte vid varje uppdatering. */
+function quickHintsOnce(){
+ if(quickHintsTried)return;
+ quickHintsTried=true;
+ loadQuickHints().catch(()=>{});
+}
+async function updateQuickPreview(){
+ const raw=($('quickValue')?.value||'').trim();
+ const span=$('quickCount'),sentence=$('quickSentence');
+ if(!raw){
+  if(span){span.hidden=true;span.textContent='';}
+  if(sentence)sentence.textContent='';
+  return;
+ }
+ let cond=null;
+ try{cond=C.choiceCondition({field:$('quickField')?.value||'domain',value:raw});}catch{cond=null;}
+ if(!cond){if(sentence)sentence.textContent='';return;}
+ if(sentence)sentence.textContent=T('quickSentence').replace('{what}',quickWords(cond)).replace('{target}',quickTargetLabel()||T('quickPickTarget'));
+ if(span){span.hidden=false;span.className='quick-count';span.textContent=T('quickMatchCounting');}
+ const seq=++quickPreviewSeq;
+ try{
+  const r=await rpc('quickPreview',{field:$('quickField')?.value||'domain',value:raw});
+  if(seq!==quickPreviewSeq)return;
+  if(span){
+   span.textContent=r.matches?T('quickMatch').replace('{n}',r.matches):T('quickMatchZero');
+   span.className='quick-count'+(r.matches?' quick-count-ok':' quick-count-zero');
+  }
+ }catch{
+  if(span)span.hidden=true;
+ }
+}
+function scheduleQuickPreview(){clearTimeout(quickPreviewTimer);quickPreviewTimer=setTimeout(()=>updateQuickPreview().catch(()=>{}),320);}
+
+async function createQuickRule({runNow=false}={}){
  const field=$('quickField')?.value||'domain';
  const rawVal=($('quickValue')?.value||'').trim();
  const targetId=$('quickTarget')?.value||'';
  if(!rawVal){$('quickValue')?.focus();throw new C.RuleError('bad_value');}
  if(!targetId){$('quickTarget')?.focus();throw new C.RuleError('choose_target');}
- const targetFolder=folders.find(f=>f.id===targetId)||folders[0];
- const accountId=targetFolder?.accountId||$('source')?.value||accounts()[0]?.id||'';
- const anchorFolder=folders.find(f=>f.accountId===accountId&&f.id!==targetId)||folders.find(f=>f.accountId===accountId)||targetFolder;
- const op=field==='domain'?'equals':field==='sender'?(rawVal.includes('@')?'equals':'contains'):'contains';
- const ruleName=((field==='subject'?T('defaultSubjectPrefix'):T('defaultRulePrefix'))+rawVal).slice(0,100);
- const moveUnread=$('quickMoveUnread')?$('quickMoveUnread').checked:true;
- const openWin=$('quickOpenWindow')?$('quickOpenWindow').checked:false;
- const newRule=C.validateRule({
-  id:crypto.randomUUID(),
-  name:ruleName,
-  enabled:true,
-  source:anchorFolder?.id||targetId,
-  sourceAccount:accountId,
-  scope:'account',
-  target:targetId,
-  match:'all',
-  readFilter:moveUnread?'both':'read',
-  unreadAction:openWin?'window':'keep',
-  conditions:[{field,op,value:rawVal}],
-  branches:[]
- });
- const rules=[...state.config.rules,newRule];
- const next=await rpc('saveRules',{rules,revision:editRevision});
- if($('quickValue'))$('quickValue').value='';
- dirty=false;renderStatus(next);loadRule(newRule.id);
- toast(T('toastQuickAdded'));
+ const button=runNow?$('quickAddRunBtn'):$('quickAddBtn');
+ if(button)button.disabled=true;
+ try{
+  const res=await rpc('quickRule',{field,value:rawVal,target:targetId,sourceAccount:$('source')?.value||'',
+   moveUnread:$('quickMoveUnread')?.checked!==false,openWindow:$('quickOpenWindow')?.checked===true,revision:state.config.revision});
+  dirty=false;renderStatus(res.snapshot);loadRule(res.ruleId);
+  if($('quickValue'))$('quickValue').value='';
+  quickHints=null;
+  await updateQuickPreview();
+  await loadQuickHints(true);
+  if(runNow){
+   const r=await rpc('catchUp',{ruleId:res.ruleId});
+   renderStatus(await rpc('status'));
+   await loadQuickHints(true);
+   toast(T('quickRunToast').replace('{n}',r.scanned).replace('{q}',r.queued));
+  }else toast(T('toastQuickAdded'));
+ }finally{
+  if(button)button.disabled=false;
+ }
 }
-if($('quickAddBtn'))handle('quickAddBtn','click',createQuickRule);
+if($('quickAddBtn'))handle('quickAddBtn','click',()=>createQuickRule({runNow:false}));
+if($('quickAddRunBtn'))handle('quickAddRunBtn','click',()=>createQuickRule({runNow:true}));
+if($('quickHintsBtn'))handle('quickHintsBtn','click',()=>loadQuickHints(true));
+if($('quickValue'))$('quickValue').addEventListener('input',scheduleQuickPreview);
+if($('quickField'))$('quickField').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
+if($('quickTarget'))$('quickTarget').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
 if($('quickValue'))$('quickValue').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickAddBtn')?.click();}});
 handle('test','click',async()=>{
  const result=await rpc('testRule',{rule:draft()});
@@ -1963,7 +2099,7 @@ handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src
 for(const btn of document.querySelectorAll('#templateBar .template-btn'))btn.addEventListener('click',()=>applyTemplate(btn.dataset.template));
 if($('suggestRulesBtn'))handle('suggestRulesBtn','click',scanInbox);
 if($('newFolderBtn'))handle('newFolderBtn','click',()=>openFolderModal($('source')?.value||''));
-if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',()=>openFolderModal(''));
+if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',()=>openFolderModal($('source')?.value||'',quickFolderSuggestion()));
 if($('folderCancelBtn'))handle('folderCancelBtn','click',()=>{$('folderModal').hidden=true;});
 if($('folderCreateBtn'))handle('folderCreateBtn','click',createFolderFromModal);
 if($('folderName'))$('folderName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();createFolderFromModal().catch(alertError);}});

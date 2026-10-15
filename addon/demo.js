@@ -33,6 +33,36 @@ globalThis.LasDemo=(()=>{
     {domain:'fortnox.se',count:4,subject:'Faktura 1042',sender:'faktura@fortnox.se'},
     {domain:'klarna.se',count:3,subject:'Order bekräftad',sender:'order@klarna.se'}
    ].filter(s=>!state.config.rules.some(r=>r.enabled&&r.conditions.some(c=>c.field==='domain'&&c.value===s.domain)));break;
+   /* Snabbregeln: samma svar som bakgrunden, med fiktiva men rimliga siffror. */
+   case 'inboxHints':{
+    const taken=state.config.rules.filter(r=>r.enabled).flatMap(r=>(r.conditions||[]).map(c=>String(c.value||'').toLowerCase()));
+    data={senders:[
+      {domain:'fortnox.se',count:4,subject:'Faktura 1042',sender:'faktura@fortnox.se'},
+      {domain:'klarna.se',count:3,subject:'Order bekräftad',sender:'order@klarna.se'},
+      {domain:'limoeurope.com',count:2,subject:'Wordfence activity for 12 oct, 2026',sender:'wordpress@limoeurope.com'}
+     ].filter(x=>!taken.includes(x.domain)),
+     words:[
+      {word:'wordfence',count:3,subject:'Wordfence activity for 12 oct, 2026 on limoeurope.com'},
+      {word:'faktura',count:5,subject:'Faktura 1042'},
+      {word:'orderbekräftelse',count:4,subject:'Orderbekräftelse 88213'}
+     ].filter(x=>!taken.some(v=>v.includes(x.word))),
+     inboxId:'demo-in',sourceAccount:'demo',scanned:37};break;
+   }
+   case 'quickPreview':{
+    const cond=LasCore.choiceCondition({field:m.field,value:m.value});
+    const v=String(cond.value||'').toLowerCase();
+    data={matches:v.includes('klarna')?3:v.includes('wordfence')?2:v.includes('faktura')?5:v.includes('order')?4:0,
+     scanned:37,condition:cond,inboxId:'demo-in',sourceAccount:'demo'};break;
+   }
+   case 'quickRule':{
+    const source=m.source||'demo-in';
+    if(!m.target||m.target===source)throw new LasCore.RuleError('choose_target');
+    const rule=LasCore.ruleFromChoice({name:m.name,field:m.field,value:m.value,target:m.target,source,
+     sourceAccount:m.sourceAccount||'demo',moveUnread:m.moveUnread!==false,openWindow:m.openWindow===true});
+    saveRules([...state.config.rules,rule]);
+    const folder=folders.find(f=>f.id===m.target)||{};
+    data={ruleId:rule.id,rule,condition:rule.conditions[0],target:{id:folder.id||m.target,name:folder.name||'',label:folder.label||''},snapshot:state};break;
+   }
    case 'diagnose':{
     const rule=LasCore.validateRule(m.rule),rows=state.config.rules.find(r=>r.id===rule.id);
     const first=(rule.conditions||[])[0]||{};

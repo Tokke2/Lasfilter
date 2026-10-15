@@ -134,28 +134,69 @@ App.createFolder=async(parentId,name)=>{
  return {id:folder?.id||'',name:folder?.name||clean,accountId:folder?.accountId||'',label:folder?.name||clean};
 };
 /* ✨ Föreslå regler från Inkorgen – endast lokala förslag, inget skapas här. */
-App.suggestRules=async()=>{
+/* Läser Inkorgen en gång och delar resultatet med alla snabbflöden (förslag, räkning, regler). */
+App.scanInbox=async({limit=400}={})=>{
  const accounts=await B.accounts.list(true),inboxes=[];
  for(const account of accounts){
   const folders=(account.rootFolder?.subFolders||[]).concat(account.folders||[]);
   const inbox=folders.find(f=>[...(f.specialUse||[]),f.type].includes('inbox'));
-  if(inbox&&C.usableFolder(inbox))inboxes.push(inbox);
+  if(inbox&&C.usableFolder(inbox))inboxes.push({inbox,accountId:account.id||inbox.accountId||''});
  }
- const collected=[];
- for(const inbox of inboxes.slice(0,5)){
+ const collected=[];let inboxId='',sourceAccount='';
+ for(const {inbox,accountId} of inboxes.slice(0,5)){
   let page=null;
   try{
-   page=await B.messages.query({folderId:inbox.id,unread:false});
+   page=await B.messages.query({folderId:inbox.id});
    for(;;){
     collected.push(...(page?.messages||[]));
-    if(!page?.id||collected.length>=400)break;
+    if(!page?.id||collected.length>=limit)break;
     page=await B.messages.continueList(page.id);
    }
   }catch{App.log('error',0,'forslag_inkorg_misslyckades');}
   finally{if(page?.id)await B.messages.abortList(page.id).catch(()=>{});}
-  if(collected.length>=400)break;
+  if(!inboxId){inboxId=inbox.id;sourceAccount=accountId;}
+  if(collected.length>=limit)break;
  }
- return C.suggestFrom(collected,{rules:App.engine?.config.rules||[],limit:8,minCount:2});
+ return {messages:collected,inboxId,sourceAccount,scanned:collected.length};
+};
+App.suggestRules=async()=>{
+ const {messages}=await App.scanInbox();
+ return C.suggestFrom(messages,{rules:App.engine?.config.rules||[],limit:8,minCount:2});
+};
+/* Klickbara förslag: återkommande avsändare och vanliga ämnesord i Inkorgen. */
+App.inboxHints=async()=>{
+ const scan=await App.scanInbox();
+ const hints=C.inboxHints(scan.messages,{rules:App.engine?.config.rules||[],limit:8,wordLimit:6,minCount:2,wordMinCount:3});
+ return {...hints,inboxId:scan.inboxId,sourceAccount:scan.sourceAccount,scanned:scan.scanned};
+};
+/* "Så många mejl träffar regeln just nu" – räknas mot Inkorgen utan att spara något. */
+App.quickPreview=async(msg)=>{
+ const scan=await App.scanInbox();
+ const rule=C.choiceRule({field:msg.field,value:msg.value});
+ return {matches:C.countMatches(scan.messages,rule),scanned:scan.scanned,condition:rule.conditions[0],inboxId:scan.inboxId,sourceAccount:scan.sourceAccount};
+};
+/* Skapar en färdig regel av ett enda val: avsändare/domän/ord + målmapp. */
+App.quickRule=async(msg)=>{
+ const e=App.engine;
+ const list=await App.folderList();
+ const target=list.find(f=>f.id===msg.target);
+ if(!target)throw new C.RuleError('choose_target');
+ let sourceAccount=msg.sourceAccount||target.accountId||'';
+ let source=msg.source||'';
+ if(!source){
+  const inbox=list.find(f=>f.accountId===sourceAccount&&(C.usableFolder(f))&&([...(f.specialUse||[]),f.type].includes('inbox')||/^(inkorg|inbox)$/i.test(f.name||'')));
+  source=inbox?.id||'';
+ }
+ if(!source){const anyInbox=list.find(f=>[...(f.specialUse||[]),f.type].includes('inbox'));if(anyInbox){source=anyInbox.id;sourceAccount=anyInbox.accountId||sourceAccount;}}
+ if(!source||source===msg.target)throw new C.RuleError('choose_source');
+ const rule=C.ruleFromChoice({name:msg.name,field:msg.field,value:msg.value,target:msg.target,source,sourceAccount,
+  moveUnread:msg.moveUnread!==false,openWindow:msg.openWindow===true});
+ await App.checkRules([rule]);
+ const rules=[...e.config.rules,rule];
+ await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+ App.log('rules_saved',rules.length);
+ App.log('debug',0,'snabbregel skapad: '+C.choiceSummary(rule.conditions[0])+' -> '+(target.name||target.label||'målmapp'));
+ return {ruleId:rule.id,rule,condition:rule.conditions[0],target:{id:target.id,name:target.name||'',label:target.label||''},snapshot:App.snapshot()};
 };
 App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
  if(!Number.isSafeInteger(id)&&targetFolderId&&headerMessageId){
@@ -282,6 +323,12 @@ App.handle=async msg=>{
   case 'folders':return App.folderList();
   case 'createFolder':return App.createFolder(msg.parentId,msg.name);
   case 'suggestRules':return App.suggestRules();
+  case 'inboxHints':return App.inboxHints();
+  case 'quickPreview':return App.quickPreview(msg);
+  case 'quickRule':return App.mutate(async()=>{
+   App.checkRevision(msg.revision);
+   return App.quickRule(msg);
+  });
   case 'pendingPrefill':return App.prefill;
   case 'prefillConsumed':{App.prefill=null;return true;}
   case 'selected':{

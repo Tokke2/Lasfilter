@@ -2203,3 +2203,90 @@ hr {
 .diagnose-any .button {
   margin-top: 6px;
 }
+
+/* ⚡ Snabbregeln: klickbara förslag och live-räkning */
+.quick-rule-actions {
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quick-chips {
+  margin: 4px 0 2px;
+}
+
+.quick-chip-group {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+
+.quick-chip-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  min-width: 96px;
+}
+
+.quick-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 240px;
+}
+
+.quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.quick-chip:hover,
+.quick-chip:focus-visible {
+  border-color: var(--accent);
+}
+
+.quick-chip-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.quick-hint-empty {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin: 4px 0;
+}
+
+.quick-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.quick-count-ok {
+  color: #1f7a4d;
+  font-weight: 600;
+}
+
+.quick-count-zero {
+  color: #ac3434;
+  font-weight: 600;
+}
+
+.quick-sentence {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 6px 0 2px;
+}

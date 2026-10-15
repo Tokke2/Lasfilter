@@ -138,9 +138,14 @@
             </div>
             <div id="quickRuleBox" class="quick-rule-box">
               <div class="quick-rule-head">
-                <strong data-i18n="quickRuleTitle">⚡ Snabbskapa nytt filter (lägg till flera olika direkt)</strong>
-                <button id="quickFetchBtn" type="button" class="text-button" data-i18n="quickFetchBtn">✉ Hämta från markerat mejl</button>
+                <strong data-i18n="quickRuleTitle">⚡ Skapa regel på tio sekunder</strong>
+                <span class="quick-rule-actions">
+                  <button id="quickHintsBtn" type="button" class="text-button" data-i18n="quickHintsScan">↻ Läs Inkorgen igen</button>
+                  <button id="quickFetchBtn" type="button" class="text-button" data-i18n="quickFetchBtn">✉ Hämta från markerat mejl</button>
+                </span>
               </div>
+              <p class="simple-help" data-i18n="quickRuleHelp">Klicka på en avsändare eller ett ämnesord – eller skriv själv. SortBro säger till hur många mejl i Inkorgen regeln träffar innan du sparar.</p>
+              <div id="quickChips" class="quick-chips"></div>
               <div class="quick-rule-row">
                 <select id="quickField" aria-label="Fält">
                   <option value="domain" data-i18n="optDomain">Avsändardomän</option>
@@ -148,11 +153,16 @@
                   <option value="subject" data-i18n="optSubject">Ämne</option>
                 </select>
                 <input id="quickValue" type="text" maxlength="256" placeholder="t.ex. fortnox.se, klarna.se eller Faktura…">
+                <span id="quickCount" class="quick-count" hidden></span>
               </div>
               <div class="quick-rule-row">
                 <select id="quickTarget" aria-label="Målmapp"><option value="">Välj målmapp…</option></select>
                 <button id="quickNewFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
+              </div>
+              <div id="quickSentence" class="quick-sentence"></div>
+              <div class="quick-rule-row">
                 <button id="quickAddBtn" type="button" class="button small primary" data-i18n="quickAddBtn">＋ Lägg till filter</button>
+                <button id="quickAddRunBtn" type="button" class="button small secondary" data-i18n="quickAddRunBtn">⚡ Lägg till och flytta nu</button>
               </div>
               <div class="quick-rule-checks">
                 <label class="rule-check-chip"><input id="quickMoveUnread" type="checkbox" checked> <span data-i18n="inlineMoveUnread">Flytta olästa mejl</span></label>

@@ -821,3 +821,88 @@ test('shouldOpenWindow suppresses popups during a batch sweep',()=>{
 
 
 
+/* ===== ⚡ Snabbregeln: ett val i stället för handskrivna villkor ===== */
+
+test('choiceCondition gör rätt villkor av det användaren pekar på',()=>{
+ assert.deepEqual(C.choiceCondition({field:'domain',value:'klarna.se'}),{field:'domain',op:'equals',value:'klarna.se'});
+ assert.deepEqual(C.choiceCondition({field:'domain',value:'klarna'}),{field:'sender',op:'contains',value:'klarna'});
+ assert.deepEqual(C.choiceCondition({field:'sender',value:'order@klarna.se'}),{field:'sender',op:'equals',value:'order@klarna.se'});
+ assert.deepEqual(C.choiceCondition({field:'sender',value:'klarna'}),{field:'sender',op:'contains',value:'klarna'});
+ assert.deepEqual(C.choiceCondition({field:'subject',value:'Faktura'}),{field:'subject',op:'contains',value:'Faktura'});
+ assert.deepEqual(C.choiceCondition({field:'subject',value:'  Faktura  '}),{field:'subject',op:'contains',value:'Faktura'},'blanksteg städas bort');
+ assert.deepEqual(C.choiceCondition({field:'nonsense',value:'x.se'}),{field:'domain',op:'equals',value:'x.se'},'okänt fält blir avsändardomän');
+ assert.throws(()=>C.choiceCondition({field:'domain',value:'   '}),e=>e.code==='bad_value');
+ assert.throws(()=>C.choiceCondition({field:'domain',value:''}),e=>e.code==='bad_value');
+});
+
+test('ruleFromChoice ger en komplett, giltig regel med förnuftiga standardval',()=>{
+ const rule=C.ruleFromChoice({field:'domain',value:'klarna.se',target:'fin',source:'inbox',sourceAccount:'a'});
+ assert.deepEqual(C.validateRule(rule),rule,'regeln klarar valideringen');
+ assert.equal(rule.enabled,true);
+ assert.equal(rule.scope,'account');
+ assert.equal(rule.match,'all');
+ assert.equal(rule.name,'klarna.se','namnet blir valet när inget annat anges');
+ assert.equal(rule.readFilter,'both','olästa mejl flyttas direkt som standard');
+ assert.equal(rule.unreadAction,'keep');
+ assert.equal(rule.yearFolders,false,'årsmappar är fortfarande avstängt som standard');
+ assert.ok(/^[a-zA-Z0-9_-]+$/.test(rule.id),'id:t är giltigt: '+rule.id);
+ const readOnly=C.ruleFromChoice({field:'subject',value:'Kvitto',target:'fin',source:'inbox',sourceAccount:'a',moveUnread:false,openWindow:true});
+ assert.equal(readOnly.readFilter,'read','omarkerad ruta väntar på läsning');
+ assert.equal(readOnly.unreadAction,'window');
+ assert.equal(readOnly.name,'Kvitto');
+ assert.throws(()=>C.ruleFromChoice({field:'domain',value:'x.se',target:'',source:'inbox',sourceAccount:'a'}),e=>e.code==='choose_target');
+ assert.throws(()=>C.ruleFromChoice({field:'domain',value:'x.se',target:'fin',source:'',sourceAccount:'a'}),e=>e.code==='choose_source');
+});
+
+test('countMatches räknar mejl, inte villkor',()=>{
+ const messages=[
+  {author:'Order <order@klarna.se>',subject:'Order bekräftad',folder:{id:'i'}},
+  {author:'Order <order@klarna.se>',subject:'Order skickad',folder:{id:'i'}},
+  {author:'Faktura <faktura@fortnox.se>',subject:'Faktura 1042',folder:{id:'i'}}];
+ assert.equal(C.countMatches(messages,C.choiceRule({field:'domain',value:'klarna.se'})),2);
+ assert.equal(C.countMatches(messages,C.choiceRule({field:'domain',value:'klarna'})),2,'löst ord i avsändaren fångar samma mejl');
+ assert.equal(C.countMatches(messages,C.choiceRule({field:'subject',value:'Order'})),2);
+ assert.equal(C.countMatches(messages,C.choiceRule({field:'domain',value:'finns-inte.se'})),0);
+ assert.equal(C.countMatches([],C.choiceRule({field:'domain',value:'klarna.se'})),0);
+ assert.equal(C.countMatches(messages,{conditions:[]}),0,'utan villkor räknas ingenting');
+});
+
+test('inboxHints föreslår återkommande avsändare och vanliga ämnesord',()=>{
+ const messages=[
+  {author:'Order <order@klarna.se>',subject:'Order bekräftad 88213',folder:{id:'i'}},
+  {author:'Order <order@klarna.se>',subject:'Din order har skickats',folder:{id:'i'}},
+  {author:'Order <order@klarna.se>',subject:'Order levererad',folder:{id:'i'}},
+  {author:'Faktura <faktura@fortnox.se>',subject:'Faktura 1042',folder:{id:'i'}}];
+ const hints=C.inboxHints(messages,{});
+ assert.deepEqual(hints.senders.map(x=>x.domain),['klarna.se'],'minst två mejl krävs för ett förslag');
+ assert.equal(hints.senders[0].count,3);
+ assert.equal(hints.senders[0].sender,'order@klarna.se');
+ assert.ok(!hints.words.some(w=>w.word==='klarna'),'avsändarens namn föreslås inte som ämnesord');
+ assert.deepEqual(hints.words.map(w=>w.word),['order'],'bara ord som återkommer');
+ assert.equal(hints.words[0].count,3);
+ assert.ok(typeof hints.words[0].subject==='string'&&hints.words[0].subject.length>0,'exempelämne följer med');
+});
+
+test('inboxHints föreslår inte sådant som redan har en regel',()=>{
+ const messages=[
+  {author:'Order <order@klarna.se>',subject:'Order bekräftad',folder:{id:'i'}},
+  {author:'Order <order@klarna.se>',subject:'Order skickad',folder:{id:'i'}},
+  {author:'Order <order@klarna.se>',subject:'Order levererad',folder:{id:'i'}}];
+ const rules=[
+  C.validateRule({id:'r1',name:'Klarna',enabled:true,source:'i',target:'t',match:'all',conditions:[{field:'domain',op:'equals',value:'klarna.se'}],branches:[]}),
+  C.validateRule({id:'r2',name:'Order',enabled:true,source:'i',target:'t2',match:'all',conditions:[{field:'subject',op:'contains',value:'Order'}],branches:[]})];
+ const hints=C.inboxHints(messages,{rules});
+ assert.deepEqual(hints.senders,[],'avsändaren har redan en regel');
+ assert.deepEqual(hints.words,[],'ämnesordet ingår redan i en regel');
+ const off=C.inboxHints(messages,{rules:rules.map(r=>({...r,enabled:false}))});
+ assert.equal(off.senders.length,1,'en avstängd regel blockerar inget förslag');
+ assert.equal(off.words.length,1,'en avstängd regel blockerar inget ämnesord');
+});
+
+test('suggestWords filtrerar bort stoppord och korta ord',()=>{
+ const messages=Array.from({length:4},(_,i)=>({author:`A <a${i}@exempel.se>`,subject:'Din nya faktura för dig och mig',folder:{id:'i'}}));
+ const words=C.inboxHints(messages,{wordMinCount:2}).words.map(w=>w.word);
+ assert.ok(words.includes('faktura'));
+ for(const stop of ['din','och','för','dig','nya'])assert.ok(!words.includes(stop),'stoppordet '+stop+' ska inte föreslås');
+ assert.ok(!words.includes('mig')||'mig'.length>=4,'för korta ord tas bort');
+});

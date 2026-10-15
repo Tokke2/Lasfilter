@@ -61,30 +61,51 @@ function clock(){
  }
  return api;
 }
-async function loadBackground(){
+async function loadBackground(api=stubApi()){
  const tick=clock();
+ const browser=api;
  const sandbox={console,JSON,Math,Number,String,Array,Object,Map,Set,WeakMap,Promise,Error,TypeError,RegExp,Symbol,Boolean,isNaN,parseInt,parseFloat,structuredClone,
   Date:tick.Date,setTimeout:tick.setTimeout,clearTimeout:tick.clearTimeout,setInterval:tick.setInterval,clearInterval:tick.clearInterval,
   LasCore:C,
   LasEngine:class{constructor(){this.config={};this.fault='';this.pending=new Map();}stop(){}},
-  browser:stubApi()};
+  browser};
  sandbox.globalThis=sandbox;
  const source=fs.readFileSync(path.join(ROOT,'addon','background.js'),'utf8')+'\nglobalThis.__app=App;';
  vm.runInNewContext(source,sandbox,{filename:'background.js'});
  const app=sandbox.__app;
  await app.ready.catch(()=>{}); /* låt startsvepet bli klart innan testet tar över motorn */
- return {app,tick};
+ return {app,tick,api:browser};
 }
 /* Fejkad motor motsvarande den riktiga motorns kontrakt. */
 function fakeEngine(app,over={}){
- const engine={enabled:()=>true,fault:'',pending:new Map(),sweeping:0,lastSweep:null,
-  config:{paused:false,hourly:true,sweepMinutes:60,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0},
+ const engine={enabled:()=>true,fault:'',pending:new Map(),sweeping:0,lastSweep:null,hold:false,epoch:0,
+  inflight:new Map(),stats:{},logs:[],backups:[],
+  config:{paused:false,hourly:true,sweepMinutes:60,moveMode:'read',newInboxDirect:true,openWindow:true,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0},
   sweepAll:async()=>({scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0}),
-  tick:async()=>{},debug(){},stop(code){engine.fault=code;},...over};
+  tick:async()=>{},debug(){},stop(code){engine.fault=code;},
+  clearPending:async()=>{},invalidateFolders(){},recordList:()=>[],blocked:()=>0,validateRuleFolders:async()=>{},...over};
  app.engine=engine;
  return engine;
 }
 const errorLogs=app=>app.logs.filter(l=>l.event==='error');
+/* Ett konto med Inkorg och en målmapp, plus mejl som liknar användarens vardag. */
+function inboxAccount(api){
+ api.accounts.list=async()=>[{
+  id:'a',name:'Testkonto',
+  rootFolder:{id:'root',accountId:'a',name:'',specialUse:[],subFolders:[
+   {id:'inbox',accountId:'a',name:'Inkorg',specialUse:['inbox'],subFolders:[]},
+   {id:'fin',accountId:'a',name:'Fakturor',specialUse:[],subFolders:[]}]}}];
+ api.messages.query=async q=>({id:null,messages:[
+  {id:1,author:'Order <order@klarna.se>',subject:'Order bekräftad',folder:{id:q.folderId,accountId:'a'},read:true},
+  {id:2,author:'Order <order@klarna.se>',subject:'Order skickad',folder:{id:q.folderId,accountId:'a'},read:true},
+  {id:3,author:'Order <order@klarna.se>',subject:'Order levererad',folder:{id:q.folderId,accountId:'a'},read:true},
+  {id:4,author:'Faktura <faktura@fortnox.se>',subject:'Faktura 1042',folder:{id:q.folderId,accountId:'a'},read:true}]});
+}
+function fakeEngineWithRules(app,over={}){
+ /* Fullt giltig konfiguration – App.save validerar den (C.config). */
+ return fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[]},...over});
+}
 
 test('pausad bevakning kör ingenting och larmar inte i loggen',async()=>{
  const {app,tick}=await loadBackground();
@@ -130,6 +151,66 @@ test('knappen Kör alla regler nu tvingar en full genomsökning',async()=>{
  assert.equal(calls[0]?.force,true,'knappen ska läsa om allt, inte lita på cachen');
  await tick.settle(app.autoSweep());
  assert.equal(calls[calls.length-1]?.force,false,'det tidsstyrda svepet får använda cachen');
+});
+
+test('Inkorgen skannas en gång och ger både avsändare och ämnesord',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ fakeEngineWithRules(app);
+ const scan=await app.scanInbox();
+ assert.equal(scan.inboxId,'inbox');
+ assert.equal(scan.sourceAccount,'a');
+ assert.equal(scan.scanned,4);
+ const hints=await app.inboxHints();
+ assert.deepEqual(hints.senders.map(x=>x.domain),['klarna.se'],'återkommande avsändare föreslås');
+ assert.equal(hints.senders[0].count,3);
+ assert.deepEqual(hints.words.map(x=>x.word),['order'],'vanliga ämnesord föreslås, avsändarens namn hoppas över');
+ assert.equal(hints.scanned,4);
+ assert.equal(hints.inboxId,'inbox');
+});
+
+test('quickPreview räknar träffar i Inkorgen utan att spara något',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ const engine=fakeEngineWithRules(app);
+ const byDomain=await app.quickPreview({field:'domain',value:'klarna.se'});
+ assert.equal(byDomain.matches,3);
+ assert.deepEqual(byDomain.condition,{field:'domain',op:'equals',value:'klarna.se'});
+ const byWord=await app.quickPreview({field:'subject',value:'Order'});
+ assert.equal(byWord.matches,3,'löst ord i ämnet fångar alla tre');
+ const bySender=await app.quickPreview({field:'sender',value:'faktura'});
+ assert.equal(bySender.matches,1,'avsändare som innehåller ett ord');
+ assert.equal(engine.config.rules.length,0,'inget skapas av en förhandsvisning');
+});
+
+test('quickRule skapar, validerar och sparar en färdig regel',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ const engine=fakeEngineWithRules(app);
+ const res=await app.handle({type:'quickRule',revision:0,field:'domain',value:'klarna.se',target:'fin',sourceAccount:'a'});
+ assert.ok(res.ruleId,'regeln får ett id');
+ assert.equal(engine.config.rules.length,1);
+ const rule=engine.config.rules[0];
+ assert.deepEqual(rule.conditions,[{field:'domain',op:'equals',value:'klarna.se'}]);
+ assert.equal(rule.name,'klarna.se','namnet blir det man valde');
+ assert.equal(rule.target,'fin');
+ assert.equal(rule.source,'inbox','källan blir Inkorgen');
+ assert.equal(rule.sourceAccount,'a');
+ assert.equal(rule.readFilter,'both','olästa mejl får flyttas som standard');
+ assert.equal(rule.unreadAction,'keep');
+ assert.equal(rule.enabled,true);
+ assert.equal(engine.config.revision,1,'sparningen höjer revisionen');
+ assert.equal(engine.config.rulesVersion,1,'cachen läses om efter en ny regel');
+ assert.equal(res.snapshot.config.rules.length,1);
+ assert.ok(app.logs.some(l=>l.event==='rules_saved'),'sparningen syns i loggen');
+});
+
+test('quickRule vägrar en målmapp som inte finns',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ fakeEngineWithRules(app);
+ await assert.rejects(()=>app.handle({type:'quickRule',revision:0,field:'domain',value:'x.se',target:'saknas'}),
+  err=>err.code==='choose_target');
 });
 
 test('ett svep som inte blir klart i tid svarar "pågår redan" i stället för nollor',async()=>{

@@ -120,6 +120,71 @@ function suggestFrom(messages,{rules=[],limit=8,minCount=2}={}){
  return [...groups.values()].filter(g=>g.count>=minCount).sort((a,b)=>b.count-a.count||a.domain.localeCompare(b.domain,'sv')).slice(0,limit)
   .map(g=>({domain:g.domain,count:g.count,subject:g.subjects[0]||'',sender:[...g.senders.entries()].sort((a,b)=>b[1]-a[1])[0][0]}));
 }
+/* Enkelt regelbygge: användaren pekar på en avsändare, en domän eller ett ord och
+   villkoret räknas ut här. En full domän/adress blir exakt träff, ett löst ord blir
+   "innehåller" – samma råd som diagnosen ger ("ett kortare ämne fångar fler mejl"). */
+function choiceCondition({field='domain',value=''}={}){
+ const kind=['domain','sender','subject'].includes(field)?field:'domain';
+ const clean=String(value??'').trim().slice(0,256);
+ if(!clean)fail('bad_value');
+ if(kind==='subject')return {field:'subject',op:'contains',value:clean};
+ if(kind==='domain')return /[.]/.test(clean)&&!/\s/.test(clean)?{field:'domain',op:'equals',value:clean}:{field:'sender',op:'contains',value:clean};
+ return clean.includes('@')?{field:'sender',op:'equals',value:clean}:{field:'sender',op:'contains',value:clean};
+}
+/* Samma villkor som ovan, men i en form som match() kan räkna mot skannade mejl. */
+function choiceRule({field='domain',value='',match='all'}={}){
+ return {enabled:true,scope:'folder',source:'',sourceAccount:'',target:'',match:match==='any'?'any':'all',conditions:[choiceCondition({field,value})],branches:[]};
+}
+function ruleFromChoice({id='',name='',field='domain',value='',target='',source='',sourceAccount='',moveUnread=true,openWindow=false}={}){
+ const clean=String(value??'').trim().slice(0,256);
+ return validateRule({
+  id:id||('r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)),
+  name:(String(name||'').trim()||clean).slice(0,100),
+  enabled:true,scope:'account',source,sourceAccount,target,match:'all',
+  readFilter:moveUnread===false?'read':'both',
+  unreadAction:openWindow===true?'window':'keep',
+  conditions:[choiceCondition({field,value:clean})],branches:[]
+ });
+}
+/* Hur många av de skannade mejlen träffas av de här villkoren? */
+function countMatches(messages,rule){
+ if(!rule||!Array.isArray(rule.conditions)||!rule.conditions.length)return 0;
+ let n=0;for(const m of Array.isArray(messages)?messages:[])if(match(rule,m,true,true))n++;
+ return n;
+}
+/* Vanliga ord i ämnesrader: gör det möjligt att skapa en regel utan att kunna en exakt adress. */
+const STOPWORDS=new Set(['och','att','för','med','din','ditt','dina','från','den','det','som','inte','har','kan','till','av','på','om','en','ett','er','ert','vi','du','är','blir','blev','nya','nytt','ny','vara','var','skulle','efter','över','under','utan','upp','ner','här','där','vad','när','hur','vem','tack','hej','fick','måste','vill','kunde','vår','vårt','våra','oss','samt','via','the','and','for','with','this','that','you','your','our','from','not','has','have','are','was','were','will','can','all','per','new','news','please','about','more','than','one','two','out','now','get','see','mail','email','http','https','www']);
+function suggestWords(messages,{rules=[],limit=6,minCount=3,minLength=4}={}){
+ const domains=new Set(),groups=new Map(),blockValues=[];
+ for(const r of Array.isArray(rules)?rules:[])if(r&&r.enabled)for(const c of r.conditions||[])if(typeof c.value==='string'&&c.value.trim())blockValues.push(norm(c.value));
+ for(const m of Array.isArray(messages)?messages:[]){
+  const dom=email(m?.author).split('@')[1]||'';if(dom)domains.add(dom);
+  if(typeof m?.subject!=='string')continue;
+  const words=new Set();
+  for(const w of m.subject.toLocaleLowerCase('sv-SE').split(/[^\p{L}\p{N}]+/u)){
+   if(w.length<minLength||!/\p{L}/u.test(w)||STOPWORDS.has(w))continue;
+   if(blockValues.some(v=>v.includes(w)))continue;
+   words.add(w);
+  }
+  for(const w of words){const g=groups.get(w)||{word:w,count:0,subject:''};g.count++;if(!g.subject)g.subject=String(m.subject).slice(0,120);groups.set(w,g);}
+ }
+ const senderParts=new Set();for(const dom of domains)for(const part of dom.split(/[.\-_]/))if(part)senderParts.add(part);
+ return [...groups.values()].filter(g=>g.count>=minCount&&!senderParts.has(g.word))
+  .sort((a,b)=>b.count-a.count||a.word.localeCompare(b.word,'sv')).slice(0,limit);
+}
+/* Kort mänsklig beskrivning av ett villkor – används i loggen (gränssnittet har egna texter). */
+function choiceSummary(c){
+ const v=String(c?.value??'').trim();
+ if(!c||!v)return 'okant villkor';
+ if(c.field==='domain')return 'avsandardoman '+v;
+ if(c.field==='sender')return c.op==='equals'?'avsandare '+v:'avsandare som innehaller '+v;
+ if(c.field==='subject')return 'amne som innehaller '+v;
+ return String(c.field||'')+' '+v;
+}
+/* Allt den enkla regelskaparen behöver: möjliga avsändare och möjliga ämnesord. */
+function inboxHints(messages,{rules=[],limit=8,wordLimit=6,minCount=2,wordMinCount=3}={}){
+ return {senders:suggestFrom(messages,{rules,limit,minCount}),words:suggestWords(messages,{rules,limit:wordLimit,minCount:wordMinCount})};
+}
 function listOf(value){return Array.isArray(value)?value.filter(v=>typeof v==='string').join(' '):typeof value==='string'?value:'';}
 function valuesFor(message){const address=email(message.author);return {sender:address,domain:address.split('@')[1]||'',subject:typeof message.subject==='string'?message.subject.slice(0,20000):'',
  recipient:listOf(message.recipients),cc:[listOf(message.ccList),listOf(message.bccList)].filter(Boolean).join(' '),
@@ -193,6 +258,6 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,yearOf,yearFolderName,yearNameOf};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

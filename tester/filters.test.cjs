@@ -7,6 +7,7 @@ const F=require('../addon/filters.js');
 const C=require('../addon/core.js');
 
 const KONTO={folders:[{id:'f-fin',name:'Fakturor'},{id:'f-ark',name:'Arkiv'},{id:'f-web',name:'Webb'}],accountId:'a',inboxId:'inbox'};
+const BS=String.fromCharCode(92); /* ett snedstreck, utan gissning */
 const rad=(...lines)=>lines.join('\r\n')+'\r\n';
 const moveTo=uri=>`enabled="yes"\r\naction="Move to folder"\r\nactionValue="${uri}"`;
 
@@ -133,6 +134,44 @@ test('importrapporten räknar vad som kan bli regler',()=>{
  const conv=parsed.rules.map(r=>F.toSortBroRule(r,KONTO));
  const report=F.importReport(conv);
  assert.deepEqual(report,{total:3,importable:1,skipped:2,withNotes:2,needsTarget:0});
+});
+
+test('mappsökvägen läses ur adressen och går före namnet',()=>{
+ assert.equal(F.folderPathFromUri('imap://u%40h.se@h.se/Ekonomi/Fakturor'),'Ekonomi/Fakturor');
+ assert.equal(F.folderPathFromUri('mailbox://nobody@Local%20Folders/ACME%20Inc/Kvitton'),'ACME Inc/Kvitton');
+ assert.equal(F.folderPathFromUri('imap://u@h.se/'),'');
+ assert.equal(F.folderPathFromUri('token=abc'),'');
+ assert.equal(F.pathKey('/Ekonomi/Fakturor/'),'ekonomi/fakturor');
+ const folders=[
+  {id:'p1',accountId:'a',name:'Fakturor',path:'Privat/Fakturor'},
+  {id:'p2',accountId:'a',name:'Fakturor',path:'Ekonomi/Fakturor'}];
+ assert.equal(F.matchFolder(folders,'Fakturor','a','Ekonomi/Fakturor'),'p2','rätt gren väljs');
+ assert.equal(F.matchFolder(folders,'Fakturor','a','Okand/Fakturor'),'p1','annars faller den tillbaka på namnet');
+ const parsed=F.parseFilterFile(rad('name="Fakturor"',moveTo('imap://u@h.se/Ekonomi/Fakturor'),'condition="AND (from,contains,a@b.se)"'));
+ assert.equal(F.toSortBroRule(parsed.rules[0],{folders,accountId:'a',inboxId:'inbox'}).target,'p2');
+});
+
+test('fler villkor än SortBro har plats med tas med så långt det går',()=>{
+ const terms=[];
+ for(let i=1;i<=11;i++)terms.push('(from,contains,avsandare'+i+'@x.se)');
+ const parsed=F.parseFilterFile(rad('name="Många"',moveTo('mailbox://nobody@Local%20Folders/Arkiv'),'condition="OR '+terms.join(' OR ')+'"'));
+ const conv=F.toSortBroRule(parsed.rules[0],KONTO);
+ assert.equal(conv.importable,true,'regeln importeras ändå');
+ assert.equal(conv.conditions.length,8,'taket hålls');
+ assert.ok(conv.notes.includes('trimmed:3'),'överskottet redovisas');
+ assert.equal(C.validateRule({...conv.rule,target:'f-ark'}).conditions.length,8);
+});
+
+test('citattecken och snedstreck förstör inte filen',()=>{
+ const value='Faktura "viktig" C:'+BS+'temp';
+ const built=F.fromSortBroRule({...sortbroRule({conditions:[{field:'subject',op:'contains',value}]})},{uriPrefix:'imap://u@h.se/',folderPath:'Arkiv'});
+ assert.ok(built.ok);
+ const condition=built.lines.find(l=>l.startsWith('condition='));
+ assert.ok(condition.startsWith('condition="AND (')&&condition.endsWith(')"'),'villkorsraden är hel: '+condition);
+ assert.ok(!/\r|\n/.test(condition),'ingen radbrytning inuti villkoret');
+ const back=F.parseFilterFile(F.buildFilterFile([sortbroRule({conditions:[{field:'subject',op:'contains',value}]})],{uriOf:{r1:{uriPrefix:'imap://u@h.se/',folderPath:'Arkiv'}}}).text);
+ assert.equal(back.rules.length,1,'filen förblir läsbar');
+ assert.equal(back.rules[0].condition.terms[0].value,value.replace(/"/g,"'"),'citatet blir apostrof, snedstrecket kommer tillbaka');
 });
 
 /* ---- Export: SortBro-regel -> filterfil ---- */

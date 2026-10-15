@@ -78,13 +78,20 @@ globalThis.LasDemo=(()=>{
      match:rule.match,conditions:rule.conditions,rule,target:rule.target,snapshot:state};break;
    }
    case 'filterExport':{
-   /* Demon kan inte bygga riktiga kontoadresser – visa samma svar som bakgrunden utan fil. */
-   const prefix=String(m.uriPrefix||'').trim()||(state.prefs&&state.prefs.filterUris&&state.prefs.filterUris[m.accountId])||'';
-   const local=!prefix;
+   /* Demon skriver samma slags fil som bakgrunden, med den adress användaren angett
+      eller lärde in vid importen. Utan adress blir det ingen fil – precis som i skarpt läge. */
+   const clean=v=>{const t=String(v||'').trim();return /^(imap|mailbox|pop3|imap-message|news):\/\//i.test(t)?t:'';};
+   const asked=clean(m.uriPrefix);
+   const stored=clean(state.prefs?.filterUris?.[m.accountId]);
+   const prefix=asked||stored;
+   if(asked&&m.accountId)state.prefs.filterUris={...(state.prefs.filterUris||{}),[m.accountId]:asked};
    const uriOf={};
-   for(const rule of state.config.rules)uriOf[rule.id]=local?{}:{uriPrefix:'imap://demo%40exempel.se@imap.exempel.se/',folderPath:(folders.find(f=>f.id===rule.target)||{}).name||''};
-   const built=LasFilters.buildFilterFile(state.config.rules,{uriOf:local?{}:uriOf});
-   data={...built.report,text:built.text,needsUri:local?state.config.rules.map(r=>({ruleId:r.id,name:r.name})):[],accountId:m.accountId||'',storedPrefix:prefix};break;
+   for(const rule of state.config.rules){
+    const folder=folders.find(f=>f.id===rule.target)||{};
+    uriOf[rule.id]=prefix?{uriPrefix:prefix,folderPath:folder.name||''}:{};
+   }
+   const built=LasFilters.buildFilterFile(state.config.rules,{uriOf:prefix?uriOf:{}});
+   data={...built.report,text:built.text,needsUri:prefix?[]:state.config.rules.map(r=>({ruleId:r.id,name:r.name})),accountId:m.accountId||'',storedPrefix:prefix};break;
   }
   case 'diagnose':{
     const rule=LasCore.validateRule(m.rule),rows=state.config.rules.find(r=>r.id===rule.id);

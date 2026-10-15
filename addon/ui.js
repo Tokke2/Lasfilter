@@ -116,16 +116,20 @@ const I18N={
   tbExportBtn:'⇩ Exportera som filterfil',
   tbPrefixHelp:'Klistra in kontots adress från filterfilen om du vill kunna exportera tillbaka.',
   tbImportTitle:'Filter i filen: {n}',
-  tbImportSummary:'{ok} kan bli regler · {skipped} hoppas över',
+  tbImportSummary:'Kan bli regler: {ok} · hoppas över: {skipped}',
   tbImportCreate:'✓ Skapa {n} regler',
   tbImportNothing:'Inget att importera – inget av filtren flyttar mejl med villkor SortBro kan matcha.',
-  tbImportDone:'{n} regler skapades från filterfilen.',
+  tbImportDone:'Nya regler från filterfilen: {n}.',
   tbImportTarget:'Målmapp',
   tbImportNeedsTarget:'Välj målmapp',
   tbImportDisabled:'avstängt i Thunderbird',
   tbImportNoTargetMatch:'Ingen målmapp matchade "{name}"',
   tbImportReviewNote:'Granska och bocka av det du vill ha. Inget skapas förrän du trycker på knappen.',
+  tbImportCapacity:'SortBro har plats med {n} regler till (högst 200). Resten hoppas över – stäng av några gamla regler först om du vill ha med dem.',
+  tbImportPartial:'Klarade: {n} · kunde inte sparas: {m}. Rader nedan säger varför.',
+  tbImportFailedRow:'Kunde inte sparas: ',
   tbExportSaved:'Filterfilen sparades: {name}',
+  tbExportBadPrefix:'Kontoadressen ska börja med imap://, mailbox:// eller pop3:// – kopiera raden actionValue ur din msgFilterRules.dat.',
   tbExportWritten:'{n} filter skrivna',
   tbExportSkipped:'{n} hoppades över',
   tbExportNoUri:'Kontots adress i filterfilen saknas. Klistra in den i fältet ovan (den står i din msgFilterRules.dat, t.ex. imap://anvandare%40server.se@imap.server.se/) eller importera filen en gång först.',
@@ -145,6 +149,7 @@ const I18N={
   tbNoteSize:'Storlek räknades om mellan byte och kB',
   tbNoteDate:'Datumvillkoret översattes till dagar',
   tbNoteActionsAdd:'Åtgärder som inte följer med: ',
+  tbNoteTrimmed:'{n} villkor fick inte plats (SortBro har högst 8 per regel) – lägg till dem i regelredigeraren',
   tbExportNoteDomain:'Domänvillkor blir "Från innehåller" i Thunderbird',
   tbExportNoteSize:'Storleken skrivs i byte',
   tbExportNoteBranches:'Grenar (olika mål per ämne) kan inte exporteras – bara huvudmålet följer med',
@@ -681,16 +686,20 @@ const I18N={
   tbExportBtn:'⇩ Export as filter file',
   tbPrefixHelp:'Paste the account address from the filter file if you want to export back to it.',
   tbImportTitle:'Filters in the file: {n}',
-  tbImportSummary:'{ok} can become rules · {skipped} skipped',
+  tbImportSummary:'Can become rules: {ok} · skipped: {skipped}',
   tbImportCreate:'✓ Create {n} rules',
   tbImportNothing:'Nothing to import – none of the filters move mail with conditions SortBro can match.',
-  tbImportDone:'{n} rules created from the filter file.',
+  tbImportDone:'New rules from the filter file: {n}.',
   tbImportTarget:'Target folder',
   tbImportNeedsTarget:'Choose a target folder',
   tbImportDisabled:'disabled in Thunderbird',
   tbImportNoTargetMatch:'No target folder matched "{name}"',
   tbImportReviewNote:'Review and tick what you want. Nothing is created until you press the button.',
+  tbImportCapacity:'SortBro has room for {n} more rules (200 max). The rest are skipped – switch off some old rules first if you want them.',
+  tbImportPartial:'Saved: {n} · could not be saved: {m}. The rows below say why.',
+  tbImportFailedRow:'Could not be saved: ',
   tbExportSaved:'Filter file saved: {name}',
+  tbExportBadPrefix:'The account address must start with imap://, mailbox:// or pop3:// – copy the actionValue line from your msgFilterRules.dat.',
   tbExportWritten:'{n} filters written',
   tbExportSkipped:'{n} skipped',
   tbExportNoUri:'The account address from the filter file is missing. Paste it in the field above (it is in your msgFilterRules.dat, e.g. imap://user%40server.com@imap.server.com/) or import the file once first.',
@@ -710,6 +719,7 @@ const I18N={
   tbNoteSize:'Size was converted between bytes and kB',
   tbNoteDate:'The date condition was translated to days',
   tbNoteActionsAdd:'Actions that are not carried over: ',
+  tbNoteTrimmed:'{n} conditions did not fit (SortBro allows 8 per rule) – add them in the rule editor',
   tbExportNoteDomain:'Domain conditions become "From contains" in Thunderbird',
   tbExportNoteSize:'Size is written in bytes',
   tbExportNoteBranches:'Branches (different targets per subject) cannot be exported – only the main target follows',
@@ -1292,6 +1302,7 @@ function tbNoteText(code){
  if(code.startsWith('approx:'))return T('tbNoteApprox').replace('{field}',code.slice(7));
  if(code.startsWith('unknownField:'))return T('tbNoteUnknown').replace('{field}',code.slice(13));
  if(code==='actions')return '';
+ if(code.startsWith('trimmed:'))return T('tbNoteTrimmed').replace('{n}',code.slice(8));
  if(code.startsWith('actions:'))return T('tbNoteActions').replace('{list}',code.slice(8));
  return '';
 }
@@ -1300,15 +1311,19 @@ function renderTbReview(){
  box.replaceChildren();
  if(!tbImport){box.hidden=true;return;}
  box.hidden=false;
- box.replaceChildren();
+ const usable=f=>!!f.importable&&!f.failed;
+ const chosen=()=>tbImport.filters.filter(f=>usable(f)&&f.selected!==false&&f.target);
  const head=el('div','tb-review-head');
  head.append(el('strong','',T('tbImportTitle').replace('{n}',tbImport.filters.length)));
- head.append(el('span','muted',T('tbImportSummary').replace('{ok}',tbImport.filters.filter(f=>f.importable).length).replace('{skipped}',tbImport.filters.filter(f=>!f.importable).length)));
+ head.append(el('span','muted',T('tbImportSummary').replace('{ok}',tbImport.filters.filter(usable).length).replace('{skipped}',tbImport.filters.filter(f=>!usable(f)).length)));
  box.append(head);
  box.append(el('p','muted',T('tbImportReviewNote')));
+ const room=C.LIMITS?.rules?C.LIMITS.rules-state.config.rules.length:0;
+ if(room>=0&&tbImport.filters.filter(usable).length>room)box.append(el('p','muted tb-row-notes',T('tbImportCapacity').replace('{n}',Math.max(0,room))));
  tbImport.filters.forEach(f=>{
-  const row=el('div','tb-row'+(f.importable?'':' tb-row-off'));
-  const check=el('input');check.type='checkbox';check.checked=f.importable&&f.selected!==false;check.disabled=!f.importable;
+  const importable=usable(f);
+  const row=el('div','tb-row'+(importable?'':' tb-row-off'));
+  const check=el('input');check.type='checkbox';check.checked=importable&&f.selected!==false;check.disabled=!importable;
   const main=el('div','tb-row-main');
   main.append(el('strong','',f.name||'-'));
   const parts=[f.conditions.length?f.conditions.map(c=>fieldShortText(c.field)+' '+(OPERATOR_LABELS[c.op]?T(OPERATOR_LABELS[c.op]):c.op)+' '+c.value).join(f.match==='any'?' | ':' + '):''];
@@ -1316,11 +1331,12 @@ function renderTbReview(){
   main.append(el('small','',parts.join('')));
   const notes=f.notes.map(tbNoteText).filter(Boolean);
   if(f.needsTarget&&f.targetName)notes.unshift(T('tbImportNoTargetMatch').replace('{name}',f.targetName));
+  if(f.failed)notes.unshift(T('tbImportFailedRow')+Terr(f.failed));
   if(notes.length)main.append(el('small','tb-row-notes',T('tbNotes')+' '+notes.join(' · ')));
   const select=el('select');selectOptions(select,folders,T('tbImportTarget'),f.target||'');
-  if(f.importable&&!f.target)select.classList.add('needs-target');
-  select.addEventListener('change',()=>{f.target=select.value;f.selected=check.checked&&!!select.value;});
-  if(f.importable&&!f.target)check.checked=false;
+  select.disabled=!importable;
+  if(importable&&!f.target)select.classList.add('needs-target');
+  select.addEventListener('change',()=>{f.target=select.value;if(check.checked&&!select.value){check.checked=false;f.selected=false;}});
   check.addEventListener('change',()=>{
    if(check.checked&&!select.value){check.checked=false;toast(T('tbImportNeedsTarget'));select.focus();return;}
    f.selected=check.checked;
@@ -1328,17 +1344,32 @@ function renderTbReview(){
   row.append(check,main,select);
   box.append(row);
  });
- const button=el('button','button small primary',T('tbImportCreate').replace('{n}',tbImport.filters.filter(f=>f.importable&&f.selected!==false&&f.target).length));
- button.type='button';
- button.disabled=!tbImport.filters.some(f=>f.importable&&f.selected!==false&&f.target);
- button.addEventListener('click',()=>createTbRules(button));
- box.append(button);
+ const ready=chosen().length;
+ if(tbImport.filters.some(usable)){
+  const button=el('button','button small primary',T('tbImportCreate').replace('{n}',ready));
+  button.type='button';
+  button.disabled=!ready;
+  button.addEventListener('click',()=>createTbRules(button).catch(alertError));
+  box.append(button);
+ }
+}
+
+/* Läser en fil som användaren valt. Fil.text() finns i moderna versioner;
+   FileReader är reserven för äldre motorer (och för testmiljöer). */
+function fileText(file){
+ if(typeof file?.text==='function')return file.text();
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result??''));
+  reader.onerror=()=>reject(new C.RuleError('bad_schema'));
+  reader.readAsText(file);
+ });
 }
 async function fileTextOf(input){
  const file=input?.files?.[0];
  if(!file)return '';
  if(file.size>4194304)throw new C.RuleError('bad_schema');
- return file.text();
+ return fileText(file);
 }
 async function importTbFilters(input){
  try{
@@ -1349,11 +1380,11 @@ async function importTbFilters(input){
   const accountId=$('tbAccount')?.value||accounts()[0]?.id||'';
   const inboxId=folders.find(f=>f.accountId===accountId&&C.inboxFolder?C.inboxFolder(f):/^(inkorg|inbox)$/i.test(f.name||''))?.id||'';
   const filters=parsed.rules.map(tb=>{
-   const conv=LasFilters.toSortBroRule(tb,{folders,accountId,inboxId});
+   const conv=LasFilters.toSortBroRule(tb,{folders,accountId,inboxId,maxConditions:C.LIMITS?.conditions||8});
    return {...conv,selected:conv.importable&&!!conv.target};
   });
   tbImport={filters,accountId,uriPrefix:''};
-  const prefix=parsed.rules.map(r=>LasFilters.uriPrefix(r.move?.value||r.copy?.value||'')).find(Boolean)||'';
+  const prefix=parsed.rules.map(r=>LasFilters.uriPrefix(r.move?.value||r.copy?.value||'')).find(v=>/^(imap|mailbox|pop3|imap-message|news):\/\//i.test(v))||'';
   if(prefix){
    tbImport.uriPrefix=prefix;
    if($('tbUriPrefix'))$('tbUriPrefix').value=prefix;
@@ -1369,19 +1400,45 @@ async function importTbFilters(input){
 }
 async function createTbRules(button){
  if(!tbImport)return;
- const chosen=tbImport.filters.filter(f=>f.importable&&f.selected!==false&&f.target);
+ const chosen=tbImport.filters.filter(f=>f.importable&&!f.failed&&f.selected!==false&&f.target);
  if(!chosen.length){toast(T('tbImportNothing'));return;}
  if(button)button.disabled=true;
+ const created=[],failed=[];
+ const taken=new Set(state.config.rules.map(r=>r.id));
+ /* Ett id som redan finns får nytt namn i stället för att hela importen faller. */
+ const build=f=>{
+  let id=f.rule.id,n=1;
+  while(taken.has(id)){id=(f.rule.id+'-'+n).slice(0,64);n++;}
+  taken.add(id);
+  return {...f.rule,target:f.target,id};
+ };
  try{
-  const rules=[...state.config.rules,...chosen.map(f=>({...f.rule,target:f.target}))];
-  const next=await rpc('saveRules',{rules,revision:state.config.revision});
-  dirty=false;renderStatus(next);
-  const created=chosen.length;
-  tbImport=null;renderTbReview();
-  loadRule(next.config.rules[next.config.rules.length-1]?.id||'');
-  toast(T('tbImportDone').replace('{n}',created));
+  try{
+   /* Snabb väg: alla valda filter i en enda sparning. */
+   renderStatus(await rpc('saveRules',{rules:[...state.config.rules,...chosen.map(build)],revision:state.config.revision}));
+   dirty=false;created.push(...chosen);
+  }catch(err){
+   /* Ett filter som motorn inte kan använda får inte fälla hela importen: de andra
+      sparas ett i taget, och den som inte går behåller sin förklaring i listan. */
+   for(const f of chosen){
+    try{
+     renderStatus(await rpc('saveRules',{rules:[...state.config.rules,build(f)],revision:state.config.revision}));
+     dirty=false;created.push(f);
+    }catch(one){f.failed=one.code||'internal_error';failed.push(f);}
+   }
+  }
+  if(created.length)loadRule(created[created.length-1].rule.id);
+  if(failed.length){
+   tbImport.filters=tbImport.filters.filter(f=>failed.includes(f));
+   renderTbReview();
+   toast(T('tbImportPartial').replace('{n}',created.length).replace('{m}',failed.length),true);
+  }else{
+   tbImport=null;renderTbReview();
+   toast(T('tbImportDone').replace('{n}',created.length));
+  }
  }finally{if(button)button.disabled=false;}
 }
+
 function tbExportNoteText(code){
  const table={domain:'tbExportNoteDomain',size:'tbExportNoteSize',branches:'tbExportNoteBranches',yearFolders:'tbExportNoteYearFolders',readPolicy:'tbExportNoteReadPolicy',date:'tbExportNoteDate'};
  if(table[code])return T(table[code]);
@@ -1392,6 +1449,10 @@ async function exportTbFilters(){
  if(!(state.config.rules||[]).length){toast(T('tbExportNeedsRules'));return;}
  const accountId=$('tbAccount')?.value||'';
  const uriPrefix=($('tbUriPrefix')?.value||'').trim();
+ if(uriPrefix&&!/^(imap|mailbox|pop3|imap-message|news):\/\//i.test(uriPrefix)){
+  toast(T('tbExportBadPrefix'),true);
+  return;
+ }
  const result=await rpc('filterExport',{accountId,uriPrefix});
  const report=$('tbReport');
  if(!result.written){

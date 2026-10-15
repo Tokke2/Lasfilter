@@ -38,7 +38,7 @@ const APPROX_FIELDS=new Set(['all addresses','any address','to or cc']);
 
 function clean(v){return String(v??'');}
 function unescapeValue(v){return v.replace(/\\(.)/g,'$1');}
-function escapeValue(v){return clean(v).replace(/"/g,"'").replace(/[\r\n]+/g,' ');}
+function escapeValue(v){return clean(v).replace(/\\/g,'\\\\').replace(/"/g,"'").replace(/[\r\n]+/g,' ');}
 
 /* ---------- Tolkning av filterfilen ---------- */
 function parseFilterFile(text){
@@ -129,6 +129,20 @@ function folderNameFromUri(uri){
  const last=path.split('/').filter(Boolean).pop()||'';
  try{return decodeURIComponent(last).slice(0,80);}catch{return last.slice(0,80);}
 }
+/* Mappsökvägen ur adressen, t.ex. Ekonomi/Fakturor (utan kontodelen). */
+function folderPathFromUri(uri){
+ const text=clean(uri).split('?')[0];
+ const m=/^(?:imap|mailbox|pop3|imap-message|news):\/\//i.exec(text);
+ if(!m)return '';
+ const rest=text.slice(m[0].length);
+ const slash=rest.indexOf('/');
+ if(slash<0)return '';
+ return rest.slice(slash+1).split('/').filter(Boolean).map(seg=>{try{return decodeURIComponent(seg);}catch{return seg;}}).join('/').slice(0,300);
+}
+/* Sökvägen skriven så att den går att jämföra: gemener, utan inledande snedstreck. */
+function pathKey(value){
+ return clean(value).split('/').filter(Boolean).map(seg=>seg.trim().toLocaleLowerCase('sv-SE')).join('/');
+}
 /* Kontots URI-prefix (allt före mappsökvägen) – används för att kunna exportera tillbaka. */
 function uriPrefix(uri){
  const text=clean(uri).split('?')[0];
@@ -137,20 +151,26 @@ function uriPrefix(uri){
 }
 /* Målmappen letas bara i det valda kontot – en mapp med samma namn i ett annat konto
    är inte samma mapp, och fel konto i en regel är värre än att behöva välja själv. */
-function matchFolder(folders,name,accountId=''){
- if(!name)return '';
- const want=String(name).toLocaleLowerCase('sv-SE');
+function matchFolder(folders,name,accountId='',path=''){
+ const want=String(name||'').toLocaleLowerCase('sv-SE');
+ const wantPath=pathKey(path);
  const list=(Array.isArray(folders)?folders:[]).filter(f=>!accountId||!f.accountId||f.accountId===accountId);
+ /* Hela sökvägen går före namnet: två mappar kan heta Fakturor i olika grenar. */
+ if(wantPath){
+  const byPath=list.find(f=>{const have=pathKey(f.path||'');return have&&(have===wantPath||have.endsWith('/'+wantPath));});
+  if(byPath)return byPath.id;
+ }
+ if(!want)return '';
  const nameOf=f=>String(f.name||'').toLocaleLowerCase('sv-SE');
  const exact=list.find(f=>nameOf(f)===want);
  if(exact)return exact.id;
  const starts=list.find(f=>nameOf(f).startsWith(want));
  if(starts)return starts.id;
- const loose=list.find(f=>nameOf(f).includes(want)||want.includes(nameOf(f)));
+ const loose=list.find(f=>nameOf(f).includes(want)||(nameOf(f).length>=3&&want.includes(nameOf(f))));
  return loose?.id||'';
 }
 /* En tolklad filterregel -> utkast till SortBro-regel + redovisning av vad som inte följer med. */
-function toSortBroRule(tb,{folders=[],accountId='',inboxId='',namePrefix=''}={}){
+function toSortBroRule(tb,{folders=[],accountId='',inboxId='',namePrefix='',maxConditions=8}={}){
  const notes=[],skipped=[],conditions=[];
  const note=code=>{if(!notes.includes(code))notes.push(code);};
  const drop=code=>{if(!skipped.includes(code))skipped.push(code);};
@@ -185,8 +205,11 @@ function toSortBroRule(tb,{folders=[],accountId='',inboxId='',namePrefix=''}={})
  if(!move)note('noMove');
  if(tb.copy&&!tb.move)note('copy');
  const targetName=folderNameFromUri(move?.value||'');
- const target=matchFolder(folders,targetName,accountId);
+ const target=matchFolder(folders,targetName,accountId,folderPathFromUri(move?.value||''));
  if(conditions.length&&move&&!target)note('noTarget');
+ const limit=Number.isInteger(maxConditions)&&maxConditions>0?maxConditions:8;
+ let trimmed=0;
+ if(conditions.length>limit){trimmed=conditions.length-limit;conditions.length=limit;note('trimmed:'+trimmed);}
  const importable=conditions.length>0&&!!move;
  const match=tb.condition?.match==='any'?'any':'all';
  return {
@@ -245,7 +268,9 @@ function fromSortBroRule(rule,{uriPrefix='',folderPath='',type='17'}={}){
  if(rule.unreadAction==='read')extraActions.push('action="Mark read"');
  if(!terms.length)return {ok:false,notes,skipped,reason:'empty'};
  const join=rule.match==='any'?'OR':'AND';
- const condition=join+' '+terms.map(t=>`(${t.field},${t.op},${t.value})`).join(' '+join+' ');
+ /* Villkorsvärden escapas som namn och adresser – ett citattecken mitt i ett värde
+    fick förut filen att sluta mitt i raden. */
+ const condition=join+' '+terms.map(t=>`(${t.field},${t.op},${escapeValue(t.value)})`).join(' '+join+' ');
  const path=clean(folderPath).split('/').filter(Boolean).map(encodeURIComponent).join('/');
  const actionValue=uriPrefix?(uriPrefix+path):'';
  const lines=[
@@ -273,7 +298,7 @@ function buildFilterFile(rules,{uriOf={}}={}){
  return {text:out.join('\r\n')+'\r\n',report};
 }
 
-const api={FIL_VERSION,parseFilterFile,parseCondition,toSortBroRule,importReport,folderNameFromUri,uriPrefix,matchFolder,fromSortBroRule,buildFilterFile,CODE_TEXT,TBFIELDS,TB_SB_OPS};
+const api={FIL_VERSION,parseFilterFile,parseCondition,toSortBroRule,importReport,folderNameFromUri,folderPathFromUri,pathKey,uriPrefix,matchFolder,fromSortBroRule,buildFilterFile,CODE_TEXT,TBFIELDS,TB_SB_OPS};
 root.LasFilters=api;
 if(typeof module!=='undefined')module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

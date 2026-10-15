@@ -178,11 +178,22 @@ App.quickPreview=async(msg)=>{
 /* Skriver ut reglerna som en Thunderbird-filterfil (msgFilterRules.dat).
    Kontots URI-prefix kommer från prefs (inlärt vid import) eller skickas med från gränssnittet.
    Lokala mappar får alltid mailbox://-formen, precis som Thunderbird själv skriver den. */
+/* En kontoadress måste se ut som en Thunderbird-adress, annars skrivs ingen fil. */
+App.cleanUriPrefix=value=>{
+ const text=typeof value==='string'?value.trim().slice(0,240):'';
+ return /^(imap|mailbox|pop3|imap-message|news):\/\//i.test(text)?text:'';
+};
 App.filterExport=async(msg)=>{
  const list=await App.folderList();
  const byId=new Map(list.map(f=>[f.id,f]));
- const prefixArg=typeof msg.uriPrefix==='string'&&msg.uriPrefix.length<=240?msg.uriPrefix.trim():'';
- const stored=(App.prefs.filterUris||{})[msg.accountId||'']||'';
+ const prefixArg=App.cleanUriPrefix(msg.uriPrefix);
+ const stored=App.cleanUriPrefix((App.prefs.filterUris||{})[msg.accountId||'']);
+ /* En adress användaren klistrar in sparas, så den bara behöver klistras in en gång. */
+ if(prefixArg&&prefixArg!==stored&&msg.accountId){
+  const map={...(App.prefs.filterUris||{}),[msg.accountId]:prefixArg};
+  App.prefs={...App.prefs,filterUris:map};
+  await App.write(()=>B.storage.local.set({prefs:App.prefs}));
+ }
  const local=accountName=>/^(local folders|lokala mappar)$/i.test(accountName||'');
  const uriOf={};
  const needsUri=[];

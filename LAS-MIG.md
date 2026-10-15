@@ -75,9 +75,11 @@ Du som redan har fyrtio filter behöver inte skriva om dem. I **Regler**-vyn fin
 
 Inget villkor tappas tyst: varje rad visar exakt vad som inte följde med, och du kan välja målmapp för hand på de rader där namnet inte gick att matcha. Filtren är dessutom urkryssade om de var avstängda i Thunderbird, så de importeras avstängda.
 
+**Om något inte går vägen:** filtren sparas ett i taget om en gemensam sparning skulle fallera, så ett enda filter som motorn inte kan använda **inte fäller de andra**. Du får då *Klarade: 3 · kunde inte sparas: 1* och den felande raden ligger kvar i listan med orsaken i klartext (*Kunde inte sparas: Ange ett regelnamn, högst 100 tecken*) – resten är redan inflyttade och klara. SortBro har plats för högst åtta villkor per regel: ett filter med fler importeras med de åtta första och raden säger *3 villkor fick inte plats (SortBro har högst 8 per regel) – lägg till dem i regelredigeraren*. Ingenting tappas tyst.
+
 Åt andra hållet gäller samma ärlighet: regler med fördelningar (olika mål per ämne), årsmappar eller läsläge skrivs som vanliga filter, och rapporten under kortet säger vilka delar Thunderbird inte kan ta emot. Villkor på årtal (*före/efter innevarande år*) och regler utan villkor skrivs inte alls – i stället står det vilka de är.
 
-**Kontoadressen:** Thunderbird skriver mottagningen som en full adress, till exempel `imap://anna%40exempel.se@imap.exempel.se/Ekonomi/Fakturor`. SortBro lär sig ditt kontos adress när du importerar en filterfil en gång och sparar den lokalt i dina inställningar; du kan också klistra in den i fältet ovanför rapporten. För ett lokalt konto skrivs `mailbox://nobody@Local%20Folders/…` automatiskt. Saknas adressen blir det ingen fil – och kortet säger precis vad som fattas i stället för att skriva något påhittat.
+**Kontoadressen:** Thunderbird skriver mottagningen som en full adress, till exempel `imap://anna%40exempel.se@imap.exempel.se/Ekonomi/Fakturor`. SortBro lär sig ditt kontos adress när du importerar en filterfil en gång, sparar den lokalt i dina inställningar och återanvänder den – klistrar du in den för hand en gång kommer du också undan med det. Adressen måste börja med `imap://`, `mailbox://` eller `pop3://`; allt annat avvisas med en begriplig rad i stället för att hamna i filen. För ett lokalt konto skrivs `mailbox://nobody@Local%20Folders/…` automatiskt. Saknas adressen blir det ingen fil – och kortet säger precis vad som fattas i stället för att skriva något påhittat.
 
 ## Arkivering – och varför olästa mejl kan vänta
 

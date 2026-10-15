@@ -1,0 +1,12 @@
+{
+  "name": "sortbro-tester",
+  "private": true,
+  "description": "Endast för utveckling: DOM-kontroller av gränssnittet med jsdom. Påverkar inte tillägget.",
+  "scripts": {
+    "dom": "node dom_check.cjs",
+    "unit": "node --test *.test.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

@@ -147,6 +147,23 @@ test('utan känd kontoadress säger exporten vilka regler som väntar på den',a
  assert.ok(withPrefix.text.includes('actionValue="imap://u%40h.se@imap.h.se/Ekonomi/Fakturor"'),'kontoadressen används direkt');
 });
 
+test('en inklistrad kontoadress sparas när den är giltig och avvisas när den inte är det',async()=>{
+ const {app,api}=await loadBackground();
+ exportAccount(api,'Testkonto');
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[exportRule]}});
+ const bad=await app.filterExport({accountId:'a',uriPrefix:'hej/Ekonomi'});
+ assert.equal(bad.written,0,'en påhittad adress ger ingen fil');
+ assert.equal(bad.needsUri.length,1);
+ assert.equal(app.prefs.filterUris?.a,undefined,'skräp sparas inte');
+ const good=await app.filterExport({accountId:'a',uriPrefix:'imap://u%40h.se@imap.h.se/'});
+ assert.equal(good.written,1);
+ assert.equal(good.text.includes('actionValue="imap://u%40h.se@imap.h.se/Ekonomi/Fakturor"'),true,'adressen hamnar i filen');
+ assert.equal(app.prefs.filterUris.a,'imap://u%40h.se@imap.h.se/','adressen sparas för nästa gång');
+ const again=await app.filterExport({accountId:'a'});
+ assert.equal(again.written,1,'nästa export klarar sig utan att adressen klistras in igen');
+ assert.equal(again.storedPrefix,'imap://u%40h.se@imap.h.se/');
+});
+
 test('kontoadresser sparas bara i rimlig form och överlever en omstart',async()=>{
  const {app}=await loadBackground();
  const next=await app.handle({type:'prefs',prefs:{filterUris:{a:'imap://u@h.se/',x:'y'.repeat(300),'':'tom nyckel'}}});

@@ -105,7 +105,7 @@ App.changed=()=>{
 App.folderList=async()=>{
  const accounts=await B.accounts.list(true),items=[],seen=new Set();
  function walk(f,account){
-  if(f.id&&!seen.has(f.id)){seen.add(f.id);if(C.usableFolder(f))items.push({id:f.id,accountId:account.id,accountName:account.name,name:f.name,label:account.name+' · '+(f.path||f.name),specialUse:f.specialUse||[]});}
+  if(f.id&&!seen.has(f.id)){seen.add(f.id);if(C.usableFolder(f))items.push({id:f.id,accountId:account.id,accountName:account.name,name:f.name,path:f.path||'',type:f.type||'',label:account.name+' · '+(f.path||f.name),specialUse:f.specialUse||[]});}
   for(const child of f.subFolders||[])walk(child,account);
  }
  for(const a of accounts){if(a.rootFolder)walk(a.rootFolder,a);else for(const f of a.folders||[])walk(f,a);}
@@ -174,6 +174,28 @@ App.quickPreview=async(msg)=>{
  const scan=await App.scanInbox();
  const rule=C.choiceRule({field:msg.field,value:msg.value});
  return {matches:C.countMatches(scan.messages,rule),scanned:scan.scanned,condition:rule.conditions[0],inboxId:scan.inboxId,sourceAccount:scan.sourceAccount};
+};
+/* Skriver ut reglerna som en Thunderbird-filterfil (msgFilterRules.dat).
+   Kontots URI-prefix kommer från prefs (inlärt vid import) eller skickas med från gränssnittet.
+   Lokala mappar får alltid mailbox://-formen, precis som Thunderbird själv skriver den. */
+App.filterExport=async(msg)=>{
+ const list=await App.folderList();
+ const byId=new Map(list.map(f=>[f.id,f]));
+ const prefixArg=typeof msg.uriPrefix==='string'&&msg.uriPrefix.length<=240?msg.uriPrefix.trim():'';
+ const stored=(App.prefs.filterUris||{})[msg.accountId||'']||'';
+ const local=accountName=>/^(local folders|lokala mappar)$/i.test(accountName||'');
+ const uriOf={};
+ const needsUri=[];
+ for(const rule of App.engine.config.rules){
+  const folder=byId.get(rule.target);
+  if(!folder)continue;
+  const accountId=msg.accountId||folder.accountId;
+  const prefix=local(folder.accountName)?'mailbox://nobody@Local%20Folders/':(prefixArg||stored||'');
+  if(!prefix){needsUri.push({ruleId:rule.id,name:rule.name});continue;}
+  uriOf[rule.id]={uriPrefix:prefix,folderPath:folder.path||folder.name||''};
+ }
+ const built=LasFilters.buildFilterFile(App.engine.config.rules,{uriOf});
+ return {...built.report,text:built.text,needsUri,accountId:msg.accountId||'',storedPrefix:stored||(prefixArg||'')};
 };
 /* Klistra in domäner/adresser i en regel som redan finns. Villkoren läggs till –
    de gamla rörs inte – och kombinationen blir "minst ett av villkoren" när regeln
@@ -366,6 +388,7 @@ App.handle=async msg=>{
   case 'suggestRules':return App.suggestRules();
   case 'inboxHints':return App.inboxHints();
   case 'quickPreview':return App.quickPreview(msg);
+  case 'filterExport':return App.filterExport(msg);
   case 'importConditions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    return App.importConditions(msg);
@@ -466,6 +489,11 @@ App.handle=async msg=>{
    if(typeof p.lastRule==='string'&&p.lastRule.length<=80)next.lastRule=p.lastRule;
    if(['sv','en'].includes(p.lang))next.lang=p.lang;
    if(['auto',...SEASONS].includes(p.season))next.season=p.season;
+   if(p.filterUris&&typeof p.filterUris==='object'&&!Array.isArray(p.filterUris)){
+    const clean={};
+    for(const [k,v] of Object.entries(p.filterUris).slice(0,10))if(typeof k==='string'&&k.length>=1&&k.length<=64&&typeof v==='string'&&v.length<=240)clean[k]=v;
+    next.filterUris=clean;
+   }
    await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;App.applySeasonIcon();return next;
   }
   default:throw new C.RuleError('bad_request');

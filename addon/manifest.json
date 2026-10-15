@@ -22,6 +22,7 @@
   "background": {
     "scripts": [
       "core.js",
+      "filters.js",
       "engine.js",
       "background.js"
     ],

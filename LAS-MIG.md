@@ -6,7 +6,7 @@ Ett Thunderbird-tillägg med ett eget svenskt och engelskt gränssnitt (MV2, Thu
 
 ## Skillnaden mot vanliga filter
 
-Thunderbirds egna filter körs när mejlet kommer in. Detta tillägg körs händelsestyrt via Thunderbirds egna gränssnittsprogram (läst-markering, visning, flytthändelse) och ändrar därför **inte** `msgFilterRules.dat`, `prefs.js` eller någon profilfil. Det samexisterar med dina befintliga filter; stäng av filter som redan flyttar samma mejl vid mottagandet, eftersom tillägget inte blockerar dem.
+Thunderbirds egna filter körs när mejlet kommer in. Detta tillägg körs händelsestyrt via Thunderbirds egna gränssnittsprogram (läst-markering, visning, flytthändelse) och ändrar därför **inte** `msgFilterRules.dat`, `prefs.js` eller någon profilfil. Det samexisterar med dina befintliga filter; stäng av filter som redan flyttar samma mejl vid mottagandet, eftersom tillägget inte blockerar dem. Undantaget är den frivilliga **import och export av filterfilen**: där skriver tillägget en fil åt dig och läser en fil du själv väljer, men det rör aldrig profilens egen `msgFilterRules.dat` – den byter du ut själv när Thunderbird är stängt (se *Thunderbirds egna filter* nedan).
 
 ”Läst” är Thunderbirds läst-markering, inte en bedömning av att du har läst färdigt. Ett mejl som öppnas i en flik eller ett meddelandefönster räknas som läst, men flyttas först när alla visningar är stängda och två sekunder har gått.
 
@@ -51,6 +51,33 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 - **1-klicksmallar:** *Fakturor & Kvitton*, *Order & Leverans*, *Nyhetsbrev*, *System & Notiser* och *Bokföring* fyller i regelnamn och villkor. Om en mapp med passande namn finns väljs den automatiskt som mål; annars väljer du målmapp och sparar.
 - **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.
 - **Högerklicksmeny på mejl:** *SortBro: Skapa filter från detta mejl…* öppnar SortBro med en ny regel förifylld från mejlet (avsändardomän, adress eller ämne). Regeln sparas först när du själv trycker Spara.
+
+## Thunderbirds egna filter – läs in dem och skriv ut dina egna
+
+Du som redan har fyrtio filter behöver inte skriva om dem. I **Regler**-vyn finns kortet **🔁 Thunderbirds egna filter**:
+
+- **⇪ Importera filterfil…** läser din `msgFilterRules.dat` och visar varje filter som en rad: namn, de villkor som gick att översätta, en rullista för målmappen och en kryssruta. **Ingenting skapas förrän du trycker på knappen**, och knappen räknar bara de rader som har en målmapp. Filen hittar du via *Hjälp → Felsökningsinformation → Öppna mappen* och sedan `ImapMail/<server>/` eller `Mail/Local Folders/`.
+- **⤓ Exportera som filterfil** skriver dina SortBro-regler som en `msgFilterRules.dat` i samma format som Thunderbird 140 använder (version 9). Filen laddas ner till Hämtade filer – du lägger själv in den i profilmappen medan Thunderbird är stängt. **Ta en kopia av den gamla filen först.** Tillägget rör aldrig profilen själv.
+
+**Det här översätts:** avsändare, till, kopia, ämne, storlek och datum; jämförelserna innehåller, är lika med, börjar med, slutar med samt större/mindre/äldre/nyare. *Alla adresser*, *vilken adress som helst* och *till eller kopia* blir den närmaste SortBro-varianten och raden säger att det är en ungefärlig översättning. Storlek räknas om mellan byte (Thunderbird) och kB (SortBro) åt båda hållen.
+
+**Det här går inte – och därför står det rakt ut på raden:**
+
+| I filterfilen | Varför | Vad du ser |
+|---|---|---|
+| Villkor på mejltexten (`body`) | SortBro matchar inte brevvästen | raden är urkryssad: *Villkor på mejltexten (body) kan SortBro inte matcha* |
+| Negerade villkor (`doesn't contain`, `isn't`) | SortBro kan inte uttrycka "inte" | *Negerade villkor (doesn't contain / isn't) kan SortBro inte uttrycka* |
+| `condition="ALL"` | filtret matchar allt och har inget villkor att översätta | *Filtret matchar allt (ALL) och har inget villkor att översätta* |
+| Blandade OCH/ELLER | SortBro kombinerar antingen alla eller minst ett | *Blandade OCH/ELLER kunde inte översättas exakt* |
+| Filter som bara markerar läst, byter etikett eller skräppostmarkerar | SortBro flyttar mejl | *Åtgärder som inte följer med: Mark read, JunkScore* |
+| Filter utan flytt | det finns ingen målmapp att ärva | *Filtret flyttar inga mejl* |
+| Målmapp som saknas hos dig | mappen kanske heter något annat | *Ingen målmapp matchade "Fakturor" – välj en* |
+
+Inget villkor tappas tyst: varje rad visar exakt vad som inte följde med, och du kan välja målmapp för hand på de rader där namnet inte gick att matcha. Filtren är dessutom urkryssade om de var avstängda i Thunderbird, så de importeras avstängda.
+
+Åt andra hållet gäller samma ärlighet: regler med fördelningar (olika mål per ämne), årsmappar eller läsläge skrivs som vanliga filter, och rapporten under kortet säger vilka delar Thunderbird inte kan ta emot. Villkor på årtal (*före/efter innevarande år*) och regler utan villkor skrivs inte alls – i stället står det vilka de är.
+
+**Kontoadressen:** Thunderbird skriver mottagningen som en full adress, till exempel `imap://anna%40exempel.se@imap.exempel.se/Ekonomi/Fakturor`. SortBro lär sig ditt kontos adress när du importerar en filterfil en gång och sparar den lokalt i dina inställningar; du kan också klistra in den i fältet ovanför rapporten. För ett lokalt konto skrivs `mailbox://nobody@Local%20Folders/…` automatiskt. Saknas adressen blir det ingen fil – och kortet säger precis vad som fattas i stället för att skriva något påhittat.
 
 ## Arkivering – och varför olästa mejl kan vänta
 
@@ -157,6 +184,7 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Valfria årsmappar:** årsarkivering är inget förval utan en kryssruta per regel (avstängd som standard). Kryssar du i den hamnar tidigare års mejl i `Arkiv/2025` – annars flyttas mejlen till den målmapp du valt.
 - **Olästa mejl flyttas när rutan är kryssad:** *Flytta även olästa mejl direkt* gör att matchande olästa mejl flyttas med en gång i alla mappar, i stället för att vänta tills de är lästa. Är *Öppna flyttade olästa mejl i nytt fönster* också kryssad öppnas mejlet **efter** flytten och alltid i målmappen – aldrig som en tom ruta.
 - **Kör alla regler nu:** en knapp sveper igenom alla aktiva regler direkt och rapporterar granskade mejl, cachade mappar, matchningar och köade flyttar.
+- **Thunderbirds egna filter:** importera din `msgFilterRules.dat` och få dina befintliga filter som färdiga SortBro-regler – eller exportera dina SortBro-regler som en filterfil Thunderbird förstår. Det som inte kan översättas står rakt ut per regel, och ingen fil skrivs utan känd kontoadress.
 - **Snabbregeln (⚡ Skapa regel på tio sekunder):** klickbara förslag från Inkorgen (avsändare och ämnesord med antal), live-räkning av hur många mejl regeln träffar, en mening i klarspråk om vad regeln gör och två knappar – *Skapa regel* eller *Lägg till och flytta nu*. Villkoret räknas ut automatiskt: full domän/adress blir exakt träff, ett löst ord blir *innehåller*.
 - **Varför flyttas inte mejlen?:** läsbar diagnos per regel som förklarar om mejlen väntar på att bli lästa, redan ligger i målmappen, redan är hanterade eller inte matchar villkoren – med exempelrader och påminnelse om Testläge/paus.
 - **Automatiskt varje timme:** standardintervallet är 60 minuter och körs vid sidan av den händelsestyrda bevakningen av inkommande mejl. Statusraden visar nästa automatiska körning.

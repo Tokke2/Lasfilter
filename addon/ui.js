@@ -109,7 +109,49 @@ const I18N={
   importSkipped:' {n} hoppades över (dubbletter eller regeln är full).',
   importNone:'Inget nytt att lägga till – allt finns redan i regeln.',
   importNoRule:'Öppna eller skapa en regel först.',
-  importSaveHint:'Tryck Spara regel för att spara ändringen.',
+    importSaveHint:'Tryck Spara regel för att spara ändringen.',
+  tbFilterTitle:'🔁 Thunderbirds egna filter',
+  tbFilterHelp:'Läs in dina befintliga filter från msgFilterRules.dat och gör dem till SortBro-regler – eller skriv ut dina regler som en filterfil som Thunderbird förstår. Filen ligger i din profil: Hjälp → Felsökningsinformation → Öppna mappen, sedan ImapMail/<server>/ eller Mail/Local Folders/.',
+  tbImportBtn:'⇪ Importera filterfil…',
+  tbExportBtn:'⇩ Exportera som filterfil',
+  tbPrefixHelp:'Klistra in kontots adress från filterfilen om du vill kunna exportera tillbaka.',
+  tbImportTitle:'Filter i filen: {n}',
+  tbImportSummary:'{ok} kan bli regler · {skipped} hoppas över',
+  tbImportCreate:'✓ Skapa {n} regler',
+  tbImportNothing:'Inget att importera – inget av filtren flyttar mejl med villkor SortBro kan matcha.',
+  tbImportDone:'{n} regler skapades från filterfilen.',
+  tbImportTarget:'Målmapp',
+  tbImportNeedsTarget:'Välj målmapp',
+  tbImportDisabled:'avstängt i Thunderbird',
+  tbImportNoTargetMatch:'Ingen målmapp matchade "{name}"',
+  tbImportReviewNote:'Granska och bocka av det du vill ha. Inget skapas förrän du trycker på knappen.',
+  tbExportSaved:'Filterfilen sparades: {name}',
+  tbExportWritten:'{n} filter skrivna',
+  tbExportSkipped:'{n} hoppades över',
+  tbExportNoUri:'Kontots adress i filterfilen saknas. Klistra in den i fältet ovan (den står i din msgFilterRules.dat, t.ex. imap://anvandare%40server.se@imap.server.se/) eller importera filen en gång först.',
+  tbExportPlace:'Lägg filen i profilens mapp för kontot (ImapMail/<server>/ eller Mail/Local Folders/) när Thunderbird är stängt, och starta sedan om Thunderbird. Ta en kopia av den gamla filen först.',
+  tbExportNeedsRules:'Det finns inga regler att exportera.',
+  tbNotes:'Att tänka på:',
+  tbNoteBody:'Villkor på mejltexten (body) kan SortBro inte matcha',
+  tbNoteNegation:'Negerade villkor (doesn\'t contain / isn\'t) kan SortBro inte uttrycka',
+  tbNoteMatchall:'Filtret matchar allt (ALL) och har inget villkor att översätta',
+  tbNoteComplex:'Blandade OCH/ELLER kunde inte översättas exakt',
+  tbNoteNoMove:'Filtret flyttar inga mejl',
+  tbNoteCopy:'Filtret kopierar i stället för att flytta – SortBro flyttar',
+  tbNoteNoTarget:'Ingen målmapp kunde matchas – välj en',
+  tbNoteActions:'Åtgärder som inte följer med: {list}',
+  tbNoteApprox:'"{field}" översattes ungefärligt',
+  tbNoteUnknown:'Fältet "{field}" finns inte i SortBro',
+  tbNoteSize:'Storlek räknades om mellan byte och kB',
+  tbNoteDate:'Datumvillkoret översattes till dagar',
+  tbNoteActionsAdd:'Åtgärder som inte följer med: ',
+  tbExportNoteDomain:'Domänvillkor blir "Från innehåller" i Thunderbird',
+  tbExportNoteSize:'Storleken skrivs i byte',
+  tbExportNoteBranches:'Grenar (olika mål per ämne) kan inte exporteras – bara huvudmålet följer med',
+  tbExportNoteYearFolders:'Årsmappar finns inte i Thunderbird-filter',
+  tbExportNoteReadPolicy:'Läsläget (olästa/lästa) finns inte i Thunderbird-filter',
+  tbExportNoteDate:'Villkor på årtal (före/efter innevarande år) kan inte exporteras',
+  tbExportNoteCondition:'Villkoret "{what}" kan inte skrivas som ett Thunderbird-filter',
   quickExistingPrompt:'"{name}" har {n} villkor sedan tidigare. Nya avsändare läggs till som alternativ, så regeln flyttar mejl som matchar något av villkoren. Fortsätta?',
   quickExistingDone:'{n} tillagt i regeln "{name}". Kombinationen är "minst ett av villkoren".',
   quickExistingNone:'Inget nytt att lägga till – värdet finns redan i regeln.',
@@ -633,6 +675,48 @@ const I18N={
   importNone:'Nothing new to add – the rule already has it all.',
   importNoRule:'Open or create a rule first.',
   importSaveHint:'Press Save rule to store the change.',
+  tbFilterTitle:'🔁 Thunderbird\'s own filters',
+  tbFilterHelp:'Read your existing filters from msgFilterRules.dat and turn them into SortBro rules – or write your rules as a filter file Thunderbird understands. The file lives in your profile: Help → Troubleshooting Information → Open Folder, then ImapMail/<server>/ or Mail/Local Folders/.',
+  tbImportBtn:'⇪ Import filter file…',
+  tbExportBtn:'⇩ Export as filter file',
+  tbPrefixHelp:'Paste the account address from the filter file if you want to export back to it.',
+  tbImportTitle:'Filters in the file: {n}',
+  tbImportSummary:'{ok} can become rules · {skipped} skipped',
+  tbImportCreate:'✓ Create {n} rules',
+  tbImportNothing:'Nothing to import – none of the filters move mail with conditions SortBro can match.',
+  tbImportDone:'{n} rules created from the filter file.',
+  tbImportTarget:'Target folder',
+  tbImportNeedsTarget:'Choose a target folder',
+  tbImportDisabled:'disabled in Thunderbird',
+  tbImportNoTargetMatch:'No target folder matched "{name}"',
+  tbImportReviewNote:'Review and tick what you want. Nothing is created until you press the button.',
+  tbExportSaved:'Filter file saved: {name}',
+  tbExportWritten:'{n} filters written',
+  tbExportSkipped:'{n} skipped',
+  tbExportNoUri:'The account address from the filter file is missing. Paste it in the field above (it is in your msgFilterRules.dat, e.g. imap://user%40server.com@imap.server.com/) or import the file once first.',
+  tbExportPlace:'Place the file in the profile folder for the account (ImapMail/<server>/ or Mail/Local Folders/) while Thunderbird is closed, then restart Thunderbird. Back up the old file first.',
+  tbExportNeedsRules:'There are no rules to export.',
+  tbNotes:'Good to know:',
+  tbNoteBody:'Conditions on the message body cannot be matched by SortBro',
+  tbNoteNegation:'Negated conditions (doesn\'t contain / isn\'t) cannot be expressed by SortBro',
+  tbNoteMatchall:'The filter matches everything (ALL) and has no condition to translate',
+  tbNoteComplex:'Mixed AND/OR could not be translated exactly',
+  tbNoteNoMove:'The filter does not move mail',
+  tbNoteCopy:'The filter copies instead of moving – SortBro moves',
+  tbNoteNoTarget:'No target folder could be matched – pick one',
+  tbNoteActions:'Actions that are not carried over: {list}',
+  tbNoteApprox:'"{field}" was translated approximately',
+  tbNoteUnknown:'The field "{field}" does not exist in SortBro',
+  tbNoteSize:'Size was converted between bytes and kB',
+  tbNoteDate:'The date condition was translated to days',
+  tbNoteActionsAdd:'Actions that are not carried over: ',
+  tbExportNoteDomain:'Domain conditions become "From contains" in Thunderbird',
+  tbExportNoteSize:'Size is written in bytes',
+  tbExportNoteBranches:'Branches (different targets per subject) cannot be exported – only the main target follows',
+  tbExportNoteYearFolders:'Year folders do not exist in Thunderbird filters',
+  tbExportNoteReadPolicy:'The read policy (unread/read) does not exist in Thunderbird filters',
+  tbExportNoteDate:'Conditions on years (before/after the current year) cannot be exported',
+  tbExportNoteCondition:'The condition "{what}" cannot be written as a Thunderbird filter',
   quickExistingPrompt:'"{name}" already has {n} conditions. New senders are added as alternatives, so the rule moves emails matching any of the conditions. Continue?',
   quickExistingDone:'{n} added to the rule "{name}". The combination is "at least one of the conditions".',
   quickExistingNone:'Nothing new to add – the value is already in the rule.',
@@ -1196,6 +1280,137 @@ function bumpCount(id,value){
  lastCounts[id]=text;node.textContent=text;
 }
 
+/* ===== 🔁 Thunderbirds egna filter: läs in msgFilterRules.dat och skriv ut våra regler ===== */
+let tbImport=null;
+
+function tbNoteText(code){
+ const table={
+  body:'tbNoteBody',negation:'tbNoteNegation',matchall:'tbNoteMatchall',complex:'tbNoteComplex',
+  noMove:'tbNoteNoMove',copy:'tbNoteCopy',noTarget:'tbNoteNoTarget',size:'tbNoteSize',date:'tbNoteDate'
+ };
+ if(table[code])return T(table[code]);
+ if(code.startsWith('approx:'))return T('tbNoteApprox').replace('{field}',code.slice(7));
+ if(code.startsWith('unknownField:'))return T('tbNoteUnknown').replace('{field}',code.slice(13));
+ if(code==='actions')return '';
+ if(code.startsWith('actions:'))return T('tbNoteActions').replace('{list}',code.slice(8));
+ return '';
+}
+function renderTbReview(){
+ const box=$('tbImportReview');if(!box)return;
+ box.replaceChildren();
+ if(!tbImport){box.hidden=true;return;}
+ box.hidden=false;
+ box.replaceChildren();
+ const head=el('div','tb-review-head');
+ head.append(el('strong','',T('tbImportTitle').replace('{n}',tbImport.filters.length)));
+ head.append(el('span','muted',T('tbImportSummary').replace('{ok}',tbImport.filters.filter(f=>f.importable).length).replace('{skipped}',tbImport.filters.filter(f=>!f.importable).length)));
+ box.append(head);
+ box.append(el('p','muted',T('tbImportReviewNote')));
+ tbImport.filters.forEach(f=>{
+  const row=el('div','tb-row'+(f.importable?'':' tb-row-off'));
+  const check=el('input');check.type='checkbox';check.checked=f.importable&&f.selected!==false;check.disabled=!f.importable;
+  const main=el('div','tb-row-main');
+  main.append(el('strong','',f.name||'-'));
+  const parts=[f.conditions.length?f.conditions.map(c=>fieldShortText(c.field)+' '+(OPERATOR_LABELS[c.op]?T(OPERATOR_LABELS[c.op]):c.op)+' '+c.value).join(f.match==='any'?' | ':' + '):''];
+  if(f.enabled===false)parts.push(T('tbImportDisabled'));
+  main.append(el('small','',parts.join('')));
+  const notes=f.notes.map(tbNoteText).filter(Boolean);
+  if(f.needsTarget&&f.targetName)notes.unshift(T('tbImportNoTargetMatch').replace('{name}',f.targetName));
+  if(notes.length)main.append(el('small','tb-row-notes',T('tbNotes')+' '+notes.join(' · ')));
+  const select=el('select');selectOptions(select,folders,T('tbImportTarget'),f.target||'');
+  if(f.importable&&!f.target)select.classList.add('needs-target');
+  select.addEventListener('change',()=>{f.target=select.value;f.selected=check.checked&&!!select.value;});
+  if(f.importable&&!f.target)check.checked=false;
+  check.addEventListener('change',()=>{
+   if(check.checked&&!select.value){check.checked=false;toast(T('tbImportNeedsTarget'));select.focus();return;}
+   f.selected=check.checked;
+  });
+  row.append(check,main,select);
+  box.append(row);
+ });
+ const button=el('button','button small primary',T('tbImportCreate').replace('{n}',tbImport.filters.filter(f=>f.importable&&f.selected!==false&&f.target).length));
+ button.type='button';
+ button.disabled=!tbImport.filters.some(f=>f.importable&&f.selected!==false&&f.target);
+ button.addEventListener('click',()=>createTbRules(button));
+ box.append(button);
+}
+async function fileTextOf(input){
+ const file=input?.files?.[0];
+ if(!file)return '';
+ if(file.size>4194304)throw new C.RuleError('bad_schema');
+ return file.text();
+}
+async function importTbFilters(input){
+ try{
+  const text=await fileTextOf(input);
+  if(!text.trim())return;
+  const parsed=LasFilters.parseFilterFile(text);
+  if(!parsed.rules.length){toast(T('tbImportNothing'));return;}
+  const accountId=$('tbAccount')?.value||accounts()[0]?.id||'';
+  const inboxId=folders.find(f=>f.accountId===accountId&&C.inboxFolder?C.inboxFolder(f):/^(inkorg|inbox)$/i.test(f.name||''))?.id||'';
+  const filters=parsed.rules.map(tb=>{
+   const conv=LasFilters.toSortBroRule(tb,{folders,accountId,inboxId});
+   return {...conv,selected:conv.importable&&!!conv.target};
+  });
+  tbImport={filters,accountId,uriPrefix:''};
+  const prefix=parsed.rules.map(r=>LasFilters.uriPrefix(r.move?.value||r.copy?.value||'')).find(Boolean)||'';
+  if(prefix){
+   tbImport.uriPrefix=prefix;
+   if($('tbUriPrefix'))$('tbUriPrefix').value=prefix;
+   if(accountId){
+    const map={...(state.prefs.filterUris||{}),...{[accountId]:prefix}};
+    try{state.prefs=await rpc('prefs',{prefs:{filterUris:map}});}catch{}
+   }
+  }
+  renderTbReview();
+  const ok=filters.filter(f=>f.importable).length;
+  toast(ok?T('tbImportSummary').replace('{ok}',ok).replace('{skipped}',filters.length-ok):T('tbImportNothing'));
+ }finally{if(input)input.value='';}
+}
+async function createTbRules(button){
+ if(!tbImport)return;
+ const chosen=tbImport.filters.filter(f=>f.importable&&f.selected!==false&&f.target);
+ if(!chosen.length){toast(T('tbImportNothing'));return;}
+ if(button)button.disabled=true;
+ try{
+  const rules=[...state.config.rules,...chosen.map(f=>({...f.rule,target:f.target}))];
+  const next=await rpc('saveRules',{rules,revision:state.config.revision});
+  dirty=false;renderStatus(next);
+  const created=chosen.length;
+  tbImport=null;renderTbReview();
+  loadRule(next.config.rules[next.config.rules.length-1]?.id||'');
+  toast(T('tbImportDone').replace('{n}',created));
+ }finally{if(button)button.disabled=false;}
+}
+function tbExportNoteText(code){
+ const table={domain:'tbExportNoteDomain',size:'tbExportNoteSize',branches:'tbExportNoteBranches',yearFolders:'tbExportNoteYearFolders',readPolicy:'tbExportNoteReadPolicy',date:'tbExportNoteDate'};
+ if(table[code])return T(table[code]);
+ if(code.startsWith('condition:'))return T('tbExportNoteCondition').replace('{what}',code.slice(10));
+ return '';
+}
+async function exportTbFilters(){
+ if(!(state.config.rules||[]).length){toast(T('tbExportNeedsRules'));return;}
+ const accountId=$('tbAccount')?.value||'';
+ const uriPrefix=($('tbUriPrefix')?.value||'').trim();
+ const result=await rpc('filterExport',{accountId,uriPrefix});
+ const report=$('tbReport');
+ if(!result.written){
+  if(report){report.hidden=false;report.textContent=T('tbExportNoUri');}
+  toast(T('tbExportNoUri'));
+  return;
+ }
+ await download(result.text,'msgFilterRules.dat','text/plain');
+ if(report){
+  report.hidden=false;
+  const lines=[T('tbExportWritten').replace('{n}',result.written)+(result.skipped?' · '+T('tbExportSkipped').replace('{n}',result.skipped):''),T('tbExportPlace')];
+  const notes=(result.notes||[]).map(tbExportNoteText).filter(Boolean);
+  if(notes.length)lines.push(T('tbNotes')+' '+notes.join(' · '));
+  if((result.needsUri||[]).length)lines.push(T('tbExportNoUri'));
+  report.replaceChildren(...lines.map(text=>el('p','tb-report-line',text)));
+ }
+ toast(T('tbExportSaved').replace('{name}','msgFilterRules.dat'));
+}
+
 /* ===== ✨ Föreslå regler från Inkorgen (endast lokala förslag) ===== */
 let suggestions=[],suggestionsScanned=false;
 function renderSuggestions(){
@@ -1357,7 +1572,7 @@ function renderStatus(next){
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
- renderRules();renderActivity();renderBackups();renderSuggestions();renderQuickExisting();quickHintsOnce();
+ renderRules();renderActivity();renderBackups();renderSuggestions();renderQuickExisting();renderTbAccounts();quickHintsOnce();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
@@ -1562,8 +1777,9 @@ function renderBackups(){
  $('blockedInfo').textContent=state.blocked?state.blocked+T('blockedSome'):T('blockedNone');
  $('clearBlocked').disabled=!state.blocked||!!state.inflight;
 }
-async function download(data,filename){
- const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+async function download(data,filename,mime='application/json'){
+ const body=typeof data==='string'?data:JSON.stringify(data,null,2);
+ const url=URL.createObjectURL(new Blob([body],{type:mime}));
  try{
   if(live&&!DEMO&&browser.downloads?.download)await browser.downloads.download({url,filename,saveAs:true});
   else{const a=el('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();}
@@ -2170,6 +2386,14 @@ async function handleRuleImport(inputId,merge=false){
   dirty=false;renderStatus(next);loadRule(next.config.rules[0]?.id||'');
   toast(T(merge?'toastMerged':'toastImported'));
  }finally{input.value='';}
+}
+if($('tbImportFile'))$('tbImportFile').addEventListener('change',()=>importTbFilters($('tbImportFile')).catch(alertError));
+if($('tbExportBtn'))handle('tbExportBtn','click',exportTbFilters);
+if($('tbUriPrefix'))$('tbUriPrefix').addEventListener('change',()=>{if(tbImport)tbImport.uriPrefix=$('tbUriPrefix').value.trim();});
+function renderTbAccounts(){
+ const sel=$('tbAccount');if(!sel)return;
+ const keep=sel.value;
+ selectOptions(sel,accounts(),T('chooseAccount'),keep);
 }
 handle('export','click',exportAllRules);
 if($('exportSettings'))handle('exportSettings','click',exportAllRules);

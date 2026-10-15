@@ -67,6 +67,7 @@ async function loadBackground(api=stubApi()){
  const sandbox={console,JSON,Math,Number,String,Array,Object,Map,Set,WeakMap,Promise,Error,TypeError,RegExp,Symbol,Boolean,isNaN,parseInt,parseFloat,structuredClone,
   Date:tick.Date,setTimeout:tick.setTimeout,clearTimeout:tick.clearTimeout,setInterval:tick.setInterval,clearInterval:tick.clearInterval,
   LasCore:C,
+  LasFilters:require(path.join(ROOT,'addon','filters.js')),
   LasEngine:class{constructor(){this.config={};this.fault='';this.pending=new Map();}stop(){}},
   browser};
  sandbox.globalThis=sandbox;
@@ -106,6 +107,54 @@ function fakeEngineWithRules(app,over={}){
  return fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
   newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[]},...over});
 }
+
+/* Konto med sökväg på målmappen – exporten behöver hela vägen, inte bara namnet. */
+function exportAccount(api,rootName){
+ api.accounts.list=async()=>[{
+  id:'a',name:rootName,
+  rootFolder:{id:'root',accountId:'a',name:'',specialUse:[],subFolders:[
+   {id:'inbox',accountId:'a',name:'Inkorg',specialUse:['inbox'],subFolders:[]},
+   {id:'fin',accountId:'a',name:'Fakturor',path:'Ekonomi/Fakturor',specialUse:[],subFolders:[]}]}}];
+}
+const exportRule={id:'r1',name:'Fakturor',enabled:true,target:'fin',match:'all',branches:[],conditions:[{field:'sender',op:'contains',value:'faktura@fortnox.se'}]};
+
+test('exporten skriver lokala mappar med Thunderbirds egen adress',async()=>{
+ const {app,api}=await loadBackground();
+ exportAccount(api,'Lokala mappar');
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[exportRule]}});
+ const list=await app.folderList();
+ assert.equal(list.find(f=>f.id==='fin').path,'Ekonomi/Fakturor','mapplistan bär hela sökvägen');
+ const out=await app.filterExport({accountId:'a'});
+ assert.equal(out.written,1);
+ assert.equal(out.needsUri.length,0,'ingen regel väntar på en adress');
+ assert.ok(out.text.includes('actionValue="mailbox://nobody@Local%20Folders/Ekonomi/Fakturor"'),'lokala mappar får mailbox-adressen: '+out.text.split('\r\n').filter(l=>l.startsWith('actionValue')));
+ assert.ok(out.text.includes('condition="AND (from,contains,faktura@fortnox.se)"'));
+});
+
+test('utan känd kontoadress säger exporten vilka regler som väntar på den',async()=>{
+ const {app,api}=await loadBackground();
+ exportAccount(api,'Testkonto');
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[exportRule]}});
+ const out=await app.filterExport({accountId:'a'});
+ assert.equal(out.written,0,'inget skrivs utan adress');
+ assert.equal(out.needsUri.length,1,'en regel väntar på adressen');
+ assert.equal(out.needsUri[0].ruleId,'r1');
+ assert.equal(out.needsUri[0].name,'Fakturor');
+ assert.ok(!out.text.includes('actionValue="imap'),'ingen påhittad adress');
+ const withPrefix=await app.filterExport({accountId:'a',uriPrefix:'imap://u%40h.se@imap.h.se/'});
+ assert.equal(withPrefix.written,1);
+ assert.equal(withPrefix.storedPrefix,'imap://u%40h.se@imap.h.se/');
+ assert.ok(withPrefix.text.includes('actionValue="imap://u%40h.se@imap.h.se/Ekonomi/Fakturor"'),'kontoadressen används direkt');
+});
+
+test('kontoadresser sparas bara i rimlig form och överlever en omstart',async()=>{
+ const {app}=await loadBackground();
+ const next=await app.handle({type:'prefs',prefs:{filterUris:{a:'imap://u@h.se/',x:'y'.repeat(300),'':'tom nyckel'}}});
+ assert.equal(JSON.stringify(next.filterUris),'{"a":"imap://u@h.se/"}','bara giltiga rader sparas');
+ assert.equal(JSON.stringify(app.prefs.filterUris),'{"a":"imap://u@h.se/"}');
+ const bogus=await app.handle({type:'prefs',prefs:{filterUris:['inte','ett','objekt']}});
+ assert.equal(JSON.stringify(bogus.filterUris),'{"a":"imap://u@h.se/"}','en lista får inte förstöra det som redan finns');
+});
 
 test('pausad bevakning kör ingenting och larmar inte i loggen',async()=>{
  const {app,tick}=await loadBackground();

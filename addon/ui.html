@@ -172,6 +172,23 @@
                 <label class="rule-check-chip"><input id="quickOpenWindow" type="checkbox"> <span data-i18n="inlineOpenWindow">Öppna i nytt fönster</span></label>
               </div>
             </div>
+            <div class="tb-filter-card" id="tbFilterCard">
+              <div class="tb-filter-head">
+                <strong data-i18n="tbFilterTitle">🔁 Thunderbirds egna filter</strong>
+                <span class="tb-filter-actions">
+                  <select id="tbAccount" aria-label="Konto"></select>
+                  <label class="button small secondary file-label"><span data-i18n="tbImportBtn">⇪ Importera filterfil…</span><input id="tbImportFile" type="file" accept=".dat,text/plain" hidden></label>
+                  <button id="tbExportBtn" type="button" class="button small secondary" data-i18n="tbExportBtn">⇩ Exportera som filterfil</button>
+                </span>
+              </div>
+              <p class="simple-help" data-i18n="tbFilterHelp">Läs in dina befintliga filter från msgFilterRules.dat och gör dem till SortBro-regler – eller skriv ut dina regler som en filterfil som Thunderbird förstår. Filen ligger i din profil: Hjälp → Felsökningsinformation → Öppna mappen, sedan ImapMail/&lt;server&gt;/ eller Mail/Local Folders/.</p>
+              <div class="tb-filter-row" id="tbPrefixRow" hidden>
+                <input id="tbUriPrefix" type="text" maxlength="240" placeholder="imap://anvandare%40server.se@imap.server.se/">
+                <span class="muted" data-i18n="tbPrefixHelp">Klistra in kontots adress från filterfilen om du vill kunna exportera tillbaka.</span>
+              </div>
+              <div id="tbImportReview" class="tb-filter-review" hidden></div>
+              <div id="tbReport" class="tb-filter-report" hidden></div>
+            </div>
             <label class="search">
               <span>⌕</span>
               <input id="ruleSearch" type="search" placeholder="Sök bland dina regler…" aria-label="Sök regler">
@@ -608,6 +625,7 @@
   </div>
 
   <script src="core.js"></script>
+  <script src="filters.js"></script>
   <script src="demo.js"></script>
   <script src="ui.js"></script>
 </body>

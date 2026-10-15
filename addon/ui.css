@@ -2322,3 +2322,102 @@ hr {
 #importResult {
   font-size: 0.82rem;
 }
+
+/* 🔁 Thunderbirds egna filter */
+.tb-filter-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+
+.tb-filter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tb-filter-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tb-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.tb-filter-row input {
+  flex: 1 1 260px;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+
+.tb-filter-review {
+  border-top: 1px dashed var(--line);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.tb-review-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.tb-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tb-row-off {
+  opacity: 0.55;
+}
+
+.tb-row-main {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.tb-row-main small {
+  display: block;
+  font-size: 0.76rem;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-row-notes {
+  color: var(--muted);
+}
+
+select.needs-target {
+  outline: 2px solid #c28a24;
+}
+
+.tb-filter-report {
+  border-top: 1px dashed var(--line);
+  margin-top: 8px;
+  padding-top: 8px;
+  font-size: 0.82rem;
+}
+
+.tb-report-line {
+  margin: 3px 0;
+}

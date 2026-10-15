@@ -18,6 +18,7 @@ globalThis.LasDemo=(()=>{
    case 'status':data=state;break;case 'folders':data=folders;break;case 'selected':data=selected;break;
    case 'prefs':{
     const p=m.prefs||{};
+    if(p.filterUris&&typeof p.filterUris==='object')state.prefs.filterUris=p.filterUris;
     if(['auto','spring','summer','autumn','winter'].includes(p.season))p.season=p.season;
     state.prefs={...state.prefs,...p};data=state.prefs;break;
    }
@@ -76,7 +77,16 @@ globalThis.LasDemo=(()=>{
     data={ruleId:rule.id,added:merged.added.length,skipped:merged.skipped+parsed.skipped,duplicates:merged.duplicates,overflow:merged.overflow,
      match:rule.match,conditions:rule.conditions,rule,target:rule.target,snapshot:state};break;
    }
-   case 'diagnose':{
+   case 'filterExport':{
+   /* Demon kan inte bygga riktiga kontoadresser – visa samma svar som bakgrunden utan fil. */
+   const prefix=String(m.uriPrefix||'').trim()||(state.prefs&&state.prefs.filterUris&&state.prefs.filterUris[m.accountId])||'';
+   const local=!prefix;
+   const uriOf={};
+   for(const rule of state.config.rules)uriOf[rule.id]=local?{}:{uriPrefix:'imap://demo%40exempel.se@imap.exempel.se/',folderPath:(folders.find(f=>f.id===rule.target)||{}).name||''};
+   const built=LasFilters.buildFilterFile(state.config.rules,{uriOf:local?{}:uriOf});
+   data={...built.report,text:built.text,needsUri:local?state.config.rules.map(r=>({ruleId:r.id,name:r.name})):[],accountId:m.accountId||'',storedPrefix:prefix};break;
+  }
+  case 'diagnose':{
     const rule=LasCore.validateRule(m.rule),rows=state.config.rules.find(r=>r.id===rule.id);
     const first=(rule.conditions||[])[0]||{};
     /* Fiktivt exempel på en regel som inte matchar något alls (t.ex. "Wordfence" i ämnet). */

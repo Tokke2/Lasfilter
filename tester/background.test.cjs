@@ -246,3 +246,39 @@ test('först efter ett andra misslyckande skrivs en läsbar felrad',async()=>{
  assert.ok(text.includes('kontrollera att regelns käll- och målmappar'),'texten ska gå att läsa och förstå: '+text);
  assert.ok(!/^svep_misslyckades code=/.test(text),'råa nycklar ska inte läckas till loggen');
 });
+
+test('villkor importeras in i en regel som redan finns',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ const existing=C.validateRule({id:'r9',name:'Webbsupport',enabled:true,source:'inbox',sourceAccount:'a',target:'fin',match:'all',readFilter:'read',
+  conditions:[{field:'subject',op:'contains',value:'WordPress'}],branches:[]});
+ const engine=fakeEngineWithRules(app,{config:{schema:1,revision:3,rulesVersion:2,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[existing]}});
+ const res=await app.handle({type:'importConditions',revision:3,ruleId:'r9',text:'wordpress@limoeurope.com\nfortnox.se'});
+ assert.equal(res.added,2);
+ assert.equal(res.skipped,0);
+ assert.equal(res.match,'any','flera avsändare kopplas med minst ett av villkoren');
+ const saved=engine.config.rules[0];
+ assert.equal(saved.conditions.length,3,'det gamla villkoret är kvar');
+ assert.deepEqual(saved.conditions[0],{field:'subject',op:'contains',value:'WordPress'});
+ assert.deepEqual(saved.conditions[1],{field:'sender',op:'equals',value:'wordpress@limoeurope.com'});
+ assert.deepEqual(saved.conditions[2],{field:'domain',op:'equals',value:'fortnox.se'});
+ assert.equal(saved.target,'fin','målmappen rörs inte');
+ assert.equal(saved.readFilter,'read','läsläget rörs inte');
+ assert.equal(saved.name,'Webbsupport','namnet rörs inte');
+ assert.equal(engine.config.revision,4,'sparningen höjer revisionen');
+ assert.equal(engine.config.rulesVersion,3,'cachen läses om så gamla mejl matchas av det nya villkoret');
+ assert.ok(app.logs.some(l=>l.event==='rules_saved'));
+});
+
+test('importen vägrar dubbletter, tom text och okänd regel',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ const existing=C.validateRule({id:'r9',name:'Klarna',enabled:true,source:'inbox',sourceAccount:'a',target:'fin',match:'any',
+  conditions:[{field:'domain',op:'equals',value:'klarna.se'}],branches:[]});
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[existing]}});
+ await assert.rejects(()=>app.handle({type:'importConditions',revision:0,ruleId:'r9',text:'KLARNA.SE'}),err=>err.code==='duplicate_id');
+ await assert.rejects(()=>app.handle({type:'importConditions',revision:0,ruleId:'r9',text:'   ,  '}),err=>err.code==='bad_value');
+ await assert.rejects(()=>app.handle({type:'importConditions',revision:0,ruleId:'finns-inte',text:'x.se'}),err=>err.code==='bad_id');
+});

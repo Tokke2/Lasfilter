@@ -175,6 +175,26 @@ App.quickPreview=async(msg)=>{
  const rule=C.choiceRule({field:msg.field,value:msg.value});
  return {matches:C.countMatches(scan.messages,rule),scanned:scan.scanned,condition:rule.conditions[0],inboxId:scan.inboxId,sourceAccount:scan.sourceAccount};
 };
+/* Klistra in domäner/adresser i en regel som redan finns. Villkoren läggs till –
+   de gamla rörs inte – och kombinationen blir "minst ett av villkoren" när regeln
+   får fler än ett villkor, eftersom flera avsändare betyder ELLER. */
+App.importConditions=async(msg)=>{
+ const e=App.engine;
+ const rule=e.config.rules.find(r=>r.id===msg.ruleId);
+ if(!rule)throw new C.RuleError('bad_id');
+ const parsed=C.parseImportList(msg.text,{limit:C.LIMITS.conditions,field:msg.field||'auto'});
+ if(!parsed.conditions.length)throw new C.RuleError('bad_value');
+ const merged=C.mergeConditions(rule.conditions,parsed.conditions,{limit:C.LIMITS.conditions});
+ if(!merged.added.length)throw new C.RuleError('duplicate_id');
+ const next=C.validateRule({...rule,conditions:merged.conditions,match:merged.conditions.length>1?'any':rule.match});
+ await App.checkRules([next]);
+ const rules=e.config.rules.map(r=>r.id===next.id?next:r);
+ await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+ App.log('rules_saved',rules.length);
+ App.log('debug',0,'importerade villkor: '+merged.added.length+' tillagda, '+merged.skipped+' hoppade (dubbletter eller full regel), kombination='+(next.match==='any'?'minst ett':'alla'));
+ return {ruleId:next.id,added:merged.added.length,skipped:merged.skipped,duplicates:merged.duplicates,overflow:merged.overflow,
+  match:next.match,conditions:next.conditions,rule:next,target:next.target,snapshot:App.snapshot()};
+};
 /* Skapar en färdig regel av ett enda val: avsändare/domän/ord + målmapp. */
 App.quickRule=async(msg)=>{
  const e=App.engine;
@@ -325,6 +345,10 @@ App.handle=async msg=>{
   case 'suggestRules':return App.suggestRules();
   case 'inboxHints':return App.inboxHints();
   case 'quickPreview':return App.quickPreview(msg);
+  case 'importConditions':return App.mutate(async()=>{
+   App.checkRevision(msg.revision);
+   return App.importConditions(msg);
+  });
   case 'quickRule':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    return App.quickRule(msg);

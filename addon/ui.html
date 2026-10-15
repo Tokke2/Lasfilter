@@ -161,6 +161,9 @@
               </div>
               <div id="quickSentence" class="quick-sentence"></div>
               <div class="quick-rule-row">
+                <select id="quickExisting" aria-label="Befintlig regel"><option value="">Skapa ny regel…</option></select>
+              </div>
+              <div class="quick-rule-row">
                 <button id="quickAddBtn" type="button" class="button small primary" data-i18n="quickAddBtn">＋ Lägg till filter</button>
                 <button id="quickAddRunBtn" type="button" class="button small secondary" data-i18n="quickAddRunBtn">⚡ Lägg till och flytta nu</button>
               </div>
@@ -232,6 +235,17 @@
                 </div>
                 <div id="conditions"></div>
                 <button id="addCondition" type="button" class="text-button" data-i18n="addConditionBtn">＋ Lägg till villkor</button>
+                <div class="import-box" id="importBox">
+                  <label class="field">
+                    <span data-i18n="importLabel">Klistra in domäner eller adresser (en per rad, eller med komma)</span>
+                    <textarea id="importValues" rows="2" maxlength="4000" placeholder="klarna.se&#10;order@fortnox.se, nyheter@klarna.se"></textarea>
+                  </label>
+                  <div class="import-actions">
+                    <button id="importBtn" type="button" class="button small secondary" data-i18n="importBtn">＋ Importera till regeln</button>
+                    <span id="importResult" class="muted" hidden></span>
+                  </div>
+                  <p class="simple-help" data-i18n="importHelp">Varje rad blir ett villkor i den här regeln. Adresser och domäner blir exakta träffar, andra ord blir "innehåller". Flera avsändare kopplas ihop med "minst ett av villkoren", så regeln flyttar mejl från vem som helst av dem.</p>
+                </div>
               </div>
 
               <div class="form-section">

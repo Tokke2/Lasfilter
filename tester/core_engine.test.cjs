@@ -906,3 +906,65 @@ test('suggestWords filtrerar bort stoppord och korta ord',()=>{
  for(const stop of ['din','och','för','dig','nya'])assert.ok(!words.includes(stop),'stoppordet '+stop+' ska inte föreslås');
  assert.ok(!words.includes('mig')||'mig'.length>=4,'för korta ord tas bort');
 });
+
+/* ===== Importera domäner/adresser till en befintlig regel ===== */
+
+test('importedCondition väljer rätt villkor för adress, domän och löst ord',()=>{
+ assert.deepEqual(C.importedCondition('order@klarna.se'),{field:'sender',op:'equals',value:'order@klarna.se'});
+ assert.deepEqual(C.importedCondition('KLARNA.SE'),{field:'domain',op:'equals',value:'KLARNA.SE'});
+ assert.deepEqual(C.importedCondition('klarna'),{field:'sender',op:'contains',value:'klarna'});
+ assert.deepEqual(C.importedCondition('mailto:info@exempel.se'),{field:'sender',op:'equals',value:'info@exempel.se'});
+ assert.deepEqual(C.importedCondition(' <Viktigt@Exempel.se> '),{field:'sender',op:'equals',value:'Viktigt@Exempel.se'});
+ assert.throws(()=>C.importedCondition('   '),e=>e.code==='bad_value');
+ assert.equal(C.looksLikeEmail('a@b.se'),true);
+ assert.equal(C.looksLikeEmail('a@b'),false);
+ assert.equal(C.looksLikeDomain('a.b.se'),true);
+ assert.equal(C.looksLikeDomain('localhost'),false);
+});
+
+test('parseImportList delar upp en inklistrad lista och hoppar över dubbletter',()=>{
+ const one=C.parseImportList('klarna.se');
+ assert.deepEqual(one.conditions,[{field:'domain',op:'equals',value:'klarna.se'}]);
+ assert.equal(one.skipped,0);
+ const many=C.parseImportList('klarna.se, order@fortnox.se\nWordfence ;  nyheter@klarna.se\nklarna.se');
+ assert.deepEqual(many.conditions,[
+  {field:'domain',op:'equals',value:'klarna.se'},
+  {field:'sender',op:'equals',value:'order@fortnox.se'},
+  {field:'sender',op:'contains',value:'Wordfence'},
+  {field:'sender',op:'equals',value:'nyheter@klarna.se'}]);
+ assert.equal(many.skipped,1,'dubbletten räknas, inte tystas');
+ assert.deepEqual(C.parseImportList('').conditions,[]);
+ assert.deepEqual(C.parseImportList('   ,  ;  ').conditions,[]);
+ assert.equal(C.parseImportList('a1.se a2.se a3.se',{limit:2}).conditions.length,2,'gränsen hålls');
+ assert.equal(C.parseImportList('a1.se a2.se a3.se',{limit:2}).skipped,1);
+ assert.deepEqual(C.parseImportList('Faktura',{field:'subject'}).conditions,[{field:'subject',op:'contains',value:'Faktura'}]);
+});
+
+test('mergeConditions lägger till utan att röra de gamla villkoren',()=>{
+ const existing=[{field:'subject',op:'contains',value:'Faktura'}];
+ const added=[{field:'domain',op:'equals',value:'klarna.se'},{field:'domain',op:'equals',value:'fortnox.se'}];
+ const merged=C.mergeConditions(existing,added);
+ assert.deepEqual(merged.conditions,merged.conditions);
+ assert.equal(merged.conditions[0].value,'Faktura','första villkoret är orört');
+ assert.deepEqual(merged.added,added);
+ assert.equal(merged.suggestedMatch,'any','flera villkor ska kopplas med minst ett');
+ assert.equal(merged.skipped,0);
+ const single=C.mergeConditions([],added.slice(0,1));
+ assert.equal(single.suggestedMatch,'all','ett enda villkor behåller alla-måste-stämma');
+});
+
+test('mergeConditions hoppar över dubbletter och respekterar åtta villkor',()=>{
+ const existing=[{field:'domain',op:'equals',value:'klarna.se'}];
+ const dup=C.mergeConditions(existing,[{field:'domain',op:'equals',value:'KLARNA.SE'}]);
+ assert.equal(dup.added.length,0,'samma värde i annan storlek är en dubblett');
+ assert.equal(dup.duplicates,1);
+ assert.equal(dup.skipped,1);
+ const full=Array.from({length:8},(_,i)=>({field:'subject',op:'contains',value:'v'+i}));
+ const over=C.mergeConditions(full,[{field:'domain',op:'equals',value:'ny.se'}]);
+ assert.equal(over.added.length,0);
+ assert.equal(over.overflow,1);
+ assert.equal(over.conditions.length,8,'regeln får aldrig fler än åtta villkor');
+ const mixed=C.mergeConditions([{field:'subject',op:'contains',value:'Faktura'}],[{field:'subject',op:'contains',value:'Faktura'},{field:'domain',op:'equals',value:'ny.se'}]);
+ assert.equal(mixed.added.length,1,'bara den nya läggs till');
+ assert.equal(mixed.duplicates,1);
+});

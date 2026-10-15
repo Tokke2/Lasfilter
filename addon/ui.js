@@ -98,6 +98,21 @@ const I18N={
   quickRunToast:'Regeln skapades och kördes: {n} mejl granskade, {q} flyttade.',
   quickFetchBtn:'✉ Hämta från markerat mejl',
   quickAddBtn:'＋ Skapa regel',
+  quickExistingNew:'Skapa ny regel…',
+  quickExistingAdd:'＋ Lägg till i: {name}',
+  quickExistingPick:'Välj en regel ovan om du vill lägga till avsändaren i en regel som redan finns.',
+  importLabel:'Klistra in domäner eller adresser (en per rad, eller med komma)',
+  importBtn:'＋ Importera till regeln',
+  importHelp:'Varje rad blir ett villkor i den här regeln. Adresser och domäner blir exakta träffar, andra ord blir "innehåller". Flera avsändare kopplas ihop med "minst ett av villkoren", så regeln flyttar mejl från vem som helst av dem.',
+  importAdded:'{n} villkor tillagda i regeln.',
+  importAddedAny:'{n} villkor tillagda. Kombinationen är nu "minst ett av villkoren".',
+  importSkipped:' {n} hoppades över (dubbletter eller regeln är full).',
+  importNone:'Inget nytt att lägga till – allt finns redan i regeln.',
+  importNoRule:'Öppna eller skapa en regel först.',
+  importSaveHint:'Tryck Spara regel för att spara ändringen.',
+  quickExistingPrompt:'"{name}" har {n} villkor sedan tidigare. Nya avsändare läggs till som alternativ, så regeln flyttar mejl som matchar något av villkoren. Fortsätta?',
+  quickExistingDone:'{n} tillagt i regeln "{name}". Kombinationen är "minst ett av villkoren".',
+  quickExistingNone:'Inget nytt att lägga till – värdet finns redan i regeln.',
   quickValuePlaceholder:'t.ex. fortnox.se, klarna.se eller Faktura…',
   ruleSearchPlaceholder:'Sök bland dina regler…',
   exportBtn:'↓ Exportera regler (.json)',
@@ -606,6 +621,21 @@ const I18N={
   quickRunToast:'Rule created and run: {n} emails checked, {q} moved.',
   quickFetchBtn:'✉ Fetch from selected email',
   quickAddBtn:'＋ Create rule',
+  quickExistingNew:'Create a new rule…',
+  quickExistingAdd:'＋ Add to: {name}',
+  quickExistingPick:'Pick a rule above to add the sender to a rule that already exists.',
+  importLabel:'Paste domains or addresses (one per line, or comma separated)',
+  importBtn:'＋ Import into the rule',
+  importHelp:'Each line becomes a condition in this rule. Addresses and domains become exact matches, other words become "contains". Several senders are joined with "at least one of the conditions", so the rule moves emails from any of them.',
+  importAdded:'{n} conditions added to the rule.',
+  importAddedAny:'{n} conditions added. The combination is now "at least one of the conditions".',
+  importSkipped:' {n} were skipped (duplicates, or the rule is full).',
+  importNone:'Nothing new to add – the rule already has it all.',
+  importNoRule:'Open or create a rule first.',
+  importSaveHint:'Press Save rule to store the change.',
+  quickExistingPrompt:'"{name}" already has {n} conditions. New senders are added as alternatives, so the rule moves emails matching any of the conditions. Continue?',
+  quickExistingDone:'{n} added to the rule "{name}". The combination is "at least one of the conditions".',
+  quickExistingNone:'Nothing new to add – the value is already in the rule.',
   quickValuePlaceholder:'e.g. fortnox.se, klarna.se or Invoice…',
   ruleSearchPlaceholder:'Search your rules…',
   exportBtn:'↓ Export rules (.json)',
@@ -1327,7 +1357,7 @@ function renderStatus(next){
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
- renderRules();renderActivity();renderBackups();renderSuggestions();quickHintsOnce();
+ renderRules();renderActivity();renderBackups();renderSuggestions();renderQuickExisting();quickHintsOnce();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
@@ -1658,6 +1688,42 @@ handle('ruleOpenWindow','change',()=>{
 handle('ruleReadFilter','change',()=>{dirty=true;updateReadPolicy();});
 handle('ruleUnreadAction','change',()=>{dirty=true;updateReadPolicy();});
 handle('addCondition','click',()=>{addCondition({field:'subject',op:'contains',value:''});dirty=true;});
+/* ＋ Importera domäner/adresser: en lista blir flera villkor i regeln som redigeras. */
+function importIntoEditor(){
+ const box=$('importValues');
+ const text=box?.value||'';
+ const parsed=C.parseImportList(text,{limit:8,field:['auto','domain','sender','subject'].includes($('importField')?.value||'auto')?($('importField')?.value||'auto'):'auto'});
+ const result=$('importResult');
+ if(!parsed.conditions.length){
+  if(result){result.hidden=false;result.textContent=T('importNone');}
+  toast(T('importNone'));
+  return null;
+ }
+ const rows=[...$('conditions').children];
+ const existing=rows.map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value}));
+ const merged=C.mergeConditions(existing,parsed.conditions,{limit:8});
+ if(!merged.added.length){
+  const skipped=merged.skipped+parsed.skipped;
+  const text=T('importNone')+(skipped?T('importSkipped').replace('{n}',skipped):'');
+  if(result){result.hidden=false;result.textContent=text;}
+  if(box)box.value='';
+  toast(text);
+  return merged;
+ }
+ for(const cond of merged.added)addCondition(cond);
+ if(merged.added.length&&merged.suggestedMatch==='any'&&($('match').value==='all'))$('match').value='any';
+ if(merged.added.length)dirty=true;
+ const parts=[T(merged.added.length&&merged.suggestedMatch==='any'?'importAddedAny':'importAdded').replace('{n}',merged.added.length)];
+ const skipped=merged.skipped+parsed.skipped;
+ if(skipped)parts.push(T('importSkipped').replace('{n}',skipped));
+ parts.push(T('importSaveHint'));
+ if(result){result.hidden=false;result.textContent=parts.join('');}
+ if(box)box.value='';
+ toast(parts.join(''));
+ return merged;
+}
+if($('importBtn'))handle('importBtn','click',()=>{if(!selectedId&&!$('conditions').children.length){toast(T('importNoRule'));return;}importIntoEditor();});
+if($('importValues'))$('importValues').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('importBtn')?.click();}});
 handle('addBranch','click',()=>{addBranchRow();dirty=true;});
 
 async function saveCurrentRule({openNewAfter=false,forceNew=false}={}){
@@ -1845,6 +1911,41 @@ async function updateQuickPreview(){
 }
 function scheduleQuickPreview(){clearTimeout(quickPreviewTimer);quickPreviewTimer=setTimeout(()=>updateQuickPreview().catch(()=>{}),320);}
 
+function renderQuickExisting(){
+ const sel=$('quickExisting');if(!sel)return;
+ const keep=sel.value;
+ const list=[{id:'',name:T('quickExistingNew')}].concat(state.config.rules.map(r=>({id:r.id,name:(r.enabled?'':'⏸ ')+r.name})));
+ sel.replaceChildren(...list.map(r=>{const o=el('option','',r.name);o.value=r.id;return o;}));
+ sel.value=state.config.rules.some(r=>r.id===keep)?keep:'';
+ const chosen=state.config.rules.find(r=>r.id===sel.value);
+ if($('quickAddBtn'))$('quickAddBtn').textContent=chosen?T('quickExistingAdd').replace('{name}',chosen.name):T('quickAddBtn');
+}
+/* Lägger det man valt in i en regel som redan finns i stället för att skapa en ny. */
+async function addToExistingRule(ruleId,{runNow=false}={}){
+ const rawVal=($('quickValue')?.value||'').trim();
+ const rule=state.config.rules.find(r=>r.id===ruleId);
+ if(!rule)throw new C.RuleError('bad_id');
+ if(!rawVal){$('quickValue')?.focus();throw new C.RuleError('bad_value');}
+ const existingCount=(rule.conditions||[]).length;
+ if(existingCount&&rule.match!=='any'&&!confirm(T('quickExistingPrompt').replace('{name}',rule.name).replace('{n}',existingCount)))return null;
+ const button=runNow?$('quickAddRunBtn'):$('quickAddBtn');
+ if(button)button.disabled=true;
+ try{
+  const res=await rpc('importConditions',{ruleId,text:rawVal,revision:state.config.revision});
+  dirty=false;renderStatus(res.snapshot);loadRule(ruleId);
+  if($('quickValue'))$('quickValue').value='';
+  await updateQuickPreview();
+  quickHints=null;await loadQuickHints(true);
+  if(runNow){
+   const r=await rpc('catchUp',{ruleId});
+   renderStatus(await rpc('status'));
+   toast(T('quickRunToast').replace('{n}',r.scanned).replace('{q}',r.queued));
+  }else toast(T('quickExistingDone').replace('{n}',res.added).replace('{name}',rule.name));
+  return res;
+ }finally{
+  if(button)button.disabled=false;
+ }
+}
 async function createQuickRule({runNow=false}={}){
  const field=$('quickField')?.value||'domain';
  const rawVal=($('quickValue')?.value||'').trim();
@@ -1871,8 +1972,15 @@ async function createQuickRule({runNow=false}={}){
   if(button)button.disabled=false;
  }
 }
-if($('quickAddBtn'))handle('quickAddBtn','click',()=>createQuickRule({runNow:false}));
-if($('quickAddRunBtn'))handle('quickAddRunBtn','click',()=>createQuickRule({runNow:true}));
+if($('quickAddBtn'))handle('quickAddBtn','click',()=>{
+ const chosen=$('quickExisting')?.value||'';
+ return chosen?addToExistingRule(chosen,{runNow:false}):createQuickRule({runNow:false});
+});
+if($('quickAddRunBtn'))handle('quickAddRunBtn','click',()=>{
+ const chosen=$('quickExisting')?.value||'';
+ return chosen?addToExistingRule(chosen,{runNow:true}):createQuickRule({runNow:true});
+});
+if($('quickExisting'))handle('quickExisting','change',()=>renderQuickExisting());
 if($('quickHintsBtn'))handle('quickHintsBtn','click',()=>loadQuickHints(true));
 if($('quickValue'))$('quickValue').addEventListener('input',scheduleQuickPreview);
 if($('quickField'))$('quickField').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));

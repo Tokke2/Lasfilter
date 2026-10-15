@@ -185,6 +185,54 @@ function choiceSummary(c){
 function inboxHints(messages,{rules=[],limit=8,wordLimit=6,minCount=2,wordMinCount=3}={}){
  return {senders:suggestFrom(messages,{rules,limit,minCount}),words:suggestWords(messages,{rules,limit:wordLimit,minCount:wordMinCount})};
 }
+/* ===== Importera domäner/adresser till en regel som redan finns ===== */
+function looksLikeEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);}
+function looksLikeDomain(v){return /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(v);}
+/* Ett inklistrat värde blir rätt sorts villkor: adress -> exakt, domän -> exakt, annat ord -> innehåller. */
+function importedCondition(value){
+ const v=String(value??'').trim().replace(/^mailto:/i,'').replace(/^[<"'(\[]+|[>"')\]]+$/g,'').trim();
+ if(!v)fail('bad_value');
+ if(looksLikeEmail(v))return {field:'sender',op:'equals',value:v};
+ if(looksLikeDomain(v))return {field:'domain',op:'equals',value:v};
+ return {field:'sender',op:'contains',value:v};
+}
+function addressTokens(text){
+ return String(text??'').split(/[\s,;|]+/)
+  .map(t=>t.trim().replace(/^[<"'([]+|[>"')\]]+$/g,'').replace(/^mailto:/i,''))
+  .filter(Boolean).slice(0,200);
+}
+/* Klistra in en lista (nya rad, komma, semikolon eller mellanslag) -> färdiga villkor.
+   Dubbletter, för långa listor och tomma rader räknas i `skipped` i stället för att tyst försvinna. */
+function parseImportList(text,{limit=LIMITS.conditions,field='auto'}={}){
+ const out=[],seen=new Set();let skipped=0;
+ for(const token of addressTokens(text)){
+  let cond=null;
+  try{cond=field&&field!=='auto'?choiceCondition({field,value:token}):importedCondition(token);}catch{cond=null;}
+  if(!cond||String(cond.value).length>LIMITS.value){skipped++;continue;}
+  const key=cond.field+'|'+cond.op+'|'+norm(cond.value);
+  if(seen.has(key)){skipped++;continue;}
+  if(out.length>=limit){skipped++;continue;}
+  seen.add(key);out.push(cond);
+ }
+ return {conditions:out,skipped};
+}
+/* Lägger till villkor i en befintlig regels villkor utan att röra de gamla. */
+function mergeConditions(existing,added,{limit=LIMITS.conditions}={}){
+ const merged=[],seen=new Set();let duplicates=0,overflow=0;
+ for(const c of Array.isArray(existing)?existing:[]){
+  const key=(c.field||'')+'|'+(c.op||'')+'|'+norm(c.value);
+  if(seen.has(key))continue;
+  seen.add(key);merged.push({field:c.field,op:c.op,value:c.value});
+ }
+ const addedList=[];
+ for(const c of Array.isArray(added)?added:[]){
+  const key=(c.field||'')+'|'+(c.op||'')+'|'+norm(c.value);
+  if(seen.has(key)){duplicates++;continue;}
+  if(merged.length>=limit){overflow++;continue;}
+  seen.add(key);merged.push({field:c.field,op:c.op,value:c.value});addedList.push({field:c.field,op:c.op,value:c.value});
+ }
+ return {conditions:merged,added:addedList,duplicates,overflow,skipped:duplicates+overflow,suggestedMatch:merged.length>1?'any':'all'};
+}
 function listOf(value){return Array.isArray(value)?value.filter(v=>typeof v==='string').join(' '):typeof value==='string'?value:'';}
 function valuesFor(message){const address=email(message.author);return {sender:address,domain:address.split('@')[1]||'',subject:typeof message.subject==='string'?message.subject.slice(0,20000):'',
  recipient:listOf(message.recipients),cc:[listOf(message.ccList),listOf(message.bccList)].filter(Boolean).join(' '),
@@ -258,6 +306,6 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

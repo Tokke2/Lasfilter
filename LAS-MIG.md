@@ -41,6 +41,12 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
   - **＋ Ny mapp** föreslår ett mappnamn ur det du skrev: `klarna.se` → *Klarna*, `wordpress@limoeurope.com` → *Limoeurope*.
   - Kryssrutorna *Flytta olästa mejl* (förkryssad) och *Öppna i nytt fönster* styr regeln direkt; årsmappar förblir avstängda som standard.
   - Allt sker lokalt: förslagen bygger bara på avsändare, ämnesrader och antal – ingen mejltext lämnar datorn, och ingenting skapas utan ditt klick.
+- **＋ Importera domäner/adresser till en befintlig regel:** i regelredigeringen, under villkoren, finns en ruta där du klistrar in en eller flera domäner/adresser – en per rad, med komma, semikolon eller mellanslag. Varje rad blir ett **villkor i just den regeln**, utan att de gamla villkoren rörs.
+  - Adress (`order@klarna.se`) och domän (`klarna.se`) blir **exakta träffar**; ett löst ord blir *avsändaren innehåller*. Klamrar och `mailto:` städas bort automatiskt.
+  - Flera villkor kopplas ihop med **"minst ett av villkoren"** (flera avsändare betyder ju eller) – rutan säger till när kombinationen ändras och hur många villkor som lades till.
+  - **Dubbletter hoppas över** och räknas upp i klartext (*"2 hoppades över (dubbletter eller regeln är full)"*), och regeln kan aldrig få fler än **8 villkor**.
+  - Ändringen ligger i utkastet tills du trycker **Spara regel** – då sparas en regelkopia först, precis som vanligt.
+  - Snabbvägen: i **⚡ Skapa regel på tio sekunder** väljer du *Lägg till i: \<regel\>* i listan och trycker knappen – då läggs avsändaren in i den regeln direkt, och **⚡ Lägg till och flytta nu** kör den också. Har regeln villkor sedan tidigare frågar SortBro först, eftersom nya avsändare blir alternativ (ELLER).
 - **✨ Föreslå regler från Inkorgen:** SortBro tittar lokalt i Inkorgen efter avsändardomäner som återkommer och visar dem som *förslag*. Inget skapas förrän du själv väljer målmapp och trycker **✓ Godkänn**. Avsändare som redan täcks av en aktiv regel föreslås aldrig.
 - **1-klicksmallar:** *Fakturor & Kvitton*, *Order & Leverans*, *Nyhetsbrev*, *System & Notiser* och *Bokföring* fyller i regelnamn och villkor. Om en mapp med passande namn finns väljs den automatiskt som mål; annars väljer du målmapp och sparar.
 - **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.

@@ -63,6 +63,19 @@ globalThis.LasDemo=(()=>{
     const folder=folders.find(f=>f.id===m.target)||{};
     data={ruleId:rule.id,rule,condition:rule.conditions[0],target:{id:folder.id||m.target,name:folder.name||'',label:folder.label||''},snapshot:state};break;
    }
+   case 'importConditions':{
+    const rule=state.config.rules.find(r=>r.id===m.ruleId);
+    if(!rule)throw new LasCore.RuleError('bad_id');
+    const parsed=LasCore.parseImportList(m.text,{limit:8,field:m.field||'auto'});
+    if(!parsed.conditions.length)throw new LasCore.RuleError('bad_value');
+    const merged=LasCore.mergeConditions(rule.conditions||[],parsed.conditions,{limit:8});
+    if(!merged.added.length)throw new LasCore.RuleError('duplicate_id');
+    rule.conditions=merged.conditions;
+    if(merged.conditions.length>1)rule.match='any';
+    saveRules(state.config.rules);
+    data={ruleId:rule.id,added:merged.added.length,skipped:merged.skipped+parsed.skipped,duplicates:merged.duplicates,overflow:merged.overflow,
+     match:rule.match,conditions:rule.conditions,rule,target:rule.target,snapshot:state};break;
+   }
    case 'diagnose':{
     const rule=LasCore.validateRule(m.rule),rows=state.config.rules.find(r=>r.id===rule.id);
     const first=(rule.conditions||[])[0]||{};

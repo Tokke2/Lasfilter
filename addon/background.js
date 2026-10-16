@@ -196,7 +196,6 @@ App.createFolder=async(parentId,name)=>{
  App.log('settings_saved');
  return {id:folder?.id||'',name:folder?.name||clean,accountId:folder?.accountId||'',label:folder?.name||clean};
 };
-/* ✨ Föreslå regler från Inkorgen – endast lokala förslag, inget skapas här. */
 /* Läser Inkorgen en gång och delar resultatet med alla snabbflöden (förslag, räkning, regler). */
 App.scanInbox=async({limit=400}={})=>{
  const accounts=await B.accounts.list(true),inboxes=[];
@@ -222,11 +221,6 @@ App.scanInbox=async({limit=400}={})=>{
  }
  return {messages:collected,inboxId,sourceAccount,scanned:collected.length};
 };
-App.suggestRules=async()=>{
- const {messages}=await App.scanInbox();
- return C.suggestFrom(messages,{rules:App.engine?.config.rules||[],limit:8,minCount:2});
-};
-/* Klickbara förslag: återkommande avsändare och vanliga ämnesord i Inkorgen. */
 App.inboxHints=async()=>{
  const scan=await App.scanInbox();
  const hints=C.inboxHints(scan.messages,{rules:App.engine?.config.rules||[],limit:8,wordLimit:6,minCount:2,wordMinCount:3});
@@ -484,7 +478,6 @@ App.handle=async msg=>{
   case 'status':return App.snapshot();
   case 'folders':return App.folderList();
   case 'createFolder':return App.createFolder(msg.parentId,msg.name);
-  case 'suggestRules':return App.suggestRules();
   case 'inboxHints':return App.inboxHints();
   case 'quickPreview':return App.quickPreview(msg);
   case 'filterExport':return App.filterExport(msg);

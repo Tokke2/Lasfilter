@@ -502,14 +502,6 @@ const I18N={
   tplNameBookkeeping:'Bokföring',
   tplApplied:'Mallen är ifylld. Välj målmapp och spara regeln.',
   tplTargetHint:'Tips: skapa målmappen med ＋ Ny mapp.',
-  suggestTitle:'✨ Föreslå regler från Inkorgen',
-  suggestBtn:'✨ Skanna Inkorgen',
-  suggestHelp:'SortBro tittar lokalt i Inkorgen och föreslår avsändare som återkommer. Inget skapas förrän du själv väljer målmapp och godkänner.',
-  suggestEmpty:'Inga nya förslag just nu – Inkorgen har inga återkommande avsändare som saknar regel.',
-  suggestSummary:'{count} mejl',
-  suggestFound:'{count} förslag hittades i Inkorgen.',
-  suggestApprove:'✓ Godkänn',
-  suggestApproved:'Regeln skapades från Inkorgen.',
   newFolderBtn:'＋ Ny mapp',
   newFolderEyebrow:'NY MAPP I THUNDERBIRD',
   newFolderTitle:'Skapa en ny målmapp',
@@ -1080,14 +1072,6 @@ const I18N={
   tplNameBookkeeping:'Bookkeeping',
   tplApplied:'Template filled in. Choose a target folder and save the rule.',
   tplTargetHint:'Tip: create the target folder with ＋ New folder.',
-  suggestTitle:'✨ Suggest rules from the Inbox',
-  suggestBtn:'✨ Scan the Inbox',
-  suggestHelp:'SortBro looks locally at your Inbox and suggests senders that keep coming back. Nothing is created until you pick a target folder and approve.',
-  suggestEmpty:'No new suggestions right now – your Inbox has no recurring senders without a rule.',
-  suggestSummary:'{count} emails',
-  suggestFound:'{count} suggestions found in the Inbox.',
-  suggestApprove:'✓ Approve',
-  suggestApproved:'Rule created from the Inbox.',
   newFolderBtn:'＋ New folder',
   newFolderEyebrow:'NEW FOLDER IN THUNDERBIRD',
   newFolderTitle:'Create a new target folder',
@@ -1488,60 +1472,6 @@ async function exportTbFilters(){
  toast(T('tbExportSaved').replace('{name}','msgFilterRules.dat'));
 }
 
-/* ===== ✨ Föreslå regler från Inkorgen (endast lokala förslag) ===== */
-let suggestions=[],suggestionsScanned=false;
-function renderSuggestions(){
- const box=$('suggestionsBox');if(!box)return;
- box.replaceChildren();
- if(!suggestionsScanned&&!suggestions.length)return;
- if(!suggestions.length){box.append(el('p','suggestion-empty',T('suggestEmpty')));return;}
- for(const s of suggestions){
-  const row=el('div','suggestion-row'),main=el('div','sug-main');
-  main.append(el('strong','',s.domain));
-  const parts=[T('suggestSummary').replace('{count}',s.count)];
-  if(s.subject)parts.push(s.subject);
-  if(s.sender)parts.push(s.sender);
-  main.append(el('small','',parts.join(' · ')));
-  const select=el('select');select.setAttribute('aria-label',T('chooseTarget'));selectOptions(select,folders,T('chooseTarget'),'');
-  const ok=el('button','button small primary',T('suggestApprove'));ok.type='button';
-  ok.addEventListener('click',async()=>{try{await approveSuggestion(s,select.value);}catch(err){alertError(err);}});
-  row.append(main,select,ok);box.append(row);
- }
-}
-async function scanInbox(){
- if($('suggestRulesBtn'))$('suggestRulesBtn').disabled=true;
- try{
-  suggestions=await rpc('suggestRules');
-  suggestionsScanned=true;
-  renderSuggestions();
-  toast(suggestions.length?T('suggestFound').replace('{count}',suggestions.length):T('suggestEmpty'));
- }finally{if($('suggestRulesBtn'))$('suggestRulesBtn').disabled=false;}
-}
-async function approveSuggestion(s, targetId){
- if(!targetId)throw new C.RuleError('choose_target');
- const folder=folders.find(f=>f.id===targetId)||folders[0];
- const accountId=folder?.accountId||$('source')?.value||accounts()[0]?.id||'';
- const anchor=folders.find(f=>f.accountId===accountId&&f.id!==targetId)||folder;
- const rule=C.validateRule({
-  id:crypto.randomUUID(),
-  name:(T('defaultRulePrefix')+s.domain).slice(0,100),
-  enabled:true,
-  source:anchor?.id||targetId,
-  sourceAccount:accountId,
-  scope:'account',
-  target:targetId,
-  match:'all',
-  readFilter:($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both',
-  unreadAction:($('quickOpenWindow')&&$('quickOpenWindow').checked)?'window':'keep',
-  conditions:[{field:'domain',op:'equals',value:s.domain}],
-  branches:[]
- });
- const next=await rpc('saveRules',{rules:[...state.config.rules,rule],revision:editRevision});
- suggestions=suggestions.filter(x=>x.domain!==s.domain);
- dirty=false;renderStatus(next);loadRule(rule.id);renderSuggestions();
- toast(T('suggestApproved'));
-}
-
 /* ===== 1-klicksmallar ===== */
 const TEMPLATES={
  faktura:{name:'tplNameInvoice',match:'any',conditions:[['subject','contains','faktura'],['subject','contains','kvitto']],hints:['faktur','kvitto','ekonomi','invoice']},
@@ -1649,7 +1579,7 @@ function renderStatus(next){
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
- renderRules();renderActivity();renderBackups();renderSuggestions();renderQuickExisting();renderTbAccounts();quickHintsOnce();
+ renderRules();renderActivity();renderBackups();renderQuickExisting();renderTbAccounts();quickHintsOnce();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
@@ -2512,7 +2442,6 @@ handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src
 
 /* ===== Nya funktioner: mallar, förslag, ny mapp, årstid ===== */
 for(const btn of document.querySelectorAll('#templateBar .template-btn'))btn.addEventListener('click',()=>applyTemplate(btn.dataset.template));
-if($('suggestRulesBtn'))handle('suggestRulesBtn','click',scanInbox);
 if($('newFolderBtn'))handle('newFolderBtn','click',()=>openFolderModal($('source')?.value||''));
 if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',()=>openFolderModal($('source')?.value||'',quickFolderSuggestion()));
 if($('folderCancelBtn'))handle('folderCancelBtn','click',()=>{$('folderModal').hidden=true;});

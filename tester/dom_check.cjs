@@ -97,18 +97,8 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(/Varför|flyttas|mapp/i.test(txt('diagnosePanel')),'diagnosen svarar i klartext: "'+txt('diagnosePanel').slice(0,70)+'"');
 
  /* --- Förslagskortet och kör-knappen --- */
- check(el('suggestRulesBtn')!==null,'förslagsknappen finns kvar');
- el('suggestRulesBtn').click();
- await until(()=>doc.querySelectorAll('.suggestion-row').length>0||/Inga nya förslag/.test(txt('suggestionsBox')),'Inkorgen skannas');
- const sug=doc.querySelector('.suggestion-row');
- if(sug){
-  const sBefore=rows();
-  sug.querySelector('select').value='demo-web';
-  fire(sug.querySelector('select'),'change');
-  sug.querySelector('.button').click();
-  await until(()=>rows()===sBefore+1,'förslaget godkänns');
-  check(rows()===sBefore+1,'förslag kan godkännas med målmapp');
- }
+ check(el('suggestCard')===null&&el('suggestRulesBtn')===null,'förslagskortet är borta ur gränssnittet');
+ check(!/Föreslå regler från Inkorgen/.test(doc.body.textContent),'och ingen text om det ligger kvar');
  el('runAllRulesBtn').click();
  await until(()=>/Granskade/.test(txt('toast')),'kör alla regler');
  check(/matchade och köades/.test(txt('toast')),'körningen rapporterar vad som hände: "'+txt('toast')+'"');

@@ -30,10 +30,6 @@ globalThis.LasDemo=(()=>{
     const folder={id:'demo-new-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),accountId:parent?.accountId||'demo',accountName:parent?.accountName||'Exempelkonto',name,label:(parent?.accountName||'Exempelkonto')+' · '+name};
     folders.push(folder);data=folder;break;
    }
-   case 'suggestRules':data=[
-    {domain:'fortnox.se',count:4,subject:'Faktura 1042',sender:'faktura@fortnox.se'},
-    {domain:'klarna.se',count:3,subject:'Order bekräftad',sender:'order@klarna.se'}
-   ].filter(s=>!state.config.rules.some(r=>r.enabled&&r.conditions.some(c=>c.field==='domain'&&c.value===s.domain)));break;
    /* Snabbregeln: samma svar som bakgrunden, med fiktiva men rimliga siffror. */
    case 'inboxHints':{
     const taken=state.config.rules.filter(r=>r.enabled).flatMap(r=>(r.conditions||[]).map(c=>String(c.value||'').toLowerCase()));

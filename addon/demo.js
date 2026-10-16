@@ -5,7 +5,7 @@ globalThis.LasDemo=(()=>{
   {id:'demo-web',accountId:'demo',label:'Exempelkonto · Webb',name:'Webb'},
   {id:'demo-buy',accountId:'demo',label:'Exempelkonto · Inköp',name:'Inköp'},
   {id:'demo-arkiv',accountId:'demo',label:'Exempelkonto · Arkiv',name:'Arkiv'}];
- let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[
+ let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,rules:[
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
   {id:'demo-3',name:'Arkivera äldre mejl',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',conditions:[{field:'date',op:'older',value:'90'}]}]},
@@ -141,7 +141,8 @@ globalThis.LasDemo=(()=>{
     /* Manuell körning läser om allt – därför inga cachade mappar i svaret. */
     else{data={scanned:90,queued:1,matched:6,inTarget:3,handled:2,searchedFolders:10,skippedFolders:0,emptyFolders:3,cachedFolders:0,deferred:0};state.queued+=1;}
     break;
-   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.revision++;data=state;break;
+   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.revision++;data=state;break;
+   case 'backupNow':data=state.config.autoBackup===false?{written:false,reason:'off'}:{written:true,filename:'Lasfilter/sortbro-regler-backup.json',dated:'',count:state.config.rules.length};break;
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};
  }catch(e){return {success:false,error:e.code||'internal_error'};}}

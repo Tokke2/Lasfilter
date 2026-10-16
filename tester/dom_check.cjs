@@ -250,6 +250,23 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(manual.includes('actionValue="imap://demo%40exempel.se@imap.exempel.se/'),'den inklistrade adressen hamnar i filen: '+(manual.split('\r\n').find(l=>l.startsWith('actionValue'))||'(saknas)'));
  check(!/undefined/.test(manual),'ingen rad innehåller undefined efter handpåläggning');
 
+ /* --- ⇩ Automatisk säkerhetskopia: rutan och knappen --- */
+ check(el('autoBackup')!==null,'rutan för automatisk säkerhetskopia finns');
+ check(el('autoBackup').checked===true,'den är på som standard');
+ check(!el('backupNow').disabled,'knappen Backa upp nu går att trycka på');
+ el('backupNow').click();
+ await until(()=>/backades upp/.test(txt('toast')),'knappen backar upp');
+ check(/sortbro-regler-backup\.json/.test(txt('toast')),'kvittot visar filnamnet: "'+txt('toast')+'"');
+ check(/Lasfilter\/sortbro-regler-backup\.json/.test(txt('backupInfo')),'sökvägen visas bredvid knappen: "'+txt('backupInfo')+'"');
+ const autoBackupOn=el('autoBackup').checked;
+ el('autoBackup').click();
+ await until(()=>/Automatisk säkerhetskopia avstängd/.test(txt('toast')),'avstängningen kvitteras');
+ check(/avstängd/.test(txt('toast')),'kvittot säger att den är av: "'+txt('toast')+'"');
+ el('autoBackup').click();
+ await until(()=>/backas upp automatiskt/.test(txt('toast')),'påslaget kvitteras');
+ check(el('autoBackup').checked===autoBackupOn,'rutan går att slå av och på igen');
+ check(/Kopian ligger utanför/.test(doc.body.textContent),'hjälpraden förklarar var kopian ligger');
+
  /* --- Språkbytet --- */
  const tbTitle=()=>doc.querySelector('[data-i18n="tbFilterTitle"]')?.textContent||'';
  el('langEn').click();

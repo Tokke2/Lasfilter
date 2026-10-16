@@ -246,6 +246,14 @@ const I18N={
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
   fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/lasfilter-logg.txt',
   fileLogNote:'Loggfilen skrivs om automatiskt efter nya händelser och innehåller inte ämnesrader, adresser eller mejltexter.',
+  autoBackupLabel:'Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/',
+  autoBackupNote:'Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad kopia sparas en gång per dag – de senaste 30 dagarna behålls. Under Regler importerar du filen och får tillbaka reglerna.',
+  backupNowBtn:'⇩ Backa upp reglerna nu',
+  backupNowDone:'Reglerna backades upp: {n} st i {name}',
+  backupNowUnchanged:'Inga ändringar sedan förra kopian – filen är redan aktuell.',
+  backupNowFailed:'Kopian kunde inte skrivas till Hämtade filer. Kontrollera att Thunderbird får spara filer på datorn.',
+  toastAutoBackupOn:'Reglerna backas upp automatiskt när de ändras.',
+  toastAutoBackupOff:'Automatisk säkerhetskopia avstängd.',
   shortcutsNote:'Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns. Ctrl+Shift+L kör ett svep direkt.',
   fontSizeLabel:'Textstorlek',
   refreshFoldersBtn:'Uppdatera mapplistan',
@@ -816,6 +824,14 @@ const I18N={
   verboseLabel:'Show detailed diagnostics in Activity Log',
   fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/lasfilter-logg.txt',
   fileLogNote:'The log file is updated automatically after new events and never contains subjects, addresses or message bodies.',
+  autoBackupLabel:'Back up the rules automatically to Downloads/Lasfilter/',
+  autoBackupNote:'The copy lives outside the Thunderbird profile, so it survives the add-on being removed or switched off. sortbro-regler-backup.json is always the latest, and a dated copy is written once a day – the last 30 days are kept. Import the file under Rules to get the rules back.',
+  backupNowBtn:'⇩ Back up the rules now',
+  backupNowDone:'Rules backed up: {n} in {name}',
+  backupNowUnchanged:'No changes since the last copy – the file is already up to date.',
+  backupNowFailed:'The copy could not be written to Downloads. Check that Thunderbird is allowed to save files.',
+  toastAutoBackupOn:'Rules are backed up automatically when they change.',
+  toastAutoBackupOff:'Automatic backup switched off.',
   shortcutsNote:'Alt+Shift+L opens Läsfilter even if the toolbar button is hidden. Ctrl+Shift+L runs a scan immediately.',
   fontSizeLabel:'Font size',
   refreshFoldersBtn:'Refresh folder list',
@@ -1225,7 +1241,7 @@ function applyTheme(prefs){
   if($('langSv'))$('langSv').classList.toggle('active',currentLang==='sv');
   if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');
  }
- if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;}
+ if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;$('autoBackup').checked=state.config.autoBackup!==false;}
 }
 /* ===== Årstidsteman: Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter ===== */
 const SEASON_KEYS=['spring','summer','autumn','winter'];
@@ -2484,8 +2500,14 @@ async function switchLanguage(nextLang){
 handle('langSv','click',async()=>switchLanguage('sv'));
 handle('langEn','click',async()=>switchLanguage('en'));
 handle('lang','change',async()=>switchLanguage($('lang').value));
-handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
-for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked}));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));});
+handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked,autoBackup:$('autoBackup').checked}));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
+for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog','autoBackup'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',{revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked,autoBackup:$('autoBackup').checked}));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));if(id==='autoBackup')toast($('autoBackup').checked?T('toastAutoBackupOn'):T('toastAutoBackupOff'));});
+handle('backupNow','click',async()=>{
+ const r=await rpc('backupNow');
+ const info=$('backupInfo');
+ if(r?.written){if(info)info.textContent=r.filename;toast(T('backupNowDone').replace('{n}',r.count).replace('{name}',r.filename));}
+ else{toast(r?.reason==='unchanged'?T('backupNowUnchanged'):T('backupNowFailed'),r?.reason!=='unchanged');}
+});
 handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();renderSuggestions();toast(T('toastFoldersRefreshed'));});
 
 /* ===== Nya funktioner: mallar, förslag, ny mapp, årstid ===== */

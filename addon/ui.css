@@ -2421,3 +2421,16 @@ select.needs-target {
 .tb-report-line {
   margin: 3px 0;
 }
+
+/* ⇩ Automatisk säkerhetskopia av reglerna */
+.backup-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.backup-actions .muted {
+  font-size: 0.78rem;
+}

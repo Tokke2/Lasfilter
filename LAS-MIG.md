@@ -162,6 +162,19 @@ Datorns nätverk används aldrig: tilläggets säkerhetspolicy är `connect-src 
 
 Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en teknisk händelselogg med endast räknare. Ingen logg eller export innehåller mejltexter, ämnesrader eller fullständiga adresser. Allt lagras i Thunderbirds eget tilläggsutrymme. Tillägget öppnar inga nätverksanslutningar.
 
+## Reglerna säkras automatiskt
+
+Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil:
+
+- **`Hämtade filer/Lasfilter/sortbro-regler-backup.json`** – alltid den senaste uppsättningen. Den skrivs om när du har sparat en regeländring, och en gång vid start.
+- **`Hämtade filer/Lasfilter/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad kopia, en per dag. De senaste **30 dagarna** behålls; äldre dagsfiler städas bort automatiskt (bara SortBros egna filer i den egna mappen – din manuella export rörs aldrig).
+
+Kopieringen sker bara när något faktiskt har ändrats, så reglerna skrivs inte om i onödan. Vill du ha en färsk kopia direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Avancerat**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
+
+**Varför utanför profilen?** Om tillägget en dag är borta ur Thunderbird – avinstallerat, avstängt av signaturkontrollen eller ersatt av en nyare version – så följer tilläggets egna ögonblicksbilder med i fallet. Filen i Hämtade filer ligger kvar på disken. Du hämtar tillbaka allt genom att importera den under **Regler** (*Importera*), precis som en vanlig export.
+
+Filen har samma format som den manuella exporten (`format: lasfilter-rules`), så båda vägarna fungerar lika: exportera manuellt eller lita på den automatiska kopian. Loggen får en rad varje gång kopian skrivs (`reglerna backade upp: 12 st …`), och om skrivningen misslyckas står det i loggen i stället för att felet tigs ihjäl.
+
 ## Teknisk logg
 
 Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 30 dagar, högst 5000 rader.

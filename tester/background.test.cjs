@@ -168,6 +168,90 @@ test('en inklistrad kontoadress sparas när den är giltig och avvisas när den 
  assert.equal(again.storedPrefix,'imap://u%40h.se@imap.h.se/');
 });
 
+/* ── Automatisk säkerhetskopia av reglerna ────────────────────────────── */
+function backupApi(){
+ const api=stubApi();
+ const files={},written=[],removed=[];
+ let capture='',query=null;
+ api.__captureBlob=blob=>{capture=String(blob?.parts?.[0]||'');return 'blob:x';};
+ api.downloads.download=async arg=>{written.push(arg.filename);files[arg.filename]=capture;return written.length;};
+ api.downloads.search=async q=>{query=q;return api.__searchResult||[];};
+ api.downloads.removeFile=async id=>{removed.push(id);};
+ return {api,files,written,removed,getQuery:()=>query};
+}
+const backupConfig=rules=>({schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
+ newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,rules});
+
+test('säkerhetskopian skriver reglerna till Hämtade filer – och de kan läsas tillbaka',async()=>{
+ const {api,files,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ const r=await app.autoBackup({force:true});
+ assert.equal(r.written,true,'kopian skrevs');
+ assert.equal(r.count,1,'en regel i kopian');
+ assert.ok(written.includes('Lasfilter/sortbro-regler-backup.json'),'senaste kopian hamnar i vår egen mapp');
+ assert.match(r.dated,/^Lasfilter[\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/,'en daterad kopia per dag');
+ const payload=JSON.parse(files['Lasfilter/sortbro-regler-backup.json']);
+ assert.equal(payload.format,'lasfilter-rules','samma format som den manuella exporten');
+ assert.equal(payload.app,'SortBro');
+ assert.equal(payload.rules.length,1);
+ assert.ok(payload.exported,'tidsstämpel finns');
+ const back=app.extractImportedRules(payload,[{id:'fin',accountId:'a',name:'Fakturor'}],[]);
+ assert.equal(back.length,1,'filen går att importera tillbaka');
+ assert.equal(back[0].name,'Fakturor');
+ assert.equal(back[0].target,'fin');
+});
+
+test('kopian skrivs när reglerna ändrats – men inte i onödan och aldrig när rutan är av',async()=>{
+ const {api,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ await app.autoBackup({force:true});
+ const after=written.length;
+ const sameDay=await app.autoBackup();
+ assert.equal(sameDay.written,false,'oförändrade regler samma dag skrivs inte om');
+ assert.equal(sameDay.reason,'unchanged');
+ assert.equal(written.length,after,'ingen ny fil i onödan');
+ app.engine.config={...app.engine.config,rules:[{...exportRule,name:'Fakturor 2'}]};
+ const changed=await app.autoBackup();
+ assert.equal(changed.written,true,'en ändrad regel skrivs');
+ assert.equal(written.length,after+1,'bara den senaste filen skrivs om samma dag');
+ app.engine.config={...app.engine.config,autoBackup:false};
+ const off=await app.autoBackup();
+ assert.equal(off.written,false,'avstängd ruta skriver ingenting');
+ assert.equal(off.reason,'off');
+ const forced=await app.autoBackup({force:true});
+ assert.equal(forced.written,true,'knappen Backa upp nu fungerar även med rutan av');
+});
+
+test('en misslyckad kopiering larmar i loggen utan att kasta',async()=>{
+ const {api}=backupApi();
+ api.downloads.download=async()=>{throw new Error('nekad');};
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ const r=await app.autoBackup({force:true});
+ assert.equal(r.written,false);
+ assert.equal(r.reason,'failed');
+ assert.ok(app.logs.some(l=>/kunde inte backas upp/.test(l.data?.detail||'')),'orsaken skrivs i loggen');
+});
+
+test('gamla dagsfiler städas – men bara våra egna i vår egen mapp',async()=>{
+ const {api,removed,getQuery}=backupApi();
+ const old=new Date(Date.now()-40*86400000).toISOString();
+ api.__searchResult=[
+  {id:11,startTime:old,filename:'Lasfilter/sortbro-regler-2025-01-01.json'},
+  {id:12,startTime:new Date().toISOString(),filename:'Lasfilter/sortbro-regler-2026-10-16.json'}
+ ];
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ await app.autoBackup({force:true});
+ assert.deepEqual(removed,[11],'bara den för gamla filen tas bort');
+ const re=new RegExp(getQuery().filenameRegex);
+ assert.ok(re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'Lasfilter'+String.fromCharCode(92)+'sortbro-regler-2026-10-16.json'),'våra dagsfiler matchas');
+ assert.ok(!re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'sortbro-regler-2026-10-16.json'),'en manuell export i Hämtade filer rörs inte');
+ assert.ok(!re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'Lasfilter'+String.fromCharCode(92)+'sortbro-regel-fakturor.json'),'exporten av en enstaka regel rörs inte');
+});
+
 test('kontoadresser sparas bara i rimlig form och överlever en omstart',async()=>{
  const {app}=await loadBackground();
  const next=await app.handle({type:'prefs',prefs:{filterUris:{a:'imap://u@h.se/',x:'y'.repeat(300),'':'tom nyckel'}}});

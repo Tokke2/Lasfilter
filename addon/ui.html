@@ -444,6 +444,15 @@
               <span data-i18n="fileLogLabel">Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/lasfilter-logg.txt</span>
             </label>
             <p class="muted" data-i18n="fileLogNote">Loggfilen skrivs om automatiskt efter nya händelser och innehåller inte ämnesrader, adresser eller mejltexter.</p>
+            <label class="toggle-label">
+              <input id="autoBackup" type="checkbox" checked>
+              <span data-i18n="autoBackupLabel">Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/</span>
+            </label>
+            <p class="muted" data-i18n="autoBackupNote">Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad kopia sparas en gång per dag – de senaste 30 dagarna behålls. Under Regler importerar du filen och får tillbaka reglerna.</p>
+            <div class="backup-actions">
+              <button id="backupNow" type="button" class="button small secondary" data-i18n="backupNowBtn">⇩ Backa upp reglerna nu</button>
+              <span id="backupInfo" class="muted"></span>
+            </div>
             <p class="muted" data-i18n="shortcutsNote">Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns. Ctrl+Shift+L kör ett svep direkt.</p>
             <label class="field">
               <span data-i18n="fontSizeLabel">Textstorlek</span>

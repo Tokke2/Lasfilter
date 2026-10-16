@@ -41,6 +41,51 @@ App.writeTextLog=async()=>{
  try{await B.downloads.download({url,filename:'Lasfilter/lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
 };
 App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTimeout(()=>App.writeTextLog().catch(()=>{}),1200);};
+/* Automatisk säkerhetskopia av reglerna. Den skrivs till Hämtade filer, alltså
+   utanför profilen: försvinner tillägget en dag ligger reglerna kvar och kan
+   importeras tillbaka. Två filer: en som alltid är den senaste, och en daterad
+   per dag så att en felaktig ändring går att backa till. */
+App.backupFolder='Lasfilter/';
+App.autoBackupNames={latest:'sortbro-regler-backup.json',dated:day=>'sortbro-regler-'+day+'.json'};
+App.autoBackup=async({force=false}={})=>{
+ const e=App.engine;if(!e)return {written:false,reason:'no_engine'};
+ if(!force&&e.config.autoBackup===false)return {written:false,reason:'off'};
+ const rules=e.config.rules;
+ const payload={format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules,folders:[]};
+ try{payload.folders=(await App.folderList().catch(()=>[])).map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));}catch{}
+ const day=new Date().toISOString().slice(0,10);
+ const key=JSON.stringify(rules);
+ const unchanged=key===App.lastBackupKey;
+ const daily=force||App.lastBackupDay!==day;
+ const name=App.autoBackupNames.latest;
+ const write=async filename=>{
+  const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  try{await B.downloads.download({url,filename:App.backupFolder+filename,saveAs:false,conflictAction:'overwrite'});}
+  finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+ };
+ if(unchanged&&!daily)return {written:false,reason:'unchanged',count:rules.length};
+ try{
+  await write(name);
+  if(daily)await write(App.autoBackupNames.dated(day));
+ }catch{
+  /* Misslyckas filen är det ingen katastrof – men det ska synas i loggen. */
+  App.log('debug',0,'reglerna kunde inte backas upp till Hamtade filer');
+  return {written:false,reason:'failed',count:rules.length};
+ }
+ App.lastBackupKey=key;App.lastBackupDay=day;
+ App.log('debug',0,'reglerna backade upp: '+rules.length+' st till Hamtade filer/'+App.backupFolder);
+ /* Städa gamla dagsfiler – bara våra egna, bara i vår egen mapp, och tyst om det inte går. */
+ try{
+  const found=await B.downloads.search({filenameRegex:'[\\\\/]Lasfilter[\\\\/]sortbro-regler-\\d{4}-\\d{2}-\\d{2}\\.json$'});
+  const limit=Date.now()-30*86400000;
+  for(const item of Array.isArray(found)?found:[]){
+   const when=Date.parse(item?.startTime||'');
+   if(Number.isFinite(when)&&when<limit&&Number.isSafeInteger(item?.id))await B.downloads.removeFile(item.id);
+  }
+ }catch{}
+ return {written:true,filename:App.backupFolder+name,dated:daily?App.backupFolder+App.autoBackupNames.dated(day):'',count:rules.length};
+};
+App.scheduleAutoBackup=()=>{clearTimeout(App.backupTimer);App.backupTimer=setTimeout(()=>App.autoBackup().catch(()=>{}),3000);};
 App.log=(name,count=0,detail='')=>{
  const entry=C.event(name,count,Date.now(),detail);if(!entry)return;
  /* Samma klocka som stämplade raden avgör om den får ligga kvar – annars kan en
@@ -478,10 +523,12 @@ App.handle=async msg=>{
   }
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
-   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean')throw new C.RuleError('bad_schema');
+   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean')throw new C.RuleError('bad_schema');
    const modeChanged=msg.moveMode!==e.config.moveMode;
    const verboseChanged=msg.verbose!==e.config.verbose;
-   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});App.scheduleSweep();
+   const backupChanged=msg.autoBackup!==e.config.autoBackup;
+   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});App.scheduleSweep();
+   if(backupChanged&&msg.autoBackup)App.scheduleAutoBackup();
    if(msg.verbose&&verboseChanged)App.log('debug',0,'detaljlogg aktiverad: svep, trafik och avvisningar visas utan mejlinnehall');
    App.log('settings_saved');return App.snapshot();
   });
@@ -499,7 +546,7 @@ App.handle=async msg=>{
   case 'saveRules':return App.mutate(async()=>{
    App.checkRevision(msg.revision);const rules=C.validateRules(msg.rules);await App.checkRules(rules);
    await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
-   App.log('rules_saved',rules.length);return App.snapshot();
+   App.log('rules_saved',rules.length);App.scheduleAutoBackup();return App.snapshot();
   });
   case 'setMode':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
@@ -514,6 +561,7 @@ App.handle=async msg=>{
    return {format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:e.config.rules,folders:folderHints};
   }
   case 'exportLog':return {format:'lasfilter-technical-log',version:1,events:C.cleanLogs(App.logs)};
+  case 'backupNow':return App.autoBackup({force:true});
   case 'import':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    const currentFolders=await App.folderList().catch(()=>[]);
@@ -589,7 +637,9 @@ App.ready=(async()=>{
  App.log('start');
  /* Egen rad med båda versionerna: bara debug-rader bär detaljtext, och den här
     raden är det sista spåret i loggfilen om tillägget en dag är borta. */
- App.log('debug',0,App.startDetail());App.changed();
+ App.log('debug',0,App.startDetail());
+ /* En färsk kopia direkt vid start: den senaste kända uppsättningen regler. */
+ App.scheduleAutoBackup();App.changed();
  try{
   const uiUrl=B.runtime.getURL('ui.html');
   const tabs=await B.tabs.query({});

@@ -68,6 +68,10 @@ async function loadBackground(api=stubApi()){
   Date:tick.Date,setTimeout:tick.setTimeout,clearTimeout:tick.clearTimeout,setInterval:tick.setInterval,clearInterval:tick.clearInterval,
   LasCore:C,
   LasFilters:require(path.join(ROOT,'addon','filters.js')),
+  /* Blob/URL behövs för att skriva loggfilen. Testet kan fånga innehållet
+     genom att sätta api.__captureBlob innan bakgrunden laddas. */
+  Blob:class{constructor(parts){this.parts=parts;}},
+  URL:{createObjectURL:typeof api.__captureBlob==='function'?api.__captureBlob:()=>'blob:x',revokeObjectURL:()=>{}},
   LasEngine:class{constructor(){this.config={};this.fault='';this.pending=new Map();}stop(){}},
   browser};
  sandbox.globalThis=sandbox;
@@ -383,6 +387,43 @@ test('mejlet hittas via Message-ID när id:t bytts vid flytten',async()=>{
  const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
  assert.equal(id,99,'öppnar id:t i målmappen, inte det gamla');
  assert.equal(opened[0].messageId,99);
+});
+
+test('startraden och loggfilen bär både tilläggets och Thunderbirds version',async()=>{
+ const api=stubApi();
+ api.runtime.getBrowserInfo=async()=>({name:'Thunderbird',version:'140.4.2'});
+ const downloaded=[];
+ api.downloads.download=async arg=>{downloaded.push(arg);return 1;};
+ let logText='';
+ api.__captureBlob=blob=>{logText=String(blob?.parts?.[0]||'');return 'blob:x';};
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[]}});
+ assert.equal(await app.readTbVersion(),'140.4.2','Thunderbirds version läses in');
+ app.log('debug',0,app.startDetail());
+ const start=app.logs.find(l=>/thunderbird /.test(l.data?.detail||''));
+ assert.ok(start,'versionsraden hamnar i loggen');
+ assert.match(start.data.detail,/thunderbird 140\.4\.2/,'Thunderbirds version står i raden');
+ assert.match(start.data.detail,/sortbro /,'tilläggsversionen står där också');
+ assert.equal(start.event,'debug','raden är en debug-rad – bara de bär detaljtext');
+ app.scheduleTextLog();
+ await tick.flush(20);
+ await tick.settle(Promise.resolve(),20);
+ assert.deepEqual([...new Set(downloaded.map(d=>d.filename))],['Lasfilter/lasfilter-logg.txt'],'loggfilen skrivs dit den ska');
+ assert.match(logText,/Thunderbird: 140\.4\.2/,'loggfilens huvud visar Thunderbirds version');
+ assert.match(logText,/sortbro /,'och startraden med båda versionerna finns i filen');
+});
+
+test('utan svar om Thunderbirds version skrivs raden ändå, utan att ljuga',async()=>{
+ const api=stubApi();
+ api.runtime.getBrowserInfo=async()=>{throw new Error('inte tillgängligt');};
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ assert.equal(await app.readTbVersion(),'','ingen version kunde läsas');
+ app.log('debug',0,app.startDetail());
+ const start=app.logs.find(l=>/thunderbird /.test(l.data?.detail||''));
+ assert.ok(start,'versionsraden hamnar i loggen ändå');
+ assert.match(start.data.detail,/thunderbird okand/,'okänd version skrivs som okänd');
+ assert.match(start.data.detail,/sortbro /,'tilläggsversionen är med ändå');
 });
 
 test('inget fönster om mejlet ligger rätt men kroppen inte går att läsa',async()=>{

@@ -21,9 +21,21 @@ App.persistWork=()=>{
  }
  return App.persistPending;
 };
+/* Thunderbirds version sparas vid start. Den behövs i loggen: om tillägget en dag
+   är borta vill man kunna se vilken version det senast kördes i – och om en
+   uppdatering av Thunderbird kom strax innan. */
+App.tbVersion='';
+App.readTbVersion=async()=>{
+ try{
+  const info=await B.runtime.getBrowserInfo();
+  App.tbVersion=String(info?.version||'').slice(0,32);
+ }catch{App.tbVersion='';}
+ return App.tbVersion;
+};
+App.startDetail=()=>'thunderbird '+(App.tbVersion||'okand')+' sortbro '+String(B.runtime.getManifest()?.version||'okand');
 App.writeTextLog=async()=>{
  if(!App.engine?.config.fileLog)return;
- const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
+ const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
  for(const x of App.logs)lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
  const url=URL.createObjectURL(new Blob([lines.join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'}));
  try{await B.downloads.download({url,filename:'Lasfilter/lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
@@ -31,7 +43,9 @@ App.writeTextLog=async()=>{
 App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTimeout(()=>App.writeTextLog().catch(()=>{}),1200);};
 App.log=(name,count=0,detail='')=>{
  const entry=C.event(name,count,Date.now(),detail);if(!entry)return;
- App.logs=C.cleanLogs([...App.logs,entry]);
+ /* Samma klocka som stämplade raden avgör om den får ligga kvar – annars kan en
+    rad som just skrivits gallras bort av en klocka som gått olika. */
+ App.logs=C.cleanLogs([...App.logs,entry],Date.now());
  clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs})).catch(()=>{}),500);App.scheduleTextLog();
 };
 // Behåll alltid det första, mest specifika felet. Händelselyssnare ska inte
@@ -571,7 +585,11 @@ App.ready=(async()=>{
   if(pendingWork.length>20)needResweep=true;
   await App.engine.restore(pendingWork.slice(0,20));
  }
- App.log('start');App.changed();
+ await App.readTbVersion();
+ App.log('start');
+ /* Egen rad med båda versionerna: bara debug-rader bär detaljtext, och den här
+    raden är det sista spåret i loggfilen om tillägget en dag är borta. */
+ App.log('debug',0,App.startDetail());App.changed();
  try{
   const uiUrl=B.runtime.getURL('ui.html');
   const tabs=await B.tabs.query({});

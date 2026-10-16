@@ -164,7 +164,12 @@ Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en te
 
 ## Teknisk logg
 
-Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter tio dagar, högst 500 rader.
+Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 30 dagar, högst 5000 rader.
+
+Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
+
+- **Huvudet visar båda versionerna** (*Version:* tilläggets, *Thunderbird:* programmets), och den första raden efter en start är `thunderbird <version> sortbro <version>`.
+- **Den är det sista spåret om tillägget skulle försvinna** ur Thunderbird. Filen ligger kvar på disken även om tillägget tas bort, så de sista raderna visar när det hände och i vilken Thunderbird-version det senast kördes – till exempel om en uppdatering av Thunderbird kom strax innan.
 
 ## Gränser som du bör känna till
 

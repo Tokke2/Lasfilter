@@ -255,28 +255,39 @@ App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
  const rule=App.engine?.config.rules.find(r=>r.id===ruleId);
  const action=rule?.unreadAction||'default';
  /* Mejlet ska ligga i målmappen innan fönstret öppnas. Öppnade vi id:t direkt efter
-    flytten visade Thunderbird en tom ruta, eftersom mejlet redan lämnat källmappen. */
+    flytten visade Thunderbird en tom ruta, eftersom mejlet redan lämnat källmappen.
+    Därför två krav innan något öppnas: rätt mapp – och att kroppen går att läsa. */
  const lookup=async()=>{
-  if(Number.isSafeInteger(id)){
-   try{
-    const cur=await B.messages.get(id);
-    if(!targetFolderId||cur?.folder?.id===targetFolderId)return id;
-   }catch{}
-  }
   if(targetFolderId&&headerMessageId){
    const found=await App.engine?.findByHeader(targetFolderId,headerMessageId);
    if(Number.isSafeInteger(found?.id))return found.id;
   }
+  if(Number.isSafeInteger(id)&&targetFolderId){
+   try{
+    const cur=await B.messages.get(id);
+    if(cur?.folder?.id===targetFolderId)return id;
+   }catch{}
+  }
   return null;
  };
- let targetId=await lookup();
- for(const delay of [300,700,1500,3000]){
-  if(Number.isSafeInteger(targetId))break;
-  await new Promise(r=>setTimeout(r,delay));
+ /* Går mejlet att läsa alls? Ett oläst IMAP-mejl som ännu inte hämtats hem ger ett
+    tomt fönster i stället för ett fel – då öppnar vi hellre ingenting. */
+ const readable=async mid=>{
+  if(!Number.isSafeInteger(mid))return false;
+  if(typeof B.messages?.getFull!=='function')return true;
+  try{
+   const full=await B.messages.getFull(mid);
+   return !!full&&(Array.isArray(full.parts)?full.parts.length>0:true);
+  }catch{return false;}
+ };
+ let targetId=null,ready=false;
+ for(const delay of [0,300,700,1500,3000]){
+  if(delay)await new Promise(r=>setTimeout(r,delay));
   targetId=await lookup();
+  if(Number.isSafeInteger(targetId)&&await readable(targetId)){ready=true;break;}
  }
- if(!Number.isSafeInteger(targetId)){
-  App.log('debug',0,'olasta mejlet kunde inte hittas i malmappen - fonstret oppnades inte');
+ if(!ready){
+  App.log('debug',0,Number.isSafeInteger(targetId)?'olasta mejlet gick inte att lasa an - fonstret oppnades inte':'olasta mejlet kunde inte hittas i malmappen - fonstret oppnades inte');
   return null;
  }
  if(action==='read'){
@@ -289,8 +300,22 @@ App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
  const shouldOpenWindow=C.shouldOpenWindow({action,pending:App.engine?.pending.size||0,sweeping,fromSweep:sweeping>0,openWindow:App.engine?.config.openWindow!==false});
  App.keepUnread.set(targetId,Date.now()+30000);
  if(shouldOpenWindow){
-  try{await B.messageDisplay.open({messageId:targetId,location:'window'});}
-  catch{App.log('error',0,'oppna_olast_fonster_misslyckades');}
+  /* Kvittot: loggen ska kunna svara på om fönstret verkligen visade något.
+     Tidsgränsen larmar men släcker inte förväntan – kommer visningen strax efteråt
+     skrivs kvittot ändå, i stället för att tappas på en sekund. */
+  const expectation={messageId:targetId,headerMessageId:headerMessageId||'',at:Date.now()};
+  App.expectDisplay=expectation;
+  setTimeout(()=>{if(App.expectDisplay===expectation)App.log('debug',0,'olasta mejlet visades inte i fonstret');},5200);
+  try{
+   await B.messageDisplay.open({messageId:targetId,location:'window'});
+   App.log('debug',0,'olasta mejlet oppnat i malmappen');
+  }catch{
+   /* Id:t kan ha bytts i samma stund – identiteten (Message-ID) följer alltid med. */
+   if(headerMessageId){
+    try{await B.messageDisplay.open({headerMessageId,location:'window'});App.log('debug',0,'olasta mejlet oppnat via meddelande-id');}
+    catch{App.expectDisplay=null;App.log('error',0,'oppna_olast_fonster_misslyckades');}
+   }else{App.expectDisplay=null;App.log('error',0,'oppna_olast_fonster_misslyckades');}
+  }
  }else App.log('debug',0,'olasta mejlet behalls som olast: popup-skydd');
  for(const delay of [250,1000,3000])setTimeout(()=>B.messages.update(targetId,{read:false}).catch(()=>App.log('error',0,'aterstall_olast_misslyckades')),delay);
  setTimeout(()=>App.keepUnread.delete(targetId),30000);
@@ -588,6 +613,19 @@ B.messages.onUpdated.addListener((m,props,old)=>App.ready.then(async()=>{
 B.messages.onNewMailReceived.addListener((folder,list)=>App.onNewMail(folder,list).catch(()=>App.log('error',0,'nyinkommet_misslyckades')));
 B.messages.onMoved.addListener((old,moved)=>App.ready.then(()=>App.engine.onMoved(old,moved)).catch(()=>App.fail('internal_error')));
 B.messageDisplay.onMessagesDisplayed.addListener(()=>App.ready.then(()=>App.engine.tick()).catch(()=>App.fail('display_error')));
+/* Kvitto på att fönstret visade något: samma meddelande som vi just öppnade ska
+   dyka upp i visningen. Loggen kan då svara på om en tom ruta kom från oss eller ej. */
+B.messageDisplay.onMessagesDisplayed.addListener(tab=>{
+ const want=App.expectDisplay;
+ if(!want)return;
+ App.ready.then(async()=>{
+  try{
+   const shown=await B.messageDisplay.getDisplayedMessages(tab?.id);
+   const hit=(shown||[]).some(m=>m&&(m.id===want.messageId||(want.headerMessageId&&m.headerMessageId===want.headerMessageId)));
+   if(hit){if(App.expectDisplay===want)App.expectDisplay=null;App.log('debug',0,'olasta mejlet visades i fonstret');}
+  }catch{}
+ }).catch(()=>{});
+});
 B.tabs.onRemoved.addListener(id=>{if(App.uiTab===id)App.uiTab=null;if(App.mailTab===id)App.mailTab=null;App.ready.then(()=>App.engine.tick()).catch(()=>{});});
 B.tabs.onActivated.addListener(({tabId})=>B.tabs.get(tabId).then(App.captureTab).catch(()=>{}));
 B.mailTabs.onSelectedMessagesChanged.addListener(tab=>App.captureTab(tab));

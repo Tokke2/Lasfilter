@@ -14,7 +14,7 @@ function stubApi(){
  const make=()=>new Proxy(function(){return Promise.resolve([]);},{
   get(target,prop){
    if(prop==='then'||prop==='catch'||prop==='finally')return target[prop]?.bind(target);
-   if(prop==='addListener'||prop==='removeListener'||prop==='hasListener')return ()=>{};
+   if(prop==='addListener'||prop==='removeListener'||prop==='hasListener')return typeof target[prop]==='function'?target[prop]:(()=>{});
    if(prop in target)return target[prop];
    target[prop]=make();return target[prop];
   },
@@ -383,6 +383,53 @@ test('mejlet hittas via Message-ID när id:t bytts vid flytten',async()=>{
  const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
  assert.equal(id,99,'öppnar id:t i målmappen, inte det gamla');
  assert.equal(opened[0].messageId,99);
+});
+
+test('inget fönster om mejlet ligger rätt men kroppen inte går att läsa',async()=>{
+ const {app,tick,api}=await loadBackground();
+ inboxAccount(api);
+ api.messages.get=async id=>({id,folder:{id:'fin'}});
+ api.messages.getFull=async()=>{throw new Error('meddelandet är inte nedladdat');};
+ const opened=[];api.messageDisplay.open=async()=>{opened.push(1);};
+ unreadEngine(app);
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,null);
+ assert.equal(opened.length,0,'hellre inget fönster än en tom ruta');
+ assert.ok(app.logs.some(l=>/gick inte att lasa/.test(l.data?.detail||'')),'orsaken skrivs till loggen');
+});
+
+test('fönstret öppnas på meddelandets identitet om id:t hunnit bytas',async()=>{
+ const {app,tick,api}=await loadBackground();
+ inboxAccount(api);
+ api.messages.get=async id=>({id,folder:{id:'fin'}});
+ const opened=[];
+ api.messageDisplay.open=async arg=>{if(arg.messageId)throw new Error('okänt id');opened.push(arg);};
+ api.messages.update=async()=>{};
+ unreadEngine(app);
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,7);
+ assert.equal(opened.length,1,'andra försöket öppnade fönstret');
+ assert.equal(opened[0].headerMessageId,'<h@x>');
+ assert.equal(opened[0].location,'window');
+});
+
+test('loggen får kvitto på att fönstret visade mejlet',async()=>{
+ const api=stubApi();
+ const listeners=[];
+ api.messageDisplay.onMessagesDisplayed.addListener=fn=>{listeners.push(fn);};
+ api.messageDisplay.getDisplayedMessages=async tabId=>(tabId===5?[{id:99,headerMessageId:'<h@x>'}]:[]);
+ const {app,tick}=await loadBackground(api);
+ inboxAccount(api);
+ api.messages.get=async id=>({id,folder:{id:'fin'}});
+ api.messages.update=async()=>{};
+ api.messageDisplay.open=async()=>{};
+ unreadEngine(app);
+ const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>'),80);
+ assert.equal(id,7);
+ assert.ok(listeners.length>=1,'visningslyssnaren är kopplad');
+ for(const fn of listeners)fn({id:5});
+ await tick.settle(Promise.resolve(),12);
+ assert.ok(app.logs.some(l=>/visades i fonstret/.test(l.data?.detail||'')),'kvittot skrivs till loggen');
 });
 
 test('unreadAction=read markerar läst i målmappen och öppnar inget fönster',async()=>{

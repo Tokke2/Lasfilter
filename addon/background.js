@@ -45,8 +45,12 @@ App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTime
    utanför profilen: försvinner tillägget en dag ligger reglerna kvar och kan
    importeras tillbaka. Två filer: en som alltid är den senaste, och en daterad
    per dag så att en felaktig ändring går att backa till. */
-App.backupFolder='Lasfilter/';
+/* Backuperna har sin egen undermapp, så de aldrig ligger bland loggfilen eller
+   annat i appmappen. Loggfilen ligger kvar direkt i Lasfilter/. */
+App.backupFolder='Lasfilter/Regelbackuper/';
 App.autoBackupNames={latest:'sortbro-regler-backup.json',dated:day=>'sortbro-regler-'+day+'.json'};
+/* Känns igen på hela sökvägen: bara våra egna dagsfiler i vår egen undermapp. */
+App.backupFilePattern=/[\\/]Lasfilter[\\/]Regelbackuper[\\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/;
 App.autoBackup=async({force=false}={})=>{
  const e=App.engine;if(!e)return {written:false,reason:'no_engine'};
  if(!force&&e.config.autoBackup===false)return {written:false,reason:'off'};
@@ -76,7 +80,7 @@ App.autoBackup=async({force=false}={})=>{
  App.log('debug',0,'reglerna backade upp: '+rules.length+' st till Hamtade filer/'+App.backupFolder);
  /* Städa gamla dagsfiler – bara våra egna, bara i vår egen mapp, och tyst om det inte går. */
  try{
-  const found=await B.downloads.search({filenameRegex:'[\\\\/]Lasfilter[\\\\/]sortbro-regler-\\d{4}-\\d{2}-\\d{2}\\.json$'});
+  const found=await B.downloads.search({filenameRegex:App.backupFilePattern.source});
   const limit=Date.now()-30*86400000;
   for(const item of Array.isArray(found)?found:[]){
    const when=Date.parse(item?.startTime||'');

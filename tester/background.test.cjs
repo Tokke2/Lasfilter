@@ -189,9 +189,9 @@ test('säkerhetskopian skriver reglerna till Hämtade filer – och de kan läsa
  const r=await app.autoBackup({force:true});
  assert.equal(r.written,true,'kopian skrevs');
  assert.equal(r.count,1,'en regel i kopian');
- assert.ok(written.includes('Lasfilter/sortbro-regler-backup.json'),'senaste kopian hamnar i vår egen mapp');
- assert.match(r.dated,/^Lasfilter[\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/,'en daterad kopia per dag');
- const payload=JSON.parse(files['Lasfilter/sortbro-regler-backup.json']);
+ assert.ok(written.includes('Lasfilter/Regelbackuper/sortbro-regler-backup.json'),'senaste kopian hamnar i backupernas egen undermapp');
+ assert.match(r.dated,/^Lasfilter[\\/]Regelbackuper[\\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/,'en daterad kopia per dag');
+ const payload=JSON.parse(files['Lasfilter/Regelbackuper/sortbro-regler-backup.json']);
  assert.equal(payload.format,'lasfilter-rules','samma format som den manuella exporten');
  assert.equal(payload.app,'SortBro');
  assert.equal(payload.rules.length,1);
@@ -239,15 +239,15 @@ test('gamla dagsfiler städas – men bara våra egna i vår egen mapp',async()=
  const {api,removed,getQuery}=backupApi();
  const old=new Date(Date.now()-40*86400000).toISOString();
  api.__searchResult=[
-  {id:11,startTime:old,filename:'Lasfilter/sortbro-regler-2025-01-01.json'},
-  {id:12,startTime:new Date().toISOString(),filename:'Lasfilter/sortbro-regler-2026-10-16.json'}
+  {id:11,startTime:old,filename:'Lasfilter/Regelbackuper/sortbro-regler-2025-01-01.json'},
+  {id:12,startTime:new Date().toISOString(),filename:'Lasfilter/Regelbackuper/sortbro-regler-2026-10-16.json'}
  ];
  const {app}=await loadBackground(api);
  fakeEngineWithRules(app,{config:backupConfig([exportRule])});
  await app.autoBackup({force:true});
  assert.deepEqual(removed,[11],'bara den för gamla filen tas bort');
  const re=new RegExp(getQuery().filenameRegex);
- assert.ok(re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'Lasfilter'+String.fromCharCode(92)+'sortbro-regler-2026-10-16.json'),'våra dagsfiler matchas');
+ assert.ok(re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'Lasfilter'+String.fromCharCode(92)+'Regelbackuper'+String.fromCharCode(92)+'sortbro-regler-2026-10-16.json'),'våra dagsfiler matchas');
  assert.ok(!re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'sortbro-regler-2026-10-16.json'),'en manuell export i Hämtade filer rörs inte');
  assert.ok(!re.test('C:'+String.fromCharCode(92)+'Downloads'+String.fromCharCode(92)+'Lasfilter'+String.fromCharCode(92)+'sortbro-regel-fakturor.json'),'exporten av en enstaka regel rörs inte');
 });

@@ -164,10 +164,10 @@ Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en te
 
 ## Reglerna säkras automatiskt
 
-Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil:
+Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil. Backuperna har sin egen undermapp (`Lasfilter/Regelbackuper/`) så att de aldrig blandas ihop med loggfilen eller annat i appmappen:
 
-- **`Hämtade filer/Lasfilter/sortbro-regler-backup.json`** – alltid den senaste uppsättningen. Den skrivs om när du har sparat en regeländring, och en gång vid start.
-- **`Hämtade filer/Lasfilter/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad kopia, en per dag. De senaste **30 dagarna** behålls; äldre dagsfiler städas bort automatiskt (bara SortBros egna filer i den egna mappen – din manuella export rörs aldrig).
+- **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-backup.json`** – alltid den senaste uppsättningen. Den skrivs om när du har sparat en regeländring, och en gång vid start.
+- **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad kopia, en per dag. De senaste **30 dagarna** behålls; äldre dagsfiler städas bort automatiskt (bara SortBros egna dagsfiler i den egna undermappen – din manuella export och loggfilen rörs aldrig).
 
 Kopieringen sker bara när något faktiskt har ändrats, så reglerna skrivs inte om i onödan. Vill du ha en färsk kopia direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Avancerat**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
 

@@ -142,7 +142,7 @@ globalThis.LasDemo=(()=>{
     else{data={scanned:90,queued:1,matched:6,inTarget:3,handled:2,searchedFolders:10,skippedFolders:0,emptyFolders:3,cachedFolders:0,deferred:0};state.queued+=1;}
     break;
    case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.revision++;data=state;break;
-   case 'backupNow':data=state.config.autoBackup===false?{written:false,reason:'off'}:{written:true,filename:'Lasfilter/sortbro-regler-backup.json',dated:'',count:state.config.rules.length};break;
+   case 'backupNow':data=state.config.autoBackup===false?{written:false,reason:'off'}:{written:true,filename:'Lasfilter/Regelbackuper/sortbro-regler-backup.json',dated:'',count:state.config.rules.length};break;
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};
  }catch(e){return {success:false,error:e.code||'internal_error'};}}

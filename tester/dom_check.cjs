@@ -100,6 +100,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  el('quickMoveUnread').checked=true;fire(el('quickMoveUnread'),'change');
  await until(()=>/3 mejl i Exempelkonto/.test(txt('quickCount')),'och tillbaka när kryssrutan slås på igen',false,6000);
  check(/quick-count-ok/.test(el('quickCount').className),'olästa får följa med igen: "'+txt('quickCount')+'"');
+ check(/räknat på de 400 senaste mejlen/.test(txt('quickCount')),'taket redovisas i stället för att siffran låtsas vara hela Inkorgen: "'+txt('quickCount')+'"');
 
  /* --- Fler förslag, ledtrådar och ✕ --- */
  const moreBtn=doc.querySelector('#quickChips .quick-chip-more');
@@ -323,6 +324,34 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  await until(()=>/Thunderbirds egna filter/.test(tbTitle()),'svenskan kommer tillbaka');
  check(/Thunderbirds egna filter/.test(tbTitle()),'tillbaka på svenska');
 
+ /* --- ⚠ Installationen: tillägget avinstallerar sig inte, men kan stängas av --- */
+ const pausedNow=()=>el('pause').textContent;
+ check(el('installWarn')!==null,'det finns en varningsrad för installationen');
+ check(el('installWarn').hidden===true,'den är tyst när installationen är permanent');
+ w.LasDemo.setState({installType:'development'});
+ el('pause').click();
+ await until(()=>el('installWarn').hidden===false,'tillfällig installation varnar',false,6000);
+ check(/Tillfällig installation/.test(txt('installWarnTitle')),'rubriken säger att den är tillfällig: "'+txt('installWarnTitle')+'"');
+ check(/avinstallerar sig/.test(txt('installWarnText')),'texten säger att det inte är SortBro som avinstallerar sig');
+ check(/Installera tillägg från fil/.test(txt('installWarnText')),'och hur man gör det permanent');
+ check(/Regelbackuper/.test(txt('installWarnText')),'och att reglerna finns kvar');
+ check(!/undefined|\{/.test(txt('installWarnText')),'inga ofyllda platshållare i texten');
+ w.LasDemo.setState({installType:'sideload'});
+ el('pause').click();
+ await until(()=>/Sidoladdad/.test(txt('installWarnTitle')),'sidoladdad installation får sin egen text',false,6000);
+ check(/Sidoladdad installation/.test(txt('installWarnTitle')),'rubriken skiljer sidoladdad från tillfällig: "'+txt('installWarnTitle')+'"');
+ check(/profilmapp/.test(txt('installWarnText')),'texten förklarar varför Thunderbird kan stänga av den');
+ check(/Regelbackuper/.test(txt('installWarnText')),'och att reglerna finns kvar');
+ el('installWarnHide').click();
+ await until(()=>el('installWarn').hidden===true,'✕ döljer varningen');
+ check(el('installWarn').hidden===true,'varningen går att dölja');
+ w.LasDemo.setState({installType:'normal'});
+ el('pause').click();
+ await until(()=>/Starta|Pausa/.test(pausedNow()),'demo tillbaka i normalläge');
+
+ /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
+    kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */
+ await sleep(400);
  check(jsdomErrors.length===0,'inga skriptfel: '+(jsdomErrors.slice(0,2).join(' | ')||'inga'));
  dom.window.close();
 })();

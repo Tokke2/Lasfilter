@@ -10,6 +10,14 @@
 </head>
 <body>
   <div id="demoBanner" class="demo-banner" data-i18n="demoBanner" hidden>FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.</div>
+  <div id="installWarn" class="install-warn" role="status" hidden>
+    <span class="install-warn-icon" aria-hidden="true">⚠</span>
+    <div class="install-warn-body">
+      <strong id="installWarnTitle"></strong>
+      <span id="installWarnText"></span>
+    </div>
+    <button id="installWarnHide" type="button" class="text-button" data-i18n="installWarnHide">Dölj</button>
+  </div>
   <div class="shell">
     <aside class="sidebar">
       <div class="brand">

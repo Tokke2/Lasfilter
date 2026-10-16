@@ -177,13 +177,29 @@ Kopieringen sker bara när något faktiskt har ändrats, så reglerna skrivs int
 
 Filen har samma format som den manuella exporten (`format: lasfilter-rules`), så båda vägarna fungerar lika: exportera manuellt eller lita på den automatiska kopian. Loggen får en rad varje gång kopian skrivs (`reglerna backade upp: 12 st …`), och om skrivningen misslyckas står det i loggen i stället för att felet tigs ihjäl.
 
+## Om tillägget försvinner ur Thunderbird
+
+**SortBro avinstallerar aldrig sig självt.** Tillägget innehåller inga anrop som kan ta bort eller stänga av ett tillägg (`uninstallSelf`, `management.uninstall`, `management.setEnabled`) och saknar medvetet behörigheten `management` – utan den är en avinstallation tekniskt omöjlig inifrån. Det kontrolleras av ett eget test vid varje bygge (`tester/safety.test.cjs`).
+
+Om tillägget ändå är borta vid nästa start är det Thunderbird som har stängt av det, och det finns två vanliga orsaker:
+
+- **Tillfällig installation (utvecklingsläge).** Ett tillägg som lästs in med *Läs in tillfälligt tillägg* lever bara till nästa omstart. Det ser ut som om tillägget avinstallerade sig, men det är så en tillfällig inläsning fungerar.
+- **Sidoladdad fil.** Ligger XPI-filen i Thunderbirds profilmapp (`extensions/`) i stället för att vara installerad via Tilläggshanteraren kan Thunderbird stänga av den – särskilt om signaturkontrollen (`xpinstall.signatures.required`) är påslagen.
+
+SortBro läser sin egen installationstyp vid start och säger till i klartext i stället för att du ska behöva gissa:
+
+- **En varningsrad högst upp i gränssnittet** när installationen är tillfällig eller sidoladdad, med besked om hur du gör den permanent: *Tillägg → kugghjulet ⚙ → Installera tillägg från fil…* (välj XPI-filen). Raden kan döljas och kommer tillbaka nästa gång gränssnittet öppnas.
+- **Loggfilens huvud** får raden `Installation: <typ>` (`normal`, `development`, `sideload`, `admin` eller `other`), och startraden skriver `thunderbird <version> sortbro <version> installation <typ>`. Är tillägget borta nästa gång kan du alltså läsa i `Hämtade filer/Lasfilter/lasfilter-logg.txt` hur det var installerat – och se om en Thunderbird-uppdatering kom strax innan.
+
+Installationstypen läses med `management.getSelf()`, som enligt Thunderbirds egen dokumentation fungerar **utan** någon ny behörighet. Behörighetslistan är oförändrad. Och även om tillägget stängs av förlorar du ingenting: reglerna ligger redan i `Hämtade filer/Lasfilter/Regelbackuper/` och importeras tillbaka under **Regler**.
+
 ## Teknisk logg
 
 Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 30 dagar, högst 5000 rader.
 
 Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
 
-- **Huvudet visar båda versionerna** (*Version:* tilläggets, *Thunderbird:* programmets), och den första raden efter en start är `thunderbird <version> sortbro <version>`.
+- **Huvudet visar båda versionerna och installationstypen** (*Version:* tilläggets, *Thunderbird:* programmets, *Installation:* hur tillägget installerades), och den första raden efter en start är `thunderbird <version> sortbro <version> installation <typ>`.
 - **Den är det sista spåret om tillägget skulle försvinna** ur Thunderbird. Filen ligger kvar på disken även om tillägget tas bort, så de sista raderna visar när det hände och i vilken Thunderbird-version det senast kördes – till exempel om en uppdatering av Thunderbird kom strax innan.
 
 ## Gränser som du bör känna till

@@ -32,10 +32,35 @@ App.readTbVersion=async()=>{
  }catch{App.tbVersion='';}
  return App.tbVersion;
 };
-App.startDetail=()=>'thunderbird '+(App.tbVersion||'okand')+' sortbro '+String(B.runtime.getManifest()?.version||'okand');
+/* Hur tillägget är installerat. management.getSelf() kräver ingen ny behörighet
+   (Thunderbird: "can be used without requesting the 'management' permission") och är
+   det enda sättet inifrån att veta om installationen är tillfällig. SortBro avinstallerar
+   aldrig sig självt – men ett tillfälligt eller sidoladdat tillägg kan Thunderbird stänga
+   av, och då ser det ut som om det försvann av sig själv. Vi kan inte hindra det, men vi
+   kan säga exakt vad som gäller i stället för att lämna användaren i sticket. */
+App.selfInfo={installType:'',version:'',mayDisable:null};
+App.readSelfInfo=async()=>{
+ try{
+  const info=await B.management.getSelf();
+  App.selfInfo={installType:typeof info?.installType==='string'?info.installType.slice(0,24):'',
+   version:String(info?.version||'').slice(0,32),mayDisable:info?.mayDisable===true};
+ }catch{App.selfInfo={installType:'',version:'',mayDisable:null};}
+ return App.selfInfo;
+};
+/* 'temporary' = inläst tillfälligt (försvinner vid omstart), 'sideload' = ligger i
+   profilmappens extensions-katalog (kan stängas av), '' = permanent och ofarligt. */
+App.installWarnType=()=>App.selfInfo.installType==='development'?'temporary':App.selfInfo.installType==='sideload'?'sideload':'';
+App.installLogNote=()=>{
+ const type=App.installWarnType();
+ if(type==='temporary')return 'installationen ar tillfallig (utvecklarlage) och forsvinner nar Thunderbird stangs';
+ if(type==='sideload')return 'installationen ar sidoladdad och kan stangas av av Thunderbird';
+ return '';
+};
+App.startDetail=()=>'thunderbird '+(App.tbVersion||'okand')+' sortbro '+String(B.runtime.getManifest()?.version||'okand')+
+ ' installation '+(App.selfInfo.installType||'okand');
 App.writeTextLog=async()=>{
  if(!App.engine?.config.fileLog)return;
- const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
+ const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Installation: '+(App.selfInfo.installType||'okand'),'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
  for(const x of App.logs)lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
  const url=URL.createObjectURL(new Blob([lines.join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'}));
  try{await B.downloads.download({url,filename:'Lasfilter/lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
@@ -414,7 +439,7 @@ App.snapshot=()=>{
  return {config:e.config,prefs:App.prefs,stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
    fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
-   enabledRules:e.config.rules.filter(r=>r.enabled).length,
+   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),logs:App.logs};
 };
 App.mutate=fn=>{
@@ -655,7 +680,11 @@ App.ready=(async()=>{
   await App.engine.restore(pendingWork.slice(0,20));
  }
  await App.readTbVersion();
+ await App.readSelfInfo();
  App.log('start');
+ /* Är installationen tillfällig står det i klartext i loggfilen, så att nästa gång
+    tillägget är borta går det att se varför i stället för att gissa. */
+ if(App.installLogNote())App.log('debug',0,App.installLogNote());
  /* Egen rad med båda versionerna: bara debug-rader bär detaljtext, och den här
     raden är det sista spåret i loggfilen om tillägget en dag är borta. */
  App.log('debug',0,App.startDetail());

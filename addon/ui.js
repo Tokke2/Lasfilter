@@ -8,6 +8,11 @@ const I18N={
  sv:{
   pageTitle:'SortBro · Thunderbird',
   demoBanner:'FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.',
+  installWarnHide:'Dölj',
+  installWarnTempTitle:'⚠ Tillfällig installation – försvinner när Thunderbird stängs',
+  installWarnTempText:'SortBro ligger i utvecklingsläge (inläst tillfälligt). Det är inte SortBro som avinstallerar sig. Gör det permanent: Tillägg → kugghjulet ⚙ → Installera tillägg från fil… Dina regler finns kvar i Hämtade filer/Lasfilter/Regelbackuper/.',
+  installWarnSideTitle:'⚠ Sidoladdad installation – Thunderbird kan stänga av tillägget',
+  installWarnSideText:'Filen ligger i Thunderbirds profilmapp (extensions) i stället för att vara installerad via Tillägg. Osignerade tillägg där stängs av vid omstart. Gör det permanent: Tillägg → kugghjulet ⚙ → Installera tillägg från fil… Dina regler finns kvar i Hämtade filer/Lasfilter/Regelbackuper/.',
   brandName:'SortBro',
   brandSub:'FÖR THUNDERBIRD',
   navMenu:'MENY',
@@ -588,6 +593,11 @@ const I18N={
  en:{
   pageTitle:'SortBro · Thunderbird',
   demoBanner:'PREVIEW · Sample data only. No emails are read or moved.',
+  installWarnHide:'Hide',
+  installWarnTempTitle:'⚠ Temporary install – disappears when Thunderbird closes',
+  installWarnTempText:'SortBro is loaded in developer mode (temporarily). It is not SortBro uninstalling itself. Make it permanent: Add-ons → the gear ⚙ → Install Add-on From File… Your rules stay in Downloads/Lasfilter/Regelbackuper/.',
+  installWarnSideTitle:'⚠ Side-loaded install – Thunderbird may disable the add-on',
+  installWarnSideText:'The file sits in the Thunderbird profile folder (extensions) instead of being installed through Add-ons. Unsigned add-ons there are disabled at restart. Make it permanent: Add-ons → the gear ⚙ → Install Add-on From File… Your rules stay in Downloads/Lasfilter/Regelbackuper/.',
   brandName:'SortBro',
   brandSub:'FOR THUNDERBIRD',
   navMenu:'MENU',
@@ -1568,6 +1578,17 @@ async function applyPrefill(){
 }
 
 function currentToken(){return JSON.stringify(state.config.rules);}
+/* SortBro avinstallerar aldrig sig självt – men Thunderbird stänger av tillfälliga och
+   sidoladdade tillägg. Då säger vi det rakt ut i stället för att användaren ska gissa. */
+let installWarnDismissed=false;
+function renderInstallWarning(next){
+ const box=$('installWarn');if(!box)return;
+ const type=next?.installType==='development'?'temporary':next?.installType==='sideload'?'sideload':'';
+ if(!type||installWarnDismissed){box.hidden=true;return;}
+ if($('installWarnTitle'))$('installWarnTitle').textContent=T(type==='temporary'?'installWarnTempTitle':'installWarnSideTitle');
+ if($('installWarnText'))$('installWarnText').textContent=T(type==='temporary'?'installWarnTempText':'installWarnSideText');
+ box.hidden=false;
+}
 function renderStatus(next){
  state=next;applyTheme(state.prefs);applySeason(state.prefs);
  const cfg=state.config,active=cfg.rules.filter(r=>r.enabled).length;
@@ -1586,6 +1607,7 @@ function renderStatus(next){
  for(let i=0;i<3;i++){$('setup'+(i+1)).className='setup-step'+(setup[i]?' done':'')+(!setup[i]&&(i===0||setup[i-1])?' current':'');$('setup'+(i+1)).querySelector('b').textContent=setup[i]?'✓':String(i+1);}
  $('sweepNow').disabled=!!state.fault||cfg.paused||!rulesReady;$('sweepNow').textContent=state.queued?T('sweepQueueNow'):T('sweepRunNow');
  if($('clearFault'))$('clearFault').hidden=!state.fault&&!state.blocked;
+ renderInstallWarning(state);
  $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?T('noticeStoppedPrefix')+Terr(state.fault)+T('noticeStoppedSuffix'):'';
  $('lastCheck').textContent=state.lastCheck?T('lastCheckPrefix')+new Date(state.lastCheck).toLocaleTimeString(locale())+' · '+state.stats.checks+T('lastCheckCountSuffix'):T('lastCheckWaiting');
  if($('autoRunInfo')){
@@ -2545,6 +2567,7 @@ if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
  if(msg?.event==='ruleFromMessage')applyPrefill().catch(()=>{});
 });
 (async()=>{
- try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');await applyPrefill();}
+ if($('installWarnHide'))handle('installWarnHide','click',()=>{installWarnDismissed=true;if($('installWarn'))$('installWarn').hidden=true;});
+try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');await applyPrefill();}
  catch(e){$('statusPill').textContent=T('pillDisconnected');$('notice').hidden=false;$('notice').textContent=Terr(e.code);$('notice').className='notice error';}
 })();

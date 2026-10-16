@@ -9,9 +9,11 @@ globalThis.LasDemo=(()=>{
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
   {id:'demo-3',name:'Arkivera äldre mejl',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',conditions:[{field:'date',op:'older',value:'90'}]}]},
-  prefs:{theme:'light',fontSize:14,lastRule:'demo-1',lang:'sv'},moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
+  prefs:{theme:'light',fontSize:14,lastRule:'demo-1',lang:'sv'},installType:'normal',moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];let mockPrefill=null;
+ /* Endast för förhandsvisningen: låt ett test byta en uppgift i demotillståndet. */
+ function setState(patch){Object.assign(state,patch||{});return state;}
  function saveRules(rules){snapshots.unshift(structuredClone(state.config));snapshots.splice(5);state.backups=snapshots.map((c,i)=>({index:i,time:new Date().toISOString(),count:c.rules.length}));state.config.rules=LasCore.validateRules(rules);state.config.revision++;}
  async function request(m){try{let data;
   switch(m.type){
@@ -57,7 +59,7 @@ globalThis.LasDemo=(()=>{
       {word:'månadsbesked',count:2,subject:'Månadsbesked'},
       {word:'inbjudan',count:2,subject:'Inbjudan till webbinarium'}
      ].filter(x=>!taken.some(v=>v.includes(x.word))),
-     inboxId:'demo-in',sourceAccount:'demo',scanned:37,capped:false};break;
+     inboxId:'demo-in',sourceAccount:'demo',scanned:400,capped:true};break;
    }
    case 'quickPreview':{
     const cond=LasCore.choiceCondition({field:m.field,value:m.value});
@@ -66,7 +68,7 @@ globalThis.LasDemo=(()=>{
     const unread=v.includes('klarna')?1:v.includes('faktura')?2:0;
     const allowUnread=m.allowUnread!==false;
     data={matches:allowUnread?matched:Math.max(0,matched-unread),matched,read:matched-unread,unread,allowUnread,
-     scanned:37,capped:false,condition:cond,inboxId:'demo-in',sourceAccount:'demo'};break;
+     scanned:400,capped:true,condition:cond,inboxId:'demo-in',sourceAccount:'demo'};break;
    }
    case 'quickRule':{
     const source=m.source||'demo-in';
@@ -159,5 +161,5 @@ globalThis.LasDemo=(()=>{
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};
  }catch(e){return {success:false,error:e.code||'internal_error'};}}
- return {request};
+ return {request,setState};
 })();

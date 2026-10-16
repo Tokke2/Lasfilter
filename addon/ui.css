@@ -1307,6 +1307,14 @@ th {
   line-height: 1.7;
 }
 
+.storage-note {
+  border-left: 3px solid var(--line);
+  padding: 6px 0 6px 10px;
+  margin: 6px 0 10px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .muted {
   color: var(--muted);
   font-size: 0.76rem !important;

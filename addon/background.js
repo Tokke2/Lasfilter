@@ -1,6 +1,17 @@
 'use strict';
 const C=LasCore,B=browser;
 const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null};
+/* Allt SortBro skapar hamnar i undermappar till appmappen i Hämtade filer.
+   En enda källa för sökvägarna, så att inget kan hamna utanför av misstag.
+   Sökvägarna skrivs med / och fungerar på Windows, macOS och Linux –
+   nedladdningsmappen ligger i användarens hemkatalog på alla tre. */
+App.paths={
+ root:'Lasfilter/',
+ logs:'Lasfilter/Loggar/',
+ backups:'Lasfilter/Regelbackuper/',
+ rules:'Lasfilter/Regler/',
+ filters:'Lasfilter/Filterfiler/'
+};
 const SEASONS=['spring','summer','autumn','winter'];
 App.season=()=>{
  const pref=App.prefs.season;
@@ -63,7 +74,7 @@ App.writeTextLog=async()=>{
  const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Installation: '+(App.selfInfo.installType||'okand'),'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
  for(const x of App.logs)lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
  const url=URL.createObjectURL(new Blob([lines.join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'}));
- try{await B.downloads.download({url,filename:'Lasfilter/lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+ try{await B.downloads.download({url,filename:App.paths.logs+'lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
 };
 App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTimeout(()=>App.writeTextLog().catch(()=>{}),1200);};
 /* Automatisk säkerhetskopia av reglerna. Den skrivs till Hämtade filer, alltså
@@ -72,7 +83,7 @@ App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTime
    per dag så att en felaktig ändring går att backa till. */
 /* Backuperna har sin egen undermapp, så de aldrig ligger bland loggfilen eller
    annat i appmappen. Loggfilen ligger kvar direkt i Lasfilter/. */
-App.backupFolder='Lasfilter/Regelbackuper/';
+App.backupFolder=App.paths.backups;
 App.autoBackupNames={latest:'sortbro-regler-backup.json',dated:day=>'sortbro-regler-'+day+'.json'};
 /* Känns igen på hela sökvägen: bara våra egna dagsfiler i vår egen undermapp. */
 App.backupFilePattern=/[\\/]Lasfilter[\\/]Regelbackuper[\\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/;
@@ -439,7 +450,7 @@ App.snapshot=()=>{
  return {config:e.config,prefs:App.prefs,stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
    fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
-   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,
+   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),logs:App.logs};
 };
 App.mutate=fn=>{

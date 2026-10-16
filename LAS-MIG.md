@@ -177,6 +177,21 @@ Kopieringen sker bara när något faktiskt har ändrats, så reglerna skrivs int
 
 Filen har samma format som den manuella exporten (`format: lasfilter-rules`), så båda vägarna fungerar lika: exportera manuellt eller lita på den automatiska kopian. Loggen får en rad varje gång kopian skrivs (`reglerna backade upp: 12 st …`), och om skrivningen misslyckas står det i loggen i stället för att felet tigs ihjäl.
 
+## Var filerna hamnar – allt i appmappens undermappar
+
+SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmappen. Allt hamnar i **`Hämtade filer/Lasfilter/`** och dess undermappar, en mapp per sort:
+
+| Mapp | Innehåll | Skapas av |
+| --- | --- | --- |
+| `Hämtade filer/Lasfilter/Loggar/` | `lasfilter-logg.txt` – den tekniska loggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
+| `Hämtade filer/Lasfilter/Regelbackuper/` | `sortbro-regler-backup.json` + en daterad kopia per dag | automatisk säkerhetskopia, eller *⇩ Backa upp reglerna nu* |
+| `Hämtade filer/Lasfilter/Regler/` | `sortbro-regler-ÅÅÅÅ-MM-DD.json` (alla regler) och `sortbro-regel-<namn>.json` (en regel) | *Exportera* i Regler |
+| `Hämtade filer/Lasfilter/Filterfiler/` | `msgFilterRules.dat` – filterfilen du själv kopierar in i profilen | *Skriv ut dina regler som filterfil* i Regler |
+
+**Samma sökvägar på Windows, macOS och Linux.** Sökvägarna skrivs med `/` och läggs under systemets nedladdningsmapp, som ligger i användarens hemkatalog på alla tre systemen – `%USERPROFILE%\Downloads` på Windows, `~/Downloads` på macOS och Linux (och `Hämtade filer` heter mappen på svenska Windows). Under mappen skapas undermapparna automatiskt av Thunderbirds nedladdnings-API, precis som när webbläsaren sparar en fil i en undermapp. Sökvägarna kommer från en enda källa i koden och visas i gränssnittet, så att texten och filen aldrig kan peka på olika ställen.
+
+Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen ovan och kvittot visar hela sökvägen. Vill du i stället välja plats själv vid export, säg till – då blir det en kryssruta för det.
+
 ## Om tillägget försvinner ur Thunderbird
 
 **SortBro avinstallerar aldrig sig självt.** Tillägget innehåller inga anrop som kan ta bort eller stänga av ett tillägg (`uninstallSelf`, `management.uninstall`, `management.setEnabled`) och saknar medvetet behörigheten `management` – utan den är en avinstallation tekniskt omöjlig inifrån. Det kontrolleras av ett eget test vid varje bygge (`tester/safety.test.cjs`).
@@ -189,7 +204,7 @@ Om tillägget ändå är borta vid nästa start är det Thunderbird som har stä
 SortBro läser sin egen installationstyp vid start och säger till i klartext i stället för att du ska behöva gissa:
 
 - **En varningsrad högst upp i gränssnittet** när installationen är tillfällig eller sidoladdad, med besked om hur du gör den permanent: *Tillägg → kugghjulet ⚙ → Installera tillägg från fil…* (välj XPI-filen). Raden kan döljas och kommer tillbaka nästa gång gränssnittet öppnas.
-- **Loggfilens huvud** får raden `Installation: <typ>` (`normal`, `development`, `sideload`, `admin` eller `other`), och startraden skriver `thunderbird <version> sortbro <version> installation <typ>`. Är tillägget borta nästa gång kan du alltså läsa i `Hämtade filer/Lasfilter/lasfilter-logg.txt` hur det var installerat – och se om en Thunderbird-uppdatering kom strax innan.
+- **Loggfilens huvud** får raden `Installation: <typ>` (`normal`, `development`, `sideload`, `admin` eller `other`), och startraden skriver `thunderbird <version> sortbro <version> installation <typ>`. Är tillägget borta nästa gång kan du alltså läsa i `Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt` hur det var installerat – och se om en Thunderbird-uppdatering kom strax innan.
 
 Installationstypen läses med `management.getSelf()`, som enligt Thunderbirds egen dokumentation fungerar **utan** någon ny behörighet. Behörighetslistan är oförändrad. Och även om tillägget stängs av förlorar du ingenting: reglerna ligger redan i `Hämtade filer/Lasfilter/Regelbackuper/` och importeras tillbaka under **Regler**.
 
@@ -197,7 +212,7 @@ Installationstypen läses med `management.getSelf()`, som enligt Thunderbirds eg
 
 Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 30 dagar, högst 5000 rader.
 
-Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
+Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
 
 - **Huvudet visar båda versionerna och installationstypen** (*Version:* tilläggets, *Thunderbird:* programmets, *Installation:* hur tillägget installerades), och den första raden efter en start är `thunderbird <version> sortbro <version> installation <typ>`.
 - **Den är det sista spåret om tillägget skulle försvinna** ur Thunderbird. Filen ligger kvar på disken även om tillägget tas bort, så de sista raderna visar när det hände och i vilken Thunderbird-version det senast kördes – till exempel om en uppdatering av Thunderbird kom strax innan.

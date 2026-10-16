@@ -148,7 +148,7 @@ const I18N={
   tbExportWritten:'{n} filter skrivna',
   tbExportSkipped:'{n} hoppades över',
   tbExportNoUri:'Kontots adress i filterfilen saknas. Klistra in den i fältet ovan (den står i din msgFilterRules.dat, t.ex. imap://anvandare%40server.se@imap.server.se/) eller importera filen en gång först.',
-  tbExportPlace:'Lägg filen i profilens mapp för kontot (ImapMail/<server>/ eller Mail/Local Folders/) när Thunderbird är stängt, och starta sedan om Thunderbird. Ta en kopia av den gamla filen först.',
+  tbExportPlace:'Filen ligger nu i Hämtade filer/Lasfilter/Filterfiler/. Lägg den i profilens mapp för kontot (ImapMail/<server>/ eller Mail/Local Folders/) när Thunderbird är stängt, och starta sedan om Thunderbird. Ta en kopia av den gamla filen först.',
   tbExportNeedsRules:'Det finns inga regler att exportera.',
   tbNotes:'Att tänka på:',
   tbNoteBody:'Villkor på mejltexten (body) kan SortBro inte matcha',
@@ -259,7 +259,8 @@ const I18N={
   sweepMinutesLabel:'Hur ofta alla regler körs (minuter, steg om 15 – 60 = en gång i timmen)',
   newInboxDirectLabel:'Flytta nya matchande mejl direkt när de kommer till Inkorgen',
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
-  fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/lasfilter-logg.txt',
+  fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt',
+  storageNote:'Allt SortBro skapar hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: Loggar (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.',
   fileLogNote:'Loggfilen skrivs om automatiskt efter nya händelser och innehåller inte ämnesrader, adresser eller mejltexter.',
   autoBackupLabel:'Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/Regelbackuper/',
   autoBackupNote:'Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad kopia sparas en gång per dag – de senaste 30 dagarna behålls. Under Regler importerar du filen och får tillbaka reglerna.',
@@ -400,8 +401,9 @@ const I18N={
   confirmImportMerge:'Lägg till reglerna från JSON-filen till dina befintliga regler?',
   toastImported:'Reglerna importerades från JSON-filen!',
   toastMerged:'Reglerna från JSON-filen lades till!',
-  toastExported:'Reglerna exporterades till JSON-fil.',
-  toastSingleExported:'Regeln exporterades till JSON-fil.',
+  toastExported:'Reglerna exporterades till {path}.',
+  logExported:'Loggen exporterades till {path}.',
+  toastSingleExported:'Regeln exporterades till {path}.',
   toastCleared:'Spärren är rensad och bevakningen är igång igen.',
   toastModeDirect:'Direktläge: nya matchande mejl flyttas även olästa.',
   toastModeRead:'Nya mejl flyttas när de är lästa och lämnade.',
@@ -409,7 +411,7 @@ const I18N={
   toastOpenWindowOff:'Olästa flyttade mejl stannar i målmappen utan popup-fönster.',
   toastVerboseOn:'Detaljlogg på: händelser syns under Aktivitet och i exporten.',
   toastVerboseOff:'Detaljlogg av.',
-  toastFileLogOn:'Loggfil på: Hämtade filer/Lasfilter/lasfilter-logg.txt uppdateras automatiskt.',
+  toastFileLogOn:'Loggfil på: Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt uppdateras automatiskt.',
   toastFileLogOff:'Automatisk loggfil av.',
   toastSweepIntervalPrefix:'Kontosvep körs var ',
   toastSweepIntervalSuffix:':e minut.',
@@ -733,7 +735,7 @@ const I18N={
   tbExportWritten:'{n} filters written',
   tbExportSkipped:'{n} skipped',
   tbExportNoUri:'The account address from the filter file is missing. Paste it in the field above (it is in your msgFilterRules.dat, e.g. imap://user%40server.com@imap.server.com/) or import the file once first.',
-  tbExportPlace:'Place the file in the profile folder for the account (ImapMail/<server>/ or Mail/Local Folders/) while Thunderbird is closed, then restart Thunderbird. Back up the old file first.',
+  tbExportPlace:'The file now sits in Downloads/Lasfilter/Filterfiler/. Place it in the profile folder for the account (ImapMail/<server>/ or Mail/Local Folders/) while Thunderbird is closed, then restart Thunderbird. Back up the old file first.',
   tbExportNeedsRules:'There are no rules to export.',
   tbNotes:'Good to know:',
   tbNoteBody:'Conditions on the message body cannot be matched by SortBro',
@@ -844,7 +846,8 @@ const I18N={
   sweepMinutesLabel:'How often all rules run (minutes, steps of 15 – 60 = once an hour)',
   newInboxDirectLabel:'Move new matching emails immediately when they arrive in Inbox',
   verboseLabel:'Show detailed diagnostics in Activity Log',
-  fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/lasfilter-logg.txt',
+  fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/Loggar/lasfilter-logg.txt',
+  storageNote:'Everything SortBro creates lands in subfolders of the app folder Downloads/Lasfilter/: Loggar (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads.',
   fileLogNote:'The log file is updated automatically after new events and never contains subjects, addresses or message bodies.',
   autoBackupLabel:'Back up the rules automatically to Downloads/Lasfilter/Regelbackuper/',
   autoBackupNote:'The copy lives outside the Thunderbird profile, so it survives the add-on being removed or switched off. sortbro-regler-backup.json is always the latest, and a dated copy is written once a day – the last 30 days are kept. Import the file under Rules to get the rules back.',
@@ -985,8 +988,9 @@ const I18N={
   confirmImportMerge:'Add the rules from this JSON file to your existing rules?',
   toastImported:'Rules imported from JSON file!',
   toastMerged:'Rules from JSON file added!',
-  toastExported:'Rules exported to JSON file.',
-  toastSingleExported:'Rule exported to JSON file.',
+  toastExported:'Rules exported to {path}.',
+  logExported:'Log exported to {path}.',
+  toastSingleExported:'Rule exported to {path}.',
   toastCleared:'Lock cleared and monitoring resumed.',
   toastModeDirect:'Immediate mode: new matching emails move even when unread.',
   toastModeRead:'New emails move after they are read and closed.',
@@ -994,7 +998,7 @@ const I18N={
   toastOpenWindowOff:'Moved unread emails stay in target folder without a popup window.',
   toastVerboseOn:'Detailed logging enabled: diagnostics appear in Activity Log and exports.',
   toastVerboseOff:'Detailed logging disabled.',
-  toastFileLogOn:'File log enabled: Downloads/Lasfilter/lasfilter-logg.txt updates automatically.',
+  toastFileLogOn:'File log enabled: Downloads/Lasfilter/Loggar/lasfilter-logg.txt updates automatically.',
   toastFileLogOff:'Automatic file log disabled.',
   toastSweepIntervalPrefix:'Account scan runs every ',
   toastSweepIntervalSuffix:' minutes.',
@@ -1192,6 +1196,11 @@ async function rpc(type,data={}){
 }
 function handle(id,event,fn){const n=$(id);if(n)n.addEventListener(event,async e=>{try{await fn(e);}catch(err){alertError(err);}});}
 const label=id=>folders.find(f=>f.id===id)?.label||T('missingFolder');
+/* Sökvägarna kommer från bakgrunden i statusen (state.paths), så att gränssnittet och
+   filskrivningen aldrig kan visa olika saker. Reservvärdet gäller bara innan statusen
+   hunnit in. Allt SortBro skapar ligger i undermappar till appmappen i Hämtade filer. */
+const FALLBACK_PATHS={root:'Lasfilter/',logs:'Lasfilter/Loggar/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'};
+const paths=()=>(state&&state.paths)||FALLBACK_PATHS;
 
 function updateReadPolicy(){
  const rf=$('ruleReadFilter')?.value||'default';
@@ -1490,7 +1499,8 @@ async function exportTbFilters(){
   toast(T('tbExportNoUri'));
   return;
  }
- await download(result.text,'msgFilterRules.dat','text/plain');
+ const filterFile=paths().filters+'msgFilterRules.dat';
+ await download(result.text,filterFile,'text/plain');
  if(report){
   report.hidden=false;
   const lines=[T('tbExportWritten').replace('{n}',result.written)+(result.skipped?' · '+T('tbExportSkipped').replace('{n}',result.skipped):''),T('tbExportPlace')];
@@ -1499,7 +1509,7 @@ async function exportTbFilters(){
   if((result.needsUri||[]).length)lines.push(T('tbExportNoUri'));
   report.replaceChildren(...lines.map(text=>el('p','tb-report-line',text)));
  }
- toast(T('tbExportSaved').replace('{name}','msgFilterRules.dat'));
+ toast(T('tbExportSaved').replace('{name}',filterFile));
 }
 
 /* ===== 1-klicksmallar ===== */
@@ -1830,7 +1840,9 @@ async function download(data,filename,mime='application/json'){
  const body=typeof data==='string'?data:JSON.stringify(data,null,2);
  const url=URL.createObjectURL(new Blob([body],{type:mime}));
  try{
-  if(live&&!DEMO&&browser.downloads?.download)await browser.downloads.download({url,filename,saveAs:true});
+  /* saveAs:false tillsammans med en sökväg under appmappen: filen hamnar alltid i
+     Hämtade filer/Lasfilter/... i stället för att fråga varje gång. */
+  if(live&&!DEMO&&browser.downloads?.download)await browser.downloads.download({url,filename,saveAs:false,conflictAction:'overwrite'});
   else{const a=el('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();}
  }catch(err){
   if(!String(err?.message||err||'').toLowerCase().includes('cancel')){
@@ -2483,8 +2495,9 @@ handle('catchUp','click',async()=>{
 });
 async function exportAllRules(){
  const data=await rpc('export');
- await download(data,'sortbro-regler-'+new Date().toISOString().slice(0,10)+'.json');
- toast(T('toastExported'));
+ const file=paths().rules+'sortbro-regler-'+new Date().toISOString().slice(0,10)+'.json';
+ await download(data,file);
+ toast(T('toastExported').replace('{path}',file));
 }
 async function handleRuleImport(inputId,merge=false){
  const input=$(inputId);if(!input)return;
@@ -2512,10 +2525,15 @@ if($('exportSingleRule'))handle('exportSingleRule','click',async()=>{
  const rule=buildRule();
  const slug=(rule.name||'regel').toLowerCase().replace(/[^a-z0-9åäö_-]+/gi,'-').replace(/^-+|-+$/g,'')||'regel';
  const folderHints=folders.map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
- await download({format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:[rule],folders:folderHints},'sortbro-regel-'+slug+'.json');
- toast(T('toastSingleExported'));
+ const singleFile=paths().rules+'sortbro-regel-'+slug+'.json';
+ await download({format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:[rule],folders:folderHints},singleFile);
+ toast(T('toastSingleExported').replace('{path}',singleFile));
 });
-handle('exportLog','click',async()=>download(await rpc('exportLog'),'sortbro-tekniklogg-'+new Date().toISOString().slice(0,10)+'.json'));
+handle('exportLog','click',async()=>{
+ const file=paths().logs+'sortbro-tekniklogg-'+new Date().toISOString().slice(0,10)+'.json';
+ await download(await rpc('exportLog'),file);
+ toast(T('logExported').replace('{path}',file));
+});
 handle('import','change',()=>handleRuleImport('import',false));
 if($('importSettings'))handle('importSettings','change',()=>handleRuleImport('importSettings',false));
 if($('importMerge'))handle('importMerge','change',()=>handleRuleImport('importMerge',true));

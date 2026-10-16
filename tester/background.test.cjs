@@ -182,6 +182,24 @@ function backupApi(){
 const backupConfig=rules=>({schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,rules});
 
+test('allt som skrivs hamnar i en undermapp till appmappen – inget löst i Hämtade filer',async()=>{
+ const {api,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ await app.autoBackup({force:true});
+ await app.writeTextLog();
+ assert.ok(written.length>=2,'både loggfilen och kopian skrevs');
+ for(const file of written){
+  assert.match(file,/^Lasfilter\//,'allt ligger i appmappen: '+file);
+  assert.match(file,/^Lasfilter\/[^/]+\/.+/,'och i en undermapp till den, inte löst i appmappen: '+file);
+ }
+ /* deepEqual går inte över vm-gränsen: jämför JSON i stället. */
+ assert.equal(JSON.stringify(app.paths),JSON.stringify({root:'Lasfilter/',logs:'Lasfilter/Loggar/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'}),'mappordningen är den utlovade');
+ const snap=app.snapshot();
+ assert.equal(snap.paths.logs,'Lasfilter/Loggar/','gränssnittet får samma sökvägar som filskrivningen använder');
+ assert.equal(app.backupFolder,app.paths.backups,'kopian använder sökvägen från samma källa');
+});
+
 test('säkerhetskopian skriver reglerna till Hämtade filer – och de kan läsas tillbaka',async()=>{
  const {api,files,written}=backupApi();
  const {app}=await loadBackground(api);
@@ -568,7 +586,7 @@ test('startraden och loggfilen bär både tilläggets och Thunderbirds version',
  app.scheduleTextLog();
  await tick.flush(20);
  await tick.settle(Promise.resolve(),20);
- assert.deepEqual([...new Set(downloaded.map(d=>d.filename))],['Lasfilter/lasfilter-logg.txt'],'loggfilen skrivs dit den ska');
+ assert.deepEqual([...new Set(downloaded.map(d=>d.filename))],['Lasfilter/Loggar/lasfilter-logg.txt'],'loggfilen skrivs till Loggar-mappen, inte löst i appmappen');
  assert.match(logText,/Thunderbird: 140\.4\.2/,'loggfilens huvud visar Thunderbirds version');
  assert.match(logText,/sortbro /,'och startraden med båda versionerna finns i filen');
 });

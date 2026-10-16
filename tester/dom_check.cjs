@@ -296,6 +296,24 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(manual.includes('actionValue="imap://demo%40exempel.se@imap.exempel.se/'),'den inklistrade adressen hamnar i filen: '+(manual.split('\r\n').find(l=>l.startsWith('actionValue'))||'(saknas)'));
  check(!/undefined/.test(manual),'ingen rad innehåller undefined efter handpåläggning');
 
+ /* --- Filerna hamnar i undermappar till appmappen --- */
+ const noteEl=doc.querySelector('[data-i18n="storageNote"]');
+ const note=noteEl?.textContent||'';
+ check(/Hämtade filer\/Lasfilter/.test(note),'mappraden i Avancerat pekar ut appmappen: "'+note.slice(0,90)+'…"');
+ check(/Loggar/.test(note)&&/Regelbackuper/.test(note)&&/Regler/.test(note)&&/Filterfiler/.test(note),'alla fyra undermappar nämns');
+ check(/Inget hamnar löst/.test(note),'och den lovar att inget hamnar utanför');
+ check(/Loggar\/lasfilter-logg\.txt/.test(el('fileLog').closest('label').textContent),'loggrutan pekar på Loggar-mappen: "'+el('fileLog').closest('label').textContent.trim()+'"');
+ el('export').click();
+ await until(()=>/exporterades till/.test(txt('toast')),'exporten kvitteras med sökväg');
+ check(/Lasfilter\/Regler\/sortbro-regler-\d{4}-\d{2}-\d{2}\.json/.test(txt('toast')),'regelfilen hamnar i Regler-mappen: "'+txt('toast')+'"');
+ el('exportLog').click();
+ await until(()=>/Loggen exporterades/.test(txt('toast')),'loggexporten kvitteras');
+ check(/Lasfilter\/Loggar\/sortbro-tekniklogg-\d{4}-\d{2}-\d{2}\.json/.test(txt('toast')),'loggfilen hamnar i Loggar-mappen: "'+txt('toast')+'"');
+ el('tbExportBtn').click();
+ await until(()=>/Filterfilen sparades/.test(txt('toast')),'filterexporten kvitteras');
+ check(/Lasfilter\/Filterfiler\/msgFilterRules\.dat/.test(txt('toast')),'filterfilen hamnar i Filterfiler-mappen: "'+txt('toast')+'"');
+ check(/Filterfiler/.test(txt('tbReport'))&&/ImapMail/.test(txt('tbReport')),'rapporten säger både var filen ligger och vart den ska');
+
  /* --- ⇩ Automatisk säkerhetskopia: rutan och knappen --- */
  check(el('autoBackup')!==null,'rutan för automatisk säkerhetskopia finns');
  check(el('autoBackup').checked===true,'den är på som standard');

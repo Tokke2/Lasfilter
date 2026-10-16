@@ -152,6 +152,15 @@ function countMatches(messages,rule){
  let n=0;for(const m of Array.isArray(messages)?messages:[])if(match(rule,m,true,true))n++;
  return n;
 }
+/* Ärlig räkning för snabbregeln: hur många mejl träffas, hur många av dem som är olästa och
+   hur många som faktiskt skulle flyttas. Kontot måste stämma – regeln gäller bara ett konto. */
+function countHits(messages,rule,{accountId=''}={}){
+ if(!rule||!Array.isArray(rule.conditions)||!rule.conditions.length)return {matched:0,unread:0,read:0};
+ const list=(Array.isArray(messages)?messages:[]).filter(m=>!accountId||m?.folder?.accountId===accountId);
+ let matched=0,unread=0;
+ for(const m of list)if(match(rule,m,true,true)){matched++;if(m.read!==true)unread++;}
+ return {matched,unread,read:matched-unread};
+}
 /* Vanliga ord i ämnesrader: gör det möjligt att skapa en regel utan att kunna en exakt adress. */
 const STOPWORDS=new Set(['och','att','för','med','din','ditt','dina','från','den','det','som','inte','har','kan','till','av','på','om','en','ett','er','ert','vi','du','är','blir','blev','nya','nytt','ny','vara','var','skulle','efter','över','under','utan','upp','ner','här','där','vad','när','hur','vem','tack','hej','fick','måste','vill','kunde','vår','vårt','våra','oss','samt','via','the','and','for','with','this','that','you','your','our','from','not','has','have','are','was','were','will','can','all','per','new','news','please','about','more','than','one','two','out','now','get','see','mail','email','http','https','www']);
 function suggestWords(messages,{rules=[],limit=6,minCount=3,minLength=4}={}){
@@ -307,6 +316,6 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

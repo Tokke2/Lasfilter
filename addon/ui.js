@@ -88,6 +88,16 @@ const I18N={
   quickMatch:'{n} mejl i Inkorgen matchar just nu',
   quickMatchZero:'Inga mejl matchar just nu – kontrollera stavningen eller klicka på ett förslag ovan.',
   quickMatchCounting:'Räknar i Inkorgen…',
+  quickMatchAccount:'{n} mejl i {a} matchar just nu',
+  quickMatchUnreadPart:'{n} av {m} flyttas nu – {u} olästa väntar på att läsas',
+  quickMatchUnreadOnly:'Inga mejl flyttas nu – de {u} som matchar är olästa. Kryssa i Flytta olästa mejl om de ska med.',
+  quickMatchCapped:' (räknat på de {n} senaste mejlen i Inkorgen)',
+  quickChipTipSender:'Vanligaste adressen: {a}',
+  quickChipTipSubject:'Senaste ämnet: {s}',
+  quickChipHide:'Dölj förslaget',
+  quickHintsMore:'＋ visa fler ({n})',
+  quickHintsShowLess:'− visa färre',
+  quickHintsUnhide:'Visa dolda förslag igen',
   quickSentence:'Flytta {what} till {target}',
   quickPickTarget:'välj målmapp',
   quickWhatDomain:'mejl från {v}',
@@ -658,6 +668,16 @@ const I18N={
   quickMatch:'{n} emails in the Inbox match right now',
   quickMatchZero:'No emails match right now – check the spelling or click a suggestion above.',
   quickMatchCounting:'Counting in the Inbox…',
+  quickMatchAccount:'{n} emails in {a} match now',
+  quickMatchUnreadPart:'{n} of {m} will move now – {u} unread are waiting to be read',
+  quickMatchUnreadOnly:'No emails will move now – the {u} that match are unread. Tick Move unread emails to include them.',
+  quickMatchCapped:' (counted among the {n} most recent emails in the Inbox)',
+  quickChipTipSender:'Most common address: {a}',
+  quickChipTipSubject:'Latest subject: {s}',
+  quickChipHide:'Hide this suggestion',
+  quickHintsMore:'＋ show more ({n})',
+  quickHintsShowLess:'− show fewer',
+  quickHintsUnhide:'Show hidden suggestions again',
   quickSentence:'Move {what} to {target}',
   quickPickTarget:'choose a target folder',
   quickWhatDomain:'emails from {v}',
@@ -1519,7 +1539,7 @@ async function createFolderFromModal(){
  folders=await rpc('folders');
  const src=$('source')?.value||'',target=$('target')?.value||'';
  accountOptions(src);targetOptions(created?.id||target);
- if($('quickTarget')&&created?.id)$('quickTarget').value=created.id;
+ if($('quickTarget')&&created?.id){$('quickTarget').value=created.id;rememberQuickTarget(created.id);}
  const modal=$('folderModal');if(modal)modal.hidden=true;
  renderRules();toast(T('toastFolderCreated'));
 }
@@ -1681,7 +1701,7 @@ function targetOptions(value=''){
  selectOptions($('target'),folders,T('chooseTarget'),value);
  if($('quickTarget')){
   const qVal=$('quickTarget').value;
-  selectOptions($('quickTarget'),folders,T('chooseTarget'),qVal||value||'');
+  selectOptions($('quickTarget'),folders,T('chooseTarget'),qVal||rememberedTarget()||value||'');
  }
 }
 /* Villkorsfält: text, mottagare, storlek i kB och datum (dagar eller årtal). */
@@ -2030,6 +2050,10 @@ if($('quickFetchBtn'))handle('quickFetchBtn','click',async()=>{
 
 /* ===== ⚡ Snabbregel: klickbara förslag, live-räkning och ett klick till färdig regel ===== */
 let quickHints=null,quickHintsAt=0,quickHintsLoading=false,quickHintsTried=false,quickPreviewTimer=null,quickPreviewSeq=0;
+/* Åtta avsändare syns direkt; resten ligger bakom "visa fler". ✕ döljer ett förslag för stunden. */
+const QUICK_HINTS_VISIBLE={sender:8,word:6};
+const quickHintsExpanded={sender:false,word:false};
+const quickHintsHidden=new Set();
 
 function quickWords(cond){
  if(!cond)return '';
@@ -2042,6 +2066,16 @@ function quickTargetLabel(){
  const id=$('quickTarget')?.value||'';
  return id?(folders.find(f=>f.id===id)?.name||label(id)):'';
 }
+/* Snabbregeln minns målmappen du använde sist – men bara om den finns kvar. */
+function rememberedTarget(){
+ const id=state?.prefs?.lastTarget||'';
+ return id&&folders.some(f=>f.id===id)?id:'';
+}
+function rememberQuickTarget(id){
+ if(!id||!folders.some(f=>f.id===id))return;
+ state.prefs={...(state.prefs||{}),lastTarget:id};
+ rpc('prefs',{prefs:{lastTarget:id}}).catch(()=>{});
+}
 /* Förslag på mappnamn ur det man skrev: klarna.se -> Klarna, wordpress@limoeurope.com -> Limoeurope. */
 function quickFolderSuggestion(){
  const raw=($('quickValue')?.value||'').trim();
@@ -2052,6 +2086,7 @@ function quickFolderSuggestion(){
  if(!clean)return '';
  return (clean.charAt(0).toLocaleUpperCase('sv-SE')+clean.slice(1)).slice(0,64);
 }
+function quickHintValue(kind,it){return kind==='word'?(it.word||''):(it.domain||'');}
 function renderQuickHints(){
  const box=$('quickChips');if(!box)return;
  box.replaceChildren();
@@ -2059,15 +2094,22 @@ function renderQuickHints(){
  const senders=quickHints.senders||[],words=quickHints.words||[];
  if(!senders.length&&!words.length){box.append(el('p','quick-hint-empty',T('quickHintsEmpty')));return;}
  const group=(title,items,kind)=>{
-  if(!items.length)return;
+  const all=items.filter(it=>{const value=quickHintValue(kind,it);return value&&!quickHintsHidden.has(kind+':'+value);});
+  if(!all.length)return null;
+  const expanded=quickHintsExpanded[kind]===true;
+  const shown=expanded?all:all.slice(0,QUICK_HINTS_VISIBLE[kind]);
   const wrap=el('div','quick-chip-group');
   wrap.append(el('span','quick-chip-title',title));
   const row=el('div','quick-chip-row');
-  for(const it of items){
-   const value=kind==='word'?(it.word||''):(it.domain||'');
-   if(!value)continue;
+  for(const it of shown){
+   const value=quickHintValue(kind,it);
+   const item=el('span','quick-chip-item');
    const chip=el('button','quick-chip',value);chip.type='button';
-   if(it.subject)chip.title=it.subject;
+   /* Ledtråd: vanligaste adressen bakom domänen och den senaste ämnesraden. */
+   const tip=[];
+   if(it.sender)tip.push(T('quickChipTipSender').replace('{a}',it.sender));
+   if(it.subject)tip.push(T('quickChipTipSubject').replace('{s}',it.subject));
+   if(tip.length)chip.title=tip.join(' · ');
    chip.append(el('span','quick-chip-count',String(it.count||0)));
    chip.addEventListener('click',()=>{
     if($('quickField'))$('quickField').value=kind==='word'?'subject':'domain';
@@ -2075,7 +2117,17 @@ function renderQuickHints(){
     updateQuickPreview().catch(()=>{});
     $('quickTarget')?.focus();
    });
-   row.append(chip);
+   const hide=el('button','quick-chip-hide','✕');hide.type='button';
+   hide.title=T('quickChipHide');hide.setAttribute('aria-label',T('quickChipHide'));
+   hide.addEventListener('click',()=>{quickHintsHidden.add(kind+':'+value);renderQuickHints();});
+   item.append(chip,hide);
+   row.append(item);
+  }
+  if(all.length>QUICK_HINTS_VISIBLE[kind]){
+   const more=el('button','quick-chip-more',expanded?T('quickHintsShowLess'):T('quickHintsMore').replace('{n}',all.length-shown.length));
+   more.type='button';
+   more.addEventListener('click',()=>{quickHintsExpanded[kind]=!expanded;renderQuickHints();});
+   row.append(more);
   }
   if(row.children.length)wrap.append(row);
   return wrap;
@@ -2084,6 +2136,11 @@ function renderQuickHints(){
  const w=group(T('quickHintsWords'),words,'word');
  if(s)box.append(s);
  if(w)box.append(w);
+ if(quickHintsHidden.size){
+  const again=el('button','quick-hint-unhide',T('quickHintsUnhide'));again.type='button';
+  again.addEventListener('click',()=>{quickHintsHidden.clear();renderQuickHints();});
+  box.append(again);
+ }
 }
 async function loadQuickHints(force=false){
  if(quickHintsLoading)return quickHints;
@@ -2091,7 +2148,7 @@ async function loadQuickHints(force=false){
  quickHintsLoading=true;
  const btn=$('quickHintsBtn');if(btn)btn.disabled=true;
  try{
-  quickHints=await rpc('inboxHints');
+  quickHints=await rpc('inboxHints',{force:force===true});
   quickHintsAt=Date.now();
   renderQuickHints();
  }catch(err){
@@ -2107,11 +2164,30 @@ function quickHintsOnce(){
  quickHintsTried=true;
  loadQuickHints().catch(()=>{});
 }
+/* Kontot målmappen ligger i: regeln gäller bara det kontot, alltså räknar vi bara där. */
+function quickAccountId(){
+ const id=$('quickTarget')?.value||'';
+ return id?(folders.find(f=>f.id===id)?.accountId||''):'';
+}
+function quickAccountName(accountId){
+ const f=folders.find(x=>x.accountId===accountId&&x.accountName);
+ return f?.accountName||'';
+}
+/* Räknaren säger vad som faktiskt händer: rätt konto, olästa bara om de får följa med,
+   och ett förbehåll när Inkorgen är större än det vi hinner läsa. */
+function quickCountText(r,accountId){
+ const capped=r.capped?T('quickMatchCapped').replace('{n}',r.scanned):'';
+ if(!r.matched)return T('quickMatchZero')+capped;
+ if(!r.matches)return T('quickMatchUnreadOnly').replace('{u}',r.unread)+capped;
+ if(r.unread&&r.allowUnread===false)return T('quickMatchUnreadPart').replace('{n}',r.matches).replace('{m}',r.matched).replace('{u}',r.unread)+capped;
+ const name=accountId?quickAccountName(accountId):'';
+ return (name?T('quickMatchAccount').replace('{n}',r.matches).replace('{a}',name):T('quickMatch').replace('{n}',r.matches))+capped;
+}
 async function updateQuickPreview(){
  const raw=($('quickValue')?.value||'').trim();
  const span=$('quickCount'),sentence=$('quickSentence');
  if(!raw){
-  if(span){span.hidden=true;span.textContent='';}
+  if(span){span.hidden=true;span.textContent='';span.className='quick-count';}
   if(sentence)sentence.textContent='';
   return;
  }
@@ -2121,12 +2197,13 @@ async function updateQuickPreview(){
  if(sentence)sentence.textContent=T('quickSentence').replace('{what}',quickWords(cond)).replace('{target}',quickTargetLabel()||T('quickPickTarget'));
  if(span){span.hidden=false;span.className='quick-count';span.textContent=T('quickMatchCounting');}
  const seq=++quickPreviewSeq;
+ const accountId=quickAccountId(),allowUnread=$('quickMoveUnread')?.checked!==false;
  try{
-  const r=await rpc('quickPreview',{field:$('quickField')?.value||'domain',value:raw});
+  const r=await rpc('quickPreview',{field:$('quickField')?.value||'domain',value:raw,accountId,allowUnread});
   if(seq!==quickPreviewSeq)return;
   if(span){
-   span.textContent=r.matches?T('quickMatch').replace('{n}',r.matches):T('quickMatchZero');
-   span.className='quick-count'+(r.matches?' quick-count-ok':' quick-count-zero');
+   span.textContent=quickCountText(r,accountId);
+   span.className='quick-count '+(!r.matched?'quick-count-zero':(r.matches<r.matched?'quick-count-warn':'quick-count-ok'));
   }
  }catch{
   if(span)span.hidden=true;
@@ -2180,6 +2257,7 @@ async function createQuickRule({runNow=false}={}){
  try{
   const res=await rpc('quickRule',{field,value:rawVal,target:targetId,sourceAccount:$('source')?.value||'',
    moveUnread:$('quickMoveUnread')?.checked!==false,openWindow:$('quickOpenWindow')?.checked===true,revision:state.config.revision});
+  rememberQuickTarget(targetId);
   dirty=false;renderStatus(res.snapshot);loadRule(res.ruleId);
   if($('quickValue'))$('quickValue').value='';
   quickHints=null;
@@ -2207,8 +2285,12 @@ if($('quickExisting'))handle('quickExisting','change',()=>renderQuickExisting())
 if($('quickHintsBtn'))handle('quickHintsBtn','click',()=>loadQuickHints(true));
 if($('quickValue'))$('quickValue').addEventListener('input',scheduleQuickPreview);
 if($('quickField'))$('quickField').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
-if($('quickTarget'))$('quickTarget').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
-if($('quickValue'))$('quickValue').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickAddBtn')?.click();}});
+if($('quickTarget'))$('quickTarget').addEventListener('change',()=>{rememberQuickTarget($('quickTarget').value);updateQuickPreview().catch(()=>{});});
+if($('quickMoveUnread'))$('quickMoveUnread').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
+if($('quickValue'))$('quickValue').addEventListener('keydown',e=>{
+ if(e.key==='Enter'){e.preventDefault();$('quickAddBtn')?.click();}
+ else if(e.key==='Escape'){e.preventDefault();$('quickValue').value='';updateQuickPreview().catch(()=>{});}
+});
 handle('test','click',async()=>{
  const result=await rpc('testRule',{rule:draft()});
  const reasons={no_match:T('testReasonNoMatch'),disabled:T('testReasonDisabled'),unread:T('testReasonUnread'),already_read:T('testReasonAlreadyRead'),displayed:T('testReasonDisplayed'),eligible:T('testReasonEligible')};

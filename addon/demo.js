@@ -36,20 +36,37 @@ globalThis.LasDemo=(()=>{
     data={senders:[
       {domain:'fortnox.se',count:4,subject:'Faktura 1042',sender:'faktura@fortnox.se'},
       {domain:'klarna.se',count:3,subject:'Order bekräftad',sender:'order@klarna.se'},
-      {domain:'limoeurope.com',count:2,subject:'Wordfence activity for 12 oct, 2026',sender:'wordpress@limoeurope.com'}
+      {domain:'limoeurope.com',count:2,subject:'Wordfence activity for 12 oct, 2026',sender:'wordpress@limoeurope.com'},
+      {domain:'spotify.com',count:4,subject:'Ditt kvitto från Spotify',sender:'no-reply@spotify.com'},
+      {domain:'github.com',count:3,subject:'[Tokke2/Lasfilter] Ny fråga',sender:'notifications@github.com'},
+      {domain:'swedbank.se',count:2,subject:'Månadsbesked',sender:'noreply@swedbank.se'},
+      {domain:'telenor.se',count:2,subject:'Din faktura',sender:'faktura@telenor.se'},
+      {domain:'ica.se',count:2,subject:'Veckans erbjudanden',sender:'nyhetsbrev@ica.se'},
+      {domain:'elgiganten.se',count:2,subject:'Din order är skickad',sender:'order@elgiganten.se'},
+      {domain:'sl.se',count:2,subject:'Ditt kvitto',sender:'kundservice@sl.se'},
+      {domain:'visma.se',count:2,subject:'Din faktura är klar',sender:'faktura@visma.se'},
+      {domain:'if.se',count:2,subject:'Ditt försäkringsbrev',sender:'kundservice@if.se'}
      ].filter(x=>!taken.includes(x.domain)),
      words:[
       {word:'wordfence',count:3,subject:'Wordfence activity for 12 oct, 2026 on limoeurope.com'},
       {word:'faktura',count:5,subject:'Faktura 1042'},
-      {word:'orderbekräftelse',count:4,subject:'Orderbekräftelse 88213'}
+      {word:'orderbekräftelse',count:4,subject:'Orderbekräftelse 88213'},
+      {word:'kvitto',count:4,subject:'Ditt kvitto från Spotify'},
+      {word:'erbjudanden',count:3,subject:'Veckans erbjudanden'},
+      {word:'skickad',count:3,subject:'Din order är skickad'},
+      {word:'månadsbesked',count:2,subject:'Månadsbesked'},
+      {word:'inbjudan',count:2,subject:'Inbjudan till webbinarium'}
      ].filter(x=>!taken.some(v=>v.includes(x.word))),
-     inboxId:'demo-in',sourceAccount:'demo',scanned:37};break;
+     inboxId:'demo-in',sourceAccount:'demo',scanned:37,capped:false};break;
    }
    case 'quickPreview':{
     const cond=LasCore.choiceCondition({field:m.field,value:m.value});
     const v=String(cond.value||'').toLowerCase();
-    data={matches:v.includes('klarna')?3:v.includes('wordfence')?2:v.includes('faktura')?5:v.includes('order')?4:0,
-     scanned:37,condition:cond,inboxId:'demo-in',sourceAccount:'demo'};break;
+    const matched=v.includes('klarna')?3:v.includes('wordfence')?2:v.includes('faktura')?5:v.includes('order')?4:0;
+    const unread=v.includes('klarna')?1:v.includes('faktura')?2:0;
+    const allowUnread=m.allowUnread!==false;
+    data={matches:allowUnread?matched:Math.max(0,matched-unread),matched,read:matched-unread,unread,allowUnread,
+     scanned:37,capped:false,condition:cond,inboxId:'demo-in',sourceAccount:'demo'};break;
    }
    case 'quickRule':{
     const source=m.source||'demo-in';

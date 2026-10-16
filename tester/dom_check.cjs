@@ -73,7 +73,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>/klarna\.se/.test(el('quickValue').value),'klicket fyller fältet');
  check(el('quickField').value==='domain','klick på avsändare väljer avsändardomän');
  check(/mejl från klarna\.se/.test(txt('quickSentence')),'meningen säger vad regeln gör: "'+txt('quickSentence')+'"');
- await until(()=>/\d+ mejl i Inkorgen matchar/.test(txt('quickCount')),'live-räkningen visar antal',false,6000);
+ await until(()=>/\d+ mejl i .+ matchar just nu/.test(txt('quickCount')),'live-räkningen visar antal',false,6000);
  await until(()=>/Mejl|mejl/.test(txt('quickCount')),'räkningen har en läsbar text');
  check(el('quickSentence').textContent.length>10,'meningen är en hel mening');
 
@@ -85,6 +85,61 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>rows()===beforeQuick+1,'snabbregeln skapar en regel');
  check(rows()===beforeQuick+1,'ny regel från snabbregeln ('+beforeQuick+' → '+rows()+')');
  check(/skapades|listan/i.test(txt('toast')),'snabbregeln kvitterar: "'+txt('toast')+'"');
+
+ /* --- Räknaren säger sanningen: rätt konto, olästa och taket --- */
+ el('quickTarget').value='demo-web';
+ fire(el('quickTarget'),'change');
+ el('quickField').value='domain';
+ el('quickValue').value='klarna.se';fire(el('quickValue'),'input');
+ await until(()=>/matchar/.test(txt('quickCount')),'räkningen svarar för det valda kontot',false,6000);
+ check(/3 mejl i Exempelkonto matchar/.test(txt('quickCount')),'räknaren säger vilket konto siffran gäller: "'+txt('quickCount')+'"');
+ el('quickMoveUnread').checked=false;fire(el('quickMoveUnread'),'change');
+ await until(()=>/olästa/.test(txt('quickCount')),'kryssrutan uppdaterar siffran direkt',false,6000);
+ check(/2 av 3 flyttas nu – 1 olästa väntar/.test(txt('quickCount')),'räknaren säger hur många som flyttas och varför: "'+txt('quickCount')+'"');
+ check(/quick-count-warn/.test(el('quickCount').className),'siffran varnar i stället för att ljuga ('+el('quickCount').className+')');
+ el('quickMoveUnread').checked=true;fire(el('quickMoveUnread'),'change');
+ await until(()=>/3 mejl i Exempelkonto/.test(txt('quickCount')),'och tillbaka när kryssrutan slås på igen',false,6000);
+ check(/quick-count-ok/.test(el('quickCount').className),'olästa får följa med igen: "'+txt('quickCount')+'"');
+
+ /* --- Fler förslag, ledtrådar och ✕ --- */
+ const moreBtn=doc.querySelector('#quickChips .quick-chip-more');
+ check(!!moreBtn,'fler än åtta avsändare ligger bakom "visa fler": "'+(moreBtn?.textContent||'')+'"');
+ const chipsBeforeMore=doc.querySelectorAll('#quickChips .quick-chip').length;
+ if(moreBtn){
+  moreBtn.click();
+  await until(()=>doc.querySelectorAll('#quickChips .quick-chip').length>chipsBeforeMore,'fler förslag ritas när man ber om dem');
+  check(doc.querySelectorAll('#quickChips .quick-chip').length>chipsBeforeMore,'fler förslag ritas ('+chipsBeforeMore+' → '+doc.querySelectorAll('#quickChips .quick-chip').length+')');
+  check(/visa färre/.test(doc.querySelector('#quickChips .quick-chip-more')?.textContent||''),'knappen byter till "visa färre"');
+ }
+ const firstChip=doc.querySelector('#quickChips .quick-chip');
+ check(/adress|ämne/i.test(firstChip?.title||''),'förslaget bär en ledtråd: "'+(firstChip?.title||'')+'"');
+ const hideBtn=doc.querySelector('#quickChips .quick-chip-hide');
+ const chipsBeforeHide=doc.querySelectorAll('#quickChips .quick-chip').length;
+ check(!!hideBtn,'varje förslag har ett ✕');
+ if(hideBtn){
+  hideBtn.click();
+  await until(()=>doc.querySelectorAll('#quickChips .quick-chip').length===chipsBeforeHide-1,'✕ döljer ett förslag');
+  check(doc.querySelectorAll('#quickChips .quick-chip').length===chipsBeforeHide-1,'det dolda förslaget försvinner direkt ('+chipsBeforeHide+' → '+(chipsBeforeHide-1)+')');
+  check(!!doc.querySelector('#quickChips .quick-hint-unhide'),'och det går att få tillbaka det');
+  doc.querySelector('#quickChips .quick-hint-unhide').click();
+  await until(()=>doc.querySelectorAll('#quickChips .quick-chip').length===chipsBeforeHide,'dolda förslag kommer tillbaka');
+  check(doc.querySelectorAll('#quickChips .quick-chip').length===chipsBeforeHide,'dolda förslag kommer tillbaka ('+doc.querySelectorAll('#quickChips .quick-chip').length+')');
+ }
+
+ /* --- Esc rensar och målmappen minns --- */
+ el('quickValue').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ await until(()=>el('quickValue').value==='','Esc rensar fältet');
+ check(el('quickValue').value==='','Esc tömmer fältet man skrev i');
+ await until(()=>el('quickCount').hidden===true,'räkningen städas bort när fältet är tomt');
+ check(el('quickCount').hidden===true,'ingen gammal siffra ligger kvar');
+ el('quickTarget').value='demo-buy';fire(el('quickTarget'),'change');
+ await sleep(120);
+ el('quickTarget').value='';
+ el('langEn').click();
+ await until(()=>el('quickTarget').value==='demo-buy','snabbregeln minns målmappen du använde sist',false,6000);
+ check(el('quickTarget').value==='demo-buy','målmappen är förvald nästa gång: "'+el('quickTarget').value+'"');
+ el('langSv').click();
+ await until(()=>/Skapa regel|Lägg till/.test(el('quickAddBtn').textContent),'språket tillbaka till svenska');
 
  /* --- Regelredigeraren: villkor, diagnos, test --- */
  await until(()=>/klarna|Webb/.test(el('ruleName').value),'regeln är öppen i redigeraren');

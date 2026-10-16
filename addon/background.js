@@ -1,6 +1,6 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null};
 const SEASONS=['spring','summer','autumn','winter'];
 App.season=()=>{
  const pref=App.prefs.season;
@@ -196,8 +196,15 @@ App.createFolder=async(parentId,name)=>{
  App.log('settings_saved');
  return {id:folder?.id||'',name:folder?.name||clean,accountId:folder?.accountId||'',label:folder?.name||clean};
 };
-/* Läser Inkorgen en gång och delar resultatet med alla snabbflöden (förslag, räkning, regler). */
-App.scanInbox=async({limit=400}={})=>{
+/* Läser Inkorgen en gång och delar resultatet med alla snabbflöden (förslag, räkning, regler).
+   Resultatet ligger kvar i två minuter, så att räkningen inte läser om hela Inkorgen för varje bokstav.
+   `force` läser om allt (↻-knappen), och allt som flyttar ett mejl kastar cachen. */
+App.scanTtl=120000;
+App.scanCache={at:0,data:null,limit:0};
+App.invalidateScan=()=>{App.scanCache={at:0,data:null,limit:0};return true;};
+App.scanInbox=async({limit=400,force=false}={})=>{
+ const cached=App.scanCache;
+ if(!force&&cached.data&&cached.data.limit>=limit&&Date.now()-cached.at<App.scanTtl)return cached.data;
  const accounts=await B.accounts.list(true),inboxes=[];
  for(const account of accounts){
   const folders=(account.rootFolder?.subFolders||[]).concat(account.folders||[]);
@@ -219,18 +226,26 @@ App.scanInbox=async({limit=400}={})=>{
   if(!inboxId){inboxId=inbox.id;sourceAccount=accountId;}
   if(collected.length>=limit)break;
  }
- return {messages:collected,inboxId,sourceAccount,scanned:collected.length};
+ const result={messages:collected,inboxId,sourceAccount,scanned:collected.length,capped:collected.length>=limit,limit};
+ App.scanCache={at:Date.now(),data:result,limit};
+ return result;
 };
-App.inboxHints=async()=>{
- const scan=await App.scanInbox();
- const hints=C.inboxHints(scan.messages,{rules:App.engine?.config.rules||[],limit:8,wordLimit:6,minCount:2,wordMinCount:3});
- return {...hints,inboxId:scan.inboxId,sourceAccount:scan.sourceAccount,scanned:scan.scanned};
+App.inboxHints=async(msg={})=>{
+ const scan=await App.scanInbox({force:msg?.force===true});
+ /* Fler förslag än vi visar direkt – gränssnittet visar åtta och en "visa fler"-knapp. */
+ const hints=C.inboxHints(scan.messages,{rules:App.engine?.config.rules||[],limit:24,wordLimit:18,minCount:2,wordMinCount:3});
+ return {...hints,inboxId:scan.inboxId,sourceAccount:scan.sourceAccount,scanned:scan.scanned,capped:scan.capped===true};
 };
-/* "Så många mejl träffar regeln just nu" – räknas mot Inkorgen utan att spara något. */
-App.quickPreview=async(msg)=>{
+/* "Så många mejl flyttar regeln just nu" – räknas mot Inkorgen utan att spara något.
+   Bara mejl som regeln verkligen skulle flytta räknas: rätt konto, och olästa bara om de får följa med.
+   Är Inkorgen större än det vi läser säger svaret det, i stället för att låtsas att siffran är hela sanningen. */
+App.quickPreview=async(msg={})=>{
  const scan=await App.scanInbox();
  const rule=C.choiceRule({field:msg.field,value:msg.value});
- return {matches:C.countMatches(scan.messages,rule),scanned:scan.scanned,condition:rule.conditions[0],inboxId:scan.inboxId,sourceAccount:scan.sourceAccount};
+ const hits=C.countHits(scan.messages,rule,{accountId:msg.accountId||''});
+ const allowUnread=msg.allowUnread!==false;
+ return {matches:allowUnread?hits.matched:hits.read,matched:hits.matched,read:hits.read,unread:hits.unread,allowUnread,
+  scanned:scan.scanned,capped:scan.capped===true,condition:rule.conditions[0],inboxId:scan.inboxId,sourceAccount:scan.sourceAccount};
 };
 /* Skriver ut reglerna som en Thunderbird-filterfil (msgFilterRules.dat).
    Kontots URI-prefix kommer från prefs (inlärt vid import) eller skickas med från gränssnittet.
@@ -478,7 +493,7 @@ App.handle=async msg=>{
   case 'status':return App.snapshot();
   case 'folders':return App.folderList();
   case 'createFolder':return App.createFolder(msg.parentId,msg.name);
-  case 'inboxHints':return App.inboxHints();
+  case 'inboxHints':return App.inboxHints(msg);
   case 'quickPreview':return App.quickPreview(msg);
   case 'filterExport':return App.filterExport(msg);
   case 'importConditions':return App.mutate(async()=>{
@@ -511,9 +526,14 @@ App.handle=async msg=>{
    for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
    App.kick();
    await Promise.race([App.engine.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
+   App.invalidateScan();
    return r;
   }
-  case 'sweepNow':return App.runAllRules(true);
+  case 'sweepNow':{
+   const r=await App.runAllRules(true);
+   App.invalidateScan();
+   return r;
+  }
   case 'diagnose':{
    const rule=C.validateRule(msg.rule);
    return App.engine.diagnose(rule);
@@ -538,7 +558,9 @@ App.handle=async msg=>{
     throw new C.RuleError('no_match');
    }
    const direct=e.ruleDirect(rule,m.read!==true);
-   const queued=await e.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:m.read!==true,notify:direct&&m.read!==true});return {queued};
+   const queued=await e.enqueue(m,{rule,target:C.targetFor(rule,m),allowUnread:m.read!==true,notify:direct&&m.read!==true});
+   App.invalidateScan();
+   return {queued};
   }
   case 'saveRules':return App.mutate(async()=>{
    App.checkRevision(msg.revision);const rules=C.validateRules(msg.rules);await App.checkRules(rules);
@@ -582,6 +604,7 @@ App.handle=async msg=>{
    if(['system','light','dark'].includes(p.theme))next.theme=p.theme;
    if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)next.fontSize=p.fontSize;
    if(typeof p.lastRule==='string'&&p.lastRule.length<=80)next.lastRule=p.lastRule;
+   if(typeof p.lastTarget==='string'&&p.lastTarget.length<=80)next.lastTarget=p.lastTarget;
    if(['sv','en'].includes(p.lang))next.lang=p.lang;
    if(['auto',...SEASONS].includes(p.season))next.season=p.season;
    if(p.filterUris&&typeof p.filterUris==='object'&&!Array.isArray(p.filterUris)){
@@ -609,6 +632,7 @@ App.ready=(async()=>{
  if(['system','light','dark'].includes(p.theme))App.prefs.theme=p.theme;
  if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)App.prefs.fontSize=p.fontSize;
  if(typeof p.lastRule==='string'&&p.lastRule.length<=80)App.prefs.lastRule=p.lastRule;
+ if(typeof p.lastTarget==='string'&&p.lastTarget.length<=80)App.prefs.lastTarget=p.lastTarget;
  if(['sv','en'].includes(p.lang))App.prefs.lang=p.lang;
  if(['auto',...SEASONS].includes(p.season))App.prefs.season=p.season;
  App.applySeasonIcon();
@@ -676,7 +700,7 @@ B.messages.onUpdated.addListener((m,props,old)=>App.ready.then(async()=>{
  await App.engine.readChanged(m,props,old);
 }).catch(()=>App.fail('internal_error')));
 B.messages.onNewMailReceived.addListener((folder,list)=>App.onNewMail(folder,list).catch(()=>App.log('error',0,'nyinkommet_misslyckades')));
-B.messages.onMoved.addListener((old,moved)=>App.ready.then(()=>App.engine.onMoved(old,moved)).catch(()=>App.fail('internal_error')));
+B.messages.onMoved.addListener((old,moved)=>App.ready.then(()=>{App.invalidateScan();return App.engine.onMoved(old,moved);}).catch(()=>App.fail('internal_error')));
 B.messageDisplay.onMessagesDisplayed.addListener(()=>App.ready.then(()=>App.engine.tick()).catch(()=>App.fail('display_error')));
 /* Kvitto på att fönstret visade något: samma meddelande som vi just öppnade ska
    dyka upp i visningen. Loggen kan då svara på om en tom ruta kom från oss eller ej. */

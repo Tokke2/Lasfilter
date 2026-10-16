@@ -2196,6 +2196,62 @@ hr {
   opacity: 0.75;
 }
 
+.quick-chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.quick-chip-hide {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 1px 5px;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: inherit;
+  background: transparent;
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.quick-chip-hide:hover,
+.quick-chip-hide:focus-visible {
+  opacity: 1;
+  border-color: var(--line);
+}
+
+.quick-chip-more {
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  color: inherit;
+  background: transparent;
+  opacity: 0.8;
+  cursor: pointer;
+}
+
+.quick-chip-more:hover,
+.quick-chip-more:focus-visible {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.quick-hint-unhide {
+  display: block;
+  border: 0;
+  padding: 2px 0;
+  margin: 2px 0 0;
+  font: inherit;
+  font-size: 0.76rem;
+  color: var(--accent);
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .quick-hint-empty {
   font-size: 0.8rem;
   opacity: 0.75;
@@ -2210,6 +2266,11 @@ hr {
 
 .quick-count-ok {
   color: #1f7a4d;
+  font-weight: 600;
+}
+
+.quick-count-warn {
+  color: #a06a15;
   font-weight: 600;
 }
 

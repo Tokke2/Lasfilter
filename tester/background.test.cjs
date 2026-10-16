@@ -337,6 +337,82 @@ test('quickPreview räknar träffar i Inkorgen utan att spara något',async()=>{
  assert.equal(engine.config.rules.length,0,'inget skapas av en förhandsvisning');
 });
 
+test('quickPreview räknar bara kontot regeln gäller – och bara mejl som flyttas',async()=>{
+ const {app,api}=await loadBackground();
+ api.accounts.list=async()=>[
+  {id:'a',name:'Jobbet',rootFolder:{id:'root-a',accountId:'a',name:'',specialUse:[],subFolders:[
+   {id:'in-a',accountId:'a',name:'Inkorg',specialUse:['inbox'],subFolders:[]},
+   {id:'fin-a',accountId:'a',name:'Fakturor',specialUse:[],subFolders:[]}]}},
+  {id:'b',name:'Privat',rootFolder:{id:'root-b',accountId:'b',name:'',specialUse:[],subFolders:[
+   {id:'in-b',accountId:'b',name:'Inkorg',specialUse:['inbox'],subFolders:[]},
+   {id:'fin-b',accountId:'b',name:'Fakturor',specialUse:[],subFolders:[]}]}}];
+ api.messages.query=async q=>{const acc=q.folderId==='in-b'?'b':'a';return {id:null,messages:[
+  {id:1,author:'Order <order@klarna.se>',subject:'Order bekräftad',folder:{id:q.folderId,accountId:acc},read:true},
+  {id:2,author:'Order <order@klarna.se>',subject:'Order skickad',folder:{id:q.folderId,accountId:acc},read:true},
+  {id:3,author:'Order <order@klarna.se>',subject:'Order levererad',folder:{id:q.folderId,accountId:acc},read:false},
+  {id:4,author:'Order <order@klarna.se>',subject:'Order arkiverad',folder:{id:q.folderId,accountId:acc},read:false}]};};
+ fakeEngineWithRules(app);
+ const everything=await app.quickPreview({field:'domain',value:'klarna.se'});
+ assert.equal(everything.matched,8,'båda kontonas inkorgar skannas');
+ const jobbet=await app.quickPreview({field:'domain',value:'klarna.se',accountId:'a'});
+ assert.equal(jobbet.matched,4,'bara jobbkontots mejl räknas när målmappen ligger där');
+ assert.equal(jobbet.unread,2);
+ assert.equal(jobbet.matches,4,'olästa får följa med när kryssrutan är i');
+ assert.equal(jobbet.allowUnread,true);
+ const utanOlästa=await app.quickPreview({field:'domain',value:'klarna.se',accountId:'a',allowUnread:false});
+ assert.equal(utanOlästa.matches,2,'utan olästa flyttas bara de två lästa');
+ assert.equal(utanOlästa.matched,4,'men texten kan säga hur många som matchar totalt');
+ assert.equal(utanOlästa.unread,2);
+ assert.equal(utanOlästa.allowUnread,false);
+ const privat=await app.quickPreview({field:'domain',value:'klarna.se',accountId:'b'});
+ assert.equal(privat.matched,4,'det andra kontot har sina egna fyra');
+ assert.equal(privat.unread,2);
+ assert.equal(app.engine.config.rules.length,0,'fortfarande inget sparat');
+});
+
+test('Inkorgen läses en gång, och siffran säger när den inte är hela sanningen',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ let calls=0;const real=api.messages.query;
+ api.messages.query=async q=>{calls++;return real(q);};
+ fakeEngineWithRules(app);
+ const tight=await app.scanInbox({limit:2});
+ assert.equal(calls,1,'en läsning räcker för en inkorg');
+ assert.equal(tight.scanned,4);
+ assert.equal(tight.capped,true,'taket rapporteras i stället för att låtsas');
+ const again=await app.scanInbox({limit:2});
+ assert.equal(calls,1,'cachen används – Inkorgen läses inte om för varje bokstav');
+ assert.equal(again.capped,true);
+ const roomy=await app.scanInbox();
+ assert.equal(calls,2,'ett större tak kräver en ny läsning');
+ assert.equal(roomy.capped,false,'allt ryms och siffran är hela sanningen');
+ const forced=await app.scanInbox({force:true});
+ assert.equal(calls,3,'force läser om Inkorgen');
+ assert.equal(forced.capped,false);
+ app.invalidateScan();
+ await app.scanInbox();
+ assert.equal(calls,4,'efter en flyttning läses Inkorgen om');
+ const hints=await app.inboxHints({force:true});
+ assert.equal(calls,5,'↻-knappen läser om allt');
+ assert.equal(hints.capped,false);
+ const cached=await app.inboxHints();
+ assert.equal(calls,5,'förslagen återanvänder samma läsning');
+ assert.equal(cached.scanned,4);
+});
+
+test('förslagen räcker till "visa fler" – bakgrunden skickar fler än de åtta som visas',async()=>{
+ const {app,api}=await loadBackground();
+ inboxAccount(api);
+ const messages=[];let id=0;
+ for(let i=0;i<12;i++)for(let j=0;j<2;j++)messages.push({id:++id,author:'Avsändare <info@domain'+i+'.se>',subject:'Nyhet nummer '+i,folder:{id:'inbox',accountId:'a'},read:true});
+ api.messages.query=async()=>({id:null,messages});
+ fakeEngineWithRules(app);
+ const hints=await app.inboxHints();
+ assert.equal(hints.senders.length,12,'tolv avsändare, varav de åtta första visas direkt');
+ assert.ok(hints.senders.length>8,'fler än gränssnittet visar, alltså finns "visa fler" att klicka på');
+ assert.equal(hints.words.length>0,true,'ämnesorden följer med som förut');
+});
+
 test('quickRule skapar, validerar och sparar en färdig regel',async()=>{
  const {app,api}=await loadBackground();
  inboxAccount(api);

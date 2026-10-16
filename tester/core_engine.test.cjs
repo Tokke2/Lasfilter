@@ -880,6 +880,20 @@ test('countMatches räknar mejl, inte villkor',()=>{
  assert.equal(C.countMatches(messages,{conditions:[]}),0,'utan villkor räknas ingenting');
 });
 
+test('countHits räknar rätt konto och håller reda på olästa',()=>{
+ const rule=C.choiceRule({field:'domain',value:'klarna.se'});
+ const messages=[
+  {author:'Order <order@klarna.se>',subject:'Order',folder:{id:'i',accountId:'a'},read:true},
+  {author:'Order <order@klarna.se>',subject:'Order',folder:{id:'i',accountId:'a'},read:false},
+  {author:'Order <order@klarna.se>',subject:'Order',folder:{id:'j',accountId:'b'},read:true},
+  {author:'Order <order@klarna.se>',subject:'Order',folder:{id:'j',accountId:'b'},read:false}];
+ assert.deepEqual(C.countHits(messages,rule),{matched:4,unread:2,read:2},'utan konto räknas allt');
+ assert.deepEqual(C.countHits(messages,rule,{accountId:'a'}),{matched:2,unread:1,read:1},'kontot styr siffran');
+ assert.deepEqual(C.countHits(messages,rule,{accountId:'c'}),{matched:0,unread:0,read:0},'okänt konto ger noll');
+ assert.deepEqual(C.countHits(messages,{conditions:[]}),{matched:0,unread:0,read:0},'utan villkor räknas ingenting');
+ assert.deepEqual(C.countHits([],rule,{accountId:'a'}),{matched:0,unread:0,read:0});
+});
+
 test('inboxHints föreslår återkommande avsändare och vanliga ämnesord',()=>{
  const messages=[
   {author:'Order <order@klarna.se>',subject:'Order bekräftad 88213',folder:{id:'i'}},

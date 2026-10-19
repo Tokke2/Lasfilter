@@ -79,12 +79,28 @@ App.writeTextLog=async()=>{
 App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTimeout(()=>App.writeTextLog().catch(()=>{}),1200);};
 /* Automatisk säkerhetskopia av reglerna. Den skrivs till Hämtade filer, alltså
    utanför profilen: försvinner tillägget en dag ligger reglerna kvar och kan
-   importeras tillbaka. Två filer: en som alltid är den senaste, och en daterad
-   per dag så att en felaktig ändring går att backa till. */
+   importeras tillbaka. Två filer:
+     – sortbro-regler-backup.json, som alltid är den senaste (skrivs om när
+       reglerna ändrats, så den du importerar tillbaka är aktuell),
+     – en daterad veckokopia, en per vecka, så att en felaktig ändring går att
+       backa till. Tolv veckor behålls.
+   Knappen "Backa upp reglerna nu" skriver båda direkt, oavsett veckodag. */
 /* Backuperna har sin egen undermapp, så de aldrig ligger bland loggfilen eller
    annat i appmappen. Loggfilen ligger kvar direkt i Lasfilter/. */
 App.backupFolder=App.paths.backups;
 App.autoBackupNames={latest:'sortbro-regler-backup.json',dated:day=>'sortbro-regler-'+day+'.json'};
+/* Hur många veckokopior som behålls. Tolv veckor = ett kvartal. */
+App.backupKeepWeeks=12;
+/* Veckonummer enligt ISO 8601 (måndag som första dag), t.ex. 2026-W42.
+   Används som spärr: en ny daterad kopia skrivs bara när veckan byts. */
+App.weekKey=date=>{
+ const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+ const dayNum=d.getUTCDay()||7;            /* söndag = 7, måndag = 1 */
+ d.setUTCDate(d.getUTCDate()+4-dayNum);    /* flytta till veckans torsdag */
+ const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+ const week=Math.ceil(((d-yearStart)/86400000+1)/7);
+ return d.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
+};
 /* Känns igen på hela sökvägen: bara våra egna dagsfiler i vår egen undermapp. */
 App.backupFilePattern=/[\\/]Lasfilter[\\/]Regelbackuper[\\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/;
 App.autoBackup=async({force=false}={})=>{
@@ -94,36 +110,41 @@ App.autoBackup=async({force=false}={})=>{
  const payload={format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules,folders:[]};
  try{payload.folders=(await App.folderList().catch(()=>[])).map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));}catch{}
  const day=new Date().toISOString().slice(0,10);
+ const week=App.weekKey(new Date());
  const key=JSON.stringify(rules);
  const unchanged=key===App.lastBackupKey;
- const daily=force||App.lastBackupDay!==day;
+ /* En ny daterad kopia skrivs en gång per vecka – eller direkt när du trycker på knappen. */
+ const weekly=force||App.lastBackupWeek!==week;
  const name=App.autoBackupNames.latest;
  const write=async filename=>{
   const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
   try{await B.downloads.download({url,filename:App.backupFolder+filename,saveAs:false,conflictAction:'overwrite'});}
   finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
  };
- if(unchanged&&!daily)return {written:false,reason:'unchanged',count:rules.length};
+ if(unchanged&&!weekly)return {written:false,reason:'unchanged',count:rules.length};
  try{
   await write(name);
-  if(daily)await write(App.autoBackupNames.dated(day));
+  if(weekly)await write(App.autoBackupNames.dated(day));
  }catch{
   /* Misslyckas filen är det ingen katastrof – men det ska synas i loggen. */
   App.log('debug',0,'reglerna kunde inte backas upp till Hamtade filer');
   return {written:false,reason:'failed',count:rules.length};
  }
- App.lastBackupKey=key;App.lastBackupDay=day;
+ App.lastBackupKey=key;App.lastBackupWeek=week;
+ /* Veckan sparas i lagringen, inte bara i minnet: annars skulle en omstart mitt i
+    veckan skriva ännu en "veckokopia" och det skulle bli fler än en per vecka. */
+ if(weekly)App.write(()=>B.storage.local.set({backupWeek:week})).catch(()=>{});
  App.log('debug',0,'reglerna backade upp: '+rules.length+' st till Hamtade filer/'+App.backupFolder);
  /* Städa gamla dagsfiler – bara våra egna, bara i vår egen mapp, och tyst om det inte går. */
  try{
   const found=await B.downloads.search({filenameRegex:App.backupFilePattern.source});
-  const limit=Date.now()-30*86400000;
+  const limit=Date.now()-App.backupKeepWeeks*7*86400000;
   for(const item of Array.isArray(found)?found:[]){
    const when=Date.parse(item?.startTime||'');
    if(Number.isFinite(when)&&when<limit&&Number.isSafeInteger(item?.id))await B.downloads.removeFile(item.id);
   }
  }catch{}
- return {written:true,filename:App.backupFolder+name,dated:daily?App.backupFolder+App.autoBackupNames.dated(day):'',count:rules.length};
+ return {written:true,filename:App.backupFolder+name,dated:weekly?App.backupFolder+App.autoBackupNames.dated(day):'',week,count:rules.length};
 };
 App.scheduleAutoBackup=()=>{clearTimeout(App.backupTimer);App.backupTimer=setTimeout(()=>App.autoBackup().catch(()=>{}),3000);};
 App.log=(name,count=0,detail='')=>{
@@ -514,7 +535,8 @@ App.snapshot=()=>{
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
    enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,brake:e.config.brake!==false,
    brakeHolds:(e.heldList?.()||[]).map(h=>{const rule=e.config.rules.find(r=>r.id===h.ruleId);return {...h,name:rule?.name||h.ruleId,target:rule?.target||''};}),
-   backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),logs:App.logs};
+   backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),
+   lastBackupWeek:App.lastBackupWeek||'',logs:App.logs};
 };
 App.mutate=fn=>{
  const p=App.editChain.then(async()=>{
@@ -757,7 +779,9 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake']);
+ const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake','backupWeek']);
+ /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
+ if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  let cfg=C.defaults(),fault='';
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
  App.logs=C.cleanLogs(data.logs);App.backups=[];

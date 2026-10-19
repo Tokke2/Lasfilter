@@ -217,7 +217,8 @@ Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en te
 Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil. Backuperna har sin egen undermapp (`Lasfilter/Regelbackuper/`) så att de aldrig blandas ihop med loggfilen eller annat i appmappen:
 
 - **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-backup.json`** – alltid den senaste uppsättningen. Den skrivs om när du har sparat en regeländring, och en gång vid start.
-- **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad kopia, en per dag. De senaste **30 dagarna** behålls; äldre dagsfiler städas bort automatiskt (bara SortBros egna dagsfiler i den egna undermappen – din manuella export och loggfilen rörs aldrig).
+- **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad **veckokopia**, en per vecka (ISO-vecka, måndag–söndag). De senaste **12 veckorna** behålls; äldre veckofiler städas bort automatiskt (bara SortBros egna daterade filer i den egna undermappen – din manuella export och loggfilen rörs aldrig).
+- Veckan som senast fick en kopia sparas i Thunderbirds lagring, så en omstart mitt i veckan inte skriver en extra kopia. Har Thunderbird varit stängt över en veckogräns skrivs kopian vid nästa start.
 
 Kopieringen sker bara när något faktiskt har ändrats, så reglerna skrivs inte om i onödan. Vill du ha en färsk kopia direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Avancerat**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
 
@@ -232,7 +233,7 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 | Mapp | Innehåll | Skapas av |
 | --- | --- | --- |
 | `Hämtade filer/Lasfilter/Loggar/` | `lasfilter-logg.txt` – den tekniska loggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
-| `Hämtade filer/Lasfilter/Regelbackuper/` | `sortbro-regler-backup.json` + en daterad kopia per dag | automatisk säkerhetskopia, eller *⇩ Backa upp reglerna nu* |
+| `Hämtade filer/Lasfilter/Regelbackuper/` | `sortbro-regler-backup.json` + en daterad veckokopia | automatisk säkerhetskopia en gång per vecka, eller *⇩ Backa upp reglerna nu* |
 | `Hämtade filer/Lasfilter/Regler/` | `sortbro-regler-ÅÅÅÅ-MM-DD.json` (alla regler) och `sortbro-regel-<namn>.json` (en regel) | *Exportera* i Regler |
 | `Hämtade filer/Lasfilter/Filterfiler/` | `msgFilterRules.dat` – filterfilen du själv kopierar in i profilen | *Skriv ut dina regler som filterfil* i Regler |
 

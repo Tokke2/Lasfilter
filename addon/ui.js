@@ -277,7 +277,9 @@ const I18N={
   conflictTitle:'Kan krocka med "{name}" – båda kan matcha samma mejl ({fields}).',
   conflictWinner:'Den här regeln ligger först och vinner.',
   conflictLoser:'Den regeln ligger först och vinner. Flytta upp den här om den ska gälla i stället.',
-  autoBackupNote:'Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad kopia sparas en gång per dag – de senaste 30 dagarna behålls. Under Regler importerar du filen och får tillbaka reglerna.',
+  autoBackupNote:'Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad veckokopia sparas automatiskt en gång i veckan – de senaste 12 veckorna behålls. Knappen nedan skriver båda direkt, när du vill. Under Regler importerar du filen och får tillbaka reglerna.',
+  backupLastWeek:'Senaste veckokopian skrevs: {week}',
+  backupNoWeek:'Ingen veckokopia skriven än – den skrivs automatiskt vid första starten i en ny vecka, eller direkt med knappen nedan.',
   backupNowBtn:'⇩ Backa upp reglerna nu',
   backupNowDone:'Reglerna backades upp: {n} st i {name}',
   backupNowUnchanged:'Inga ändringar sedan förra kopian – filen är redan aktuell.',
@@ -879,7 +881,9 @@ const I18N={
   conflictTitle:'May collide with "{name}" – both can match the same email ({fields}).',
   conflictWinner:'This rule comes first and wins.',
   conflictLoser:'That rule comes first and wins. Move this one up to let it apply instead.',
-  autoBackupNote:'The copy lives outside the Thunderbird profile, so it survives the add-on being removed or switched off. sortbro-regler-backup.json is always the latest, and a dated copy is written once a day – the last 30 days are kept. Import the file under Rules to get the rules back.',
+  autoBackupNote:'The copy lives outside the Thunderbird profile, so it survives the add-on being removed or switched off. sortbro-regler-backup.json is always the latest, and a dated weekly copy is written automatically once a week – the last 12 weeks are kept. The button below writes both right away, whenever you want. Import the file under Rules to get the rules back.',
+  backupLastWeek:'Last weekly copy written: {week}',
+  backupNoWeek:'No weekly copy yet – it is written automatically on the first start of a new week, or right away with the button below.',
   backupNowBtn:'⇩ Back up the rules now',
   backupNowDone:'Rules backed up: {n} in {name}',
   backupNowUnchanged:'No changes since the last copy – the file is already up to date.',
@@ -1295,6 +1299,8 @@ function applyTheme(prefs){
   if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');
  }
  if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;$('autoBackup').checked=state.config.autoBackup!==false;$('brake').checked=state.config.brake!==false;}
+ /* Veckostatus: när den senaste automatiska veckokopian skrevs. */
+ if($('backupStatus'))$('backupStatus').textContent=state.config.autoBackup===false?'':(state.lastBackupWeek?T('backupLastWeek').replace('{week}',state.lastBackupWeek):T('backupNoWeek'));
 }
 /* ===== Årstidsteman: Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter ===== */
 const SEASON_KEYS=['spring','summer','autumn','winter'];

@@ -450,7 +450,7 @@
               <input id="autoBackup" type="checkbox" checked>
               <span data-i18n="autoBackupLabel">Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/Regelbackuper/</span>
             </label>
-            <p class="muted" data-i18n="autoBackupNote">Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad kopia sparas en gång per dag – de senaste 30 dagarna behålls. Under Regler importerar du filen och får tillbaka reglerna.</p>
+            <p class="muted" data-i18n="autoBackupNote">Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad veckokopia sparas automatiskt en gång i veckan – de senaste 12 veckorna behålls. Knappen nedan skriver båda direkt, när du vill. Under Regler importerar du filen och får tillbaka reglerna.</p>
             <label class="toggle-label">
               <input id="brake" type="checkbox" checked>
               <span data-i18n="brakeLabel">Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl</span>
@@ -460,6 +460,7 @@
               <button id="backupNow" type="button" class="button small secondary" data-i18n="backupNowBtn">⇩ Backa upp reglerna nu</button>
               <span id="backupInfo" class="muted"></span>
             </div>
+            <p class="muted" id="backupStatus"></p>
             <p class="muted" data-i18n="shortcutsNote">Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns. Ctrl+Shift+L kör ett svep direkt.</p>
             <label class="field">
               <span data-i18n="fontSizeLabel">Textstorlek</span>

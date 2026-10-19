@@ -216,7 +216,8 @@ test('säkerhetskopian skriver reglerna till Hämtade filer – och de kan läsa
  assert.equal(r.written,true,'kopian skrevs');
  assert.equal(r.count,1,'en regel i kopian');
  assert.ok(written.includes('Lasfilter/Regelbackuper/sortbro-regler-backup.json'),'senaste kopian hamnar i backupernas egen undermapp');
- assert.match(r.dated,/^Lasfilter[\\/]Regelbackuper[\\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/,'en daterad kopia per dag');
+ assert.match(r.dated,/^Lasfilter[\\/]Regelbackuper[\\/]sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/,'en daterad veckokopia');
+ assert.match(r.week,/^\d{4}-W\d{2}$/,'veckan anges som 2026-W43');
  const payload=JSON.parse(files['Lasfilter/Regelbackuper/sortbro-regler-backup.json']);
  assert.equal(payload.format,'lasfilter-rules','samma format som den manuella exporten');
  assert.equal(payload.app,'SortBro');
@@ -228,20 +229,20 @@ test('säkerhetskopian skriver reglerna till Hämtade filer – och de kan läsa
  assert.equal(back[0].target,'fin');
 });
 
-test('kopian skrivs när reglerna ändrats – men inte i onödan och aldrig när rutan är av',async()=>{
+test('kopian skrivs när reglerna ändrats – men bara en veckokopia per vecka, och aldrig när rutan är av',async()=>{
  const {api,written}=backupApi();
  const {app}=await loadBackground(api);
  fakeEngineWithRules(app,{config:backupConfig([exportRule])});
  await app.autoBackup({force:true});
  const after=written.length;
- const sameDay=await app.autoBackup();
- assert.equal(sameDay.written,false,'oförändrade regler samma dag skrivs inte om');
- assert.equal(sameDay.reason,'unchanged');
+ const sameWeek=await app.autoBackup();
+ assert.equal(sameWeek.written,false,'oförändrade regler samma vecka skrivs inte om');
+ assert.equal(sameWeek.reason,'unchanged');
  assert.equal(written.length,after,'ingen ny fil i onödan');
  app.engine.config={...app.engine.config,rules:[{...exportRule,name:'Fakturor 2'}]};
  const changed=await app.autoBackup();
  assert.equal(changed.written,true,'en ändrad regel skrivs');
- assert.equal(written.length,after+1,'bara den senaste filen skrivs om samma dag');
+ assert.equal(written.length,after+1,'bara den senaste filen skrivs om – ingen ny veckokopia');
  app.engine.config={...app.engine.config,autoBackup:false};
  const off=await app.autoBackup();
  assert.equal(off.written,false,'avstängd ruta skriver ingenting');
@@ -261,9 +262,9 @@ test('en misslyckad kopiering larmar i loggen utan att kasta',async()=>{
  assert.ok(app.logs.some(l=>/kunde inte backas upp/.test(l.data?.detail||'')),'orsaken skrivs i loggen');
 });
 
-test('gamla dagsfiler städas – men bara våra egna i vår egen mapp',async()=>{
+test('gamla veckokopior städas – men bara våra egna i vår egen mapp',async()=>{
  const {api,removed,getQuery}=backupApi();
- const old=new Date(Date.now()-40*86400000).toISOString();
+ const old=new Date(Date.now()-100*86400000).toISOString();
  api.__searchResult=[
   {id:11,startTime:old,filename:'Lasfilter/Regelbackuper/sortbro-regler-2025-01-01.json'},
   {id:12,startTime:new Date().toISOString(),filename:'Lasfilter/Regelbackuper/sortbro-regler-2026-10-16.json'}
@@ -896,4 +897,90 @@ test('bromsen fungerar hela vägen från svep till statusruta',async()=>{
  assert.equal(app.logs.some(l=>l.event==='brake'),true,'händelsen finns i loggen');
  assert.equal(app.engine.pending.size,0,'ingenting ligger kvar i kön');
  assert.equal(app.brakeHistory.r1,undefined,'en stoppad regel skriver ingen ny normalnivå – annars vore bromsen verkningslös nästa svep');
+});
+
+/* ── Veckovis säkerhetskopia + manuell knapp ───────────────────────────── */
+
+test('veckonyckeln följer ISO 8601: måndag till söndag hör till samma vecka',async()=>{
+ const {app}=await loadBackground();
+ assert.equal(app.weekKey(new Date('2026-10-19T12:00:00Z')),'2026-W43','måndag');
+ assert.equal(app.weekKey(new Date('2026-10-25T12:00:00Z')),'2026-W43','söndag samma vecka');
+ assert.equal(app.weekKey(new Date('2026-10-26T12:00:00Z')),'2026-W44','nästa måndag');
+ assert.equal(app.weekKey(new Date('2027-01-04T12:00:00Z')),'2027-W01','första veckan i ett nytt år');
+ assert.equal(app.weekKey(new Date('2026-01-01T12:00:00Z')),'2026-W01','årets första dag');
+ assert.equal(app.weekKey(new Date('2026-12-31T12:00:00Z')),'2026-W53','ett år med 53 veckor');
+});
+
+test('en ny veckokopia skrivs när veckan byts – och bara en per vecka',async()=>{
+ const {api,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ /* Första körningen skriver senaste + veckokopia. */
+ const first=await app.autoBackup();
+ assert.equal(first.written,true);
+ assert.match(first.dated,/sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/,'veckokopian har datum i namnet');
+ const week1=first.week;
+ assert.equal(app.lastBackupWeek,week1);
+ const countAfterFirst=written.length;
+ /* Samma vecka igen: ingen ny fil. */
+ const again=await app.autoBackup();
+ assert.equal(again.written,false,'redan skrivet den här veckan');
+ assert.equal(written.length,countAfterFirst);
+ /* Nästa vecka: en ny daterad kopia. */
+ app.lastBackupWeek='2020-W01';
+ const next=await app.autoBackup();
+ assert.equal(next.written,true,'ny vecka ger en ny kopia');
+ assert.equal(written.length,countAfterFirst+2,'senaste + veckokopia skrivs');
+ assert.notEqual(next.week,'2020-W01');
+});
+
+test('veckan sparas i lagringen så en omstart inte skriver en extra kopia',async()=>{
+ const {api}=backupApi();
+ const stored={};
+ api.storage={local:{get:async keys=>{const out={};for(const k of [].concat(keys||[]))if(k in stored)out[k]=stored[k];return out;},set:async obj=>{Object.assign(stored,obj);}}};
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ await app.autoBackup();
+ assert.match(String(stored.backupWeek),/^\d{4}-W\d{2}$/,'veckan skrivs till lagringen');
+ /* En ny session läser tillbaka veckan och avstår från att skriva igen. */
+ const week=stored.backupWeek;
+ const second=await loadBackground(api);
+ assert.equal(second.app.lastBackupWeek,week,'veckan läses tillbaka vid start');
+ const skip=await second.app.autoBackup();
+ assert.equal(skip.dated,'','ingen ny daterad veckokopia samma vecka efter omstart');
+ assert.equal(skip.week,week,'samma vecka');
+ /* Den alltid-senaste filen skrivs om – det är meningen: den ska vara aktuell. */
+ await tick.flush(20);
+});
+
+test('knappen Backa upp reglerna nu skriver båda filerna direkt, även mitt i veckan',async()=>{
+ const {api,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ await app.autoBackup({force:true});
+ const after=written.length;
+ /* Mitt i veckan, inget har ändrats – knappen ska ändå skriva. */
+ const forced=await app.handle({type:'backupNow'});
+ assert.equal(forced.written,true,'knappen skriver direkt');
+ assert.equal(written.length,after+2,'både senaste filen och veckokopian skrivs');
+ assert.match(forced.filename,/sortbro-regler-backup\.json$/);
+ assert.match(forced.dated,/sortbro-regler-\d{4}-\d{2}-\d{2}\.json$/);
+});
+
+test('knappen fungerar även när den automatiska rutan är avstängd',async()=>{
+ const {api,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ app.engine.config={...app.engine.config,autoBackup:false};
+ const off=await app.autoBackup();
+ assert.equal(off.reason,'off','automatiken är av');
+ const before=written.length;
+ const forced=await app.handle({type:'backupNow'});
+ assert.equal(forced.written,true,'knappen är manuell och tar inte hänsyn till rutan');
+ assert.equal(written.length,before+2,'båda filerna skrivs');
+});
+
+test('veckokopior behålls i tolv veckor',async()=>{
+ const {app}=await loadBackground();
+ assert.equal(app.backupKeepWeeks,12,'tolv veckor sparas');
 });

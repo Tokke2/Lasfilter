@@ -336,6 +336,16 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(/Lasfilter\/Filterfiler\/msgFilterRules\.dat/.test(txt('toast')),'filterfilen hamnar i Filterfiler-mappen: "'+txt('toast')+'"');
  check(/Filterfiler/.test(txt('tbReport'))&&/ImapMail/.test(txt('tbReport')),'rapporten säger både var filen ligger och vart den ska');
 
+ /* --- ⇩ Säkerhetskopia: veckovis automatiskt + manuell knapp --- */
+ check(el('backupStatus')!==null,'det finns en rad som visar när veckokopian skrevs');
+ await until(()=>/2026-W42/.test(txt('backupStatus')),'veckan visas i klartext',false,6000);
+ check(/Senaste veckokopian skrevs: 2026-W42/.test(txt('backupStatus')),'raden säger vilken vecka: "'+txt('backupStatus')+'"');
+ const backupNote=[...doc.querySelectorAll('[data-i18n="autoBackupNote"]')].map(n=>n.textContent).join(' ');
+ check(/en gång i veckan/.test(backupNote),'texten säger att kopian tas en gång i veckan: "'+backupNote.slice(0,120)+'…"');
+ check(/12 veckor/.test(backupNote),'och hur många veckor som behålls');
+ check(el('backupNow')!==null,'knappen för manuell säkerhetskopia finns');
+ check(/Backa upp reglerna nu/.test(el('backupNow').textContent),'och den säger vad den gör: "'+el('backupNow').textContent.trim()+'"');
+
  /* --- ⇩ Automatisk säkerhetskopia: rutan och knappen --- */
  check(el('autoBackup')!==null,'rutan för automatisk säkerhetskopia finns');
  check(el('autoBackup').checked===true,'den är på som standard');

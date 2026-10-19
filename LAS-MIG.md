@@ -132,7 +132,9 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 ### Loggen: tyst när inget är fel, läsbar när något är det
 
 - **Pausad eller stoppad bevakning larmar inte.** Automatiska svep (timintervallet och svepet vid start) hoppar över i tysthet när bevakningen är pausad eller stoppad – du får ingen "Tekniskt fel"-rad för att du själv har tryckt Pausa. Är motorn stoppad av ett fel skrivs **en** tydlig notis i stället för en rad per försök.
-- **Övergående startfel försöks om i tysthet.** Direkt efter att Thunderbird har startat kan kontona svara "inte redo" ännu. Svepet gör då ett tyst andra försök efter 15 sekunder och skriver först därefter, om det fortfarande misslyckas: *Tekniskt fel – Automatiskt svep misslyckades (sweep_error) – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i.*
+- **Starten tar igen det som missades.** SortBro sveper **alltid en gång när Thunderbird startar**, när bevakningen är på och det finns aktiva regler – även om timersvepet är avstängt. Var det senaste svepet mer än ett intervall sedan (datorn har varit avstängd, locket stängt, Thunderbird stängt över natten) sker det **direkt**, efter mindre än en sekund, i stället för att vänta en hel timme. Tiden för senaste svepet sparas i Thunderbirds lagring, så starten vet hur länge sedan det var även efter en omstart; sveprutan under **Flyttstatus** visar därför rätt nästa tid direkt. Raden `svepet ar forsenat sedan forra gangen - tar igen det direkt vid start` skrivs i loggen när det händer.
+- **Ett svep som väntar för länge tas igen.** SortBro kontrollerar klockan varannan sekund. Upptäcker den ett glapp på över två minuter – datorn har sovit – och svepet samtidigt är försenat, körs det direkt i stället för att vänta på nästa intervall. Det är samma logik som vid start, bara utan omstart.
+- **Övergående startfel försöks om i tysthet.** Direkt efter att Thunderbird har startat kan kontona svara "inte redo" ännu. Vid en start görs två tysta försök: efter 10 sekunder och efter ytterligare en minut. Under drift räcker ett försök efter 15 sekunder. Först därefter, om det fortfarande misslyckas, skrivs: *Tekniskt fel – Automatiskt svep misslyckades (sweep_error) – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i.*
 - **Svepraden i loggen säger varför inget flyttas.** Varje svep skriver `skannade=… matchade=… i_mal=… klara=… koade=…`: `matchade` är mejl som träffades av regeln, `i_mal` sådana som redan låg i målmappen/sin årsmapp och `klara` sådana som redan var hanterade. Är `matchade=0` finns det helt enkelt inget som matchar regeln.
 - **▶ Kör alla regler nu väntar in en pågående körning** i stället för att rapportera noll: pågår redan ett svep (t.ex. startsvepet) väntar knappen in det och visar hela körningens siffror. Är bevakningen pausad eller stoppad säger knappen det rakt ut, och om ett svep verkligen fallerar visas felmeddelandet som en toast i stället för att tigas ihjäl. Varje klick ger exakt **en** körning och en rapport – knappen har bara en klickhanterare.
 
@@ -164,6 +166,17 @@ Datorns nätverk används aldrig: tilläggets säkerhetspolicy är `connect-src 
 
 Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en teknisk händelselogg med endast räknare. Ingen logg eller export innehåller mejltexter, ämnesrader eller fullständiga adresser. Allt lagras i Thunderbirds eget tilläggsutrymme. Tillägget öppnar inga nätverksanslutningar.
 
+## Startsvepet – vad som händer när Thunderbird startar
+
+| Situation | Vad SortBro gör |
+| --- | --- |
+| Senaste svepet är äldre än intervallet (t.ex. över natten) | Sveper **direkt** (800 ms efter start) och loggar varför |
+| Nyligen svept | Sveper en gång efter 3 sekunder, så att kontona hinner svara |
+| Timersvepet avstängt | Sveper **ändå en gång vid start** – det är då kön från förra gången tas om hand |
+| Bevakningen pausad eller stoppad | Ingenting. Starten är tyst, precis som resten |
+| Datorn har sovit | Klockglappet upptäcks inom två sekunder; är svepet försenat körs det direkt |
+| Kontona svarar inte ännu | Två tysta försök (10 s och 60 s) innan något skrivs i loggen |
+
 ## Reglerna säkras automatiskt
 
 Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil. Backuperna har sin egen undermapp (`Lasfilter/Regelbackuper/`) så att de aldrig blandas ihop med loggfilen eller annat i appmappen:
@@ -191,6 +204,18 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 **Samma sökvägar på Windows, macOS och Linux.** Sökvägarna skrivs med `/` och läggs under systemets nedladdningsmapp, som ligger i användarens hemkatalog på alla tre systemen – `%USERPROFILE%\Downloads` på Windows, `~/Downloads` på macOS och Linux (och `Hämtade filer` heter mappen på svenska Windows). Under mappen skapas undermapparna automatiskt av Thunderbirds nedladdnings-API, precis som när webbläsaren sparar en fil i en undermapp. Sökvägarna kommer från en enda källa i koden och visas i gränssnittet, så att texten och filen aldrig kan peka på olika ställen.
 
 Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen ovan och kvittot visar hela sökvägen. Vill du i stället välja plats själv vid export, säg till – då blir det en kryssruta för det.
+
+## Verktygsmappen: `verktyg/`
+
+I repot ligger `verktyg/` – en liten samling filer för Python-appar (till exempel ArkivPiloten) som **följer med sin mapp om den flyttas**:
+
+- `pythonstart.py` hittar en Python som är ny nog, skapar miljön `.venv` i appmappen, installerar `requirements.txt` bara när filen ändrats och startar appens huvudfil.
+- `start_windows.cmd`, `start_macos_linux.sh` och `start_macos.command` är dubbelklickbara startfiler för respektive system. De räknar alltid ut sökvägen från sin egen placering, så en flyttad mapp fungerar direkt.
+- Ingenting skrivs utanför appmappen: inget i registret, inget i `%APPDATA%`, inget i `~/.local`, ingen `PATH`-ändring.
+- En Python-miljö sparar absoluta sökvägar. Därför kontrollerar skriptet varje start om miljön pekar rätt och bygger om den automatiskt när mappen flyttats eller bas-Python försvunnit.
+- `python3 -m unittest -v verktyg/test_pythonstart.py` kör 12 tester, bland annat ett som flyttar hela appmappen och startar appen från den nya platsen.
+
+Detaljer och kommandon finns i `verktyg/README.md`.
 
 ## Om tillägget försvinner ur Thunderbird
 

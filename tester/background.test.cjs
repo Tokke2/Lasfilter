@@ -72,7 +72,14 @@ async function loadBackground(api=stubApi()){
      genom att sätta api.__captureBlob innan bakgrunden laddas. */
   Blob:class{constructor(parts){this.parts=parts;}},
   URL:{createObjectURL:typeof api.__captureBlob==='function'?api.__captureBlob:()=>'blob:x',revokeObjectURL:()=>{}},
-  LasEngine:class{constructor(){this.config={};this.fault='';this.pending=new Map();}stop(){}},
+  /* Stubbmotorn får samma grundbeteende som den riktiga: den är bara igång när den har
+     en giltig konfiguration med minst en aktiv regel. Annars kan startvägen inte testas. */
+  LasEngine:class{constructor(api,cfg){this.config=cfg&&typeof cfg==='object'?cfg:{};this.fault='';this.pending=new Map();this.inflight=new Map();this.lastSweep=null;this.sweeping=0;
+   this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};}
+   enabled(){return !this.config.paused&&Array.isArray(this.config.rules)&&this.config.rules.some(r=>r&&r.enabled);}
+   sweepAll(){return Promise.resolve({scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0});}
+   tick(){return Promise.resolve();}restore(){return Promise.resolve();}stop(){}clearPending(){return Promise.resolve();}
+   invalidateFolders(){}recordList(){return [];}blocked(){return 0;}},
   browser};
  sandbox.globalThis=sandbox;
  const source=fs.readFileSync(path.join(ROOT,'addon','background.js'),'utf8')+'\nglobalThis.__app=App;';
@@ -277,6 +284,87 @@ test('kontoadresser sparas bara i rimlig form och överlever en omstart',async()
  assert.equal(JSON.stringify(app.prefs.filterUris),'{"a":"imap://u@h.se/"}');
  const bogus=await app.handle({type:'prefs',prefs:{filterUris:['inte','ett','objekt']}});
  assert.equal(JSON.stringify(bogus.filterUris),'{"a":"imap://u@h.se/"}','en lista får inte förstöra det som redan finns');
+});
+
+/* ── Autostart: ta igen det som missades medan datorn var av ──────────── */
+
+test('senaste svepet sparas och läses tillbaka – starten vet om det är försenat',async()=>{
+ const {api}=backupApi();
+ const stored={};
+ api.storage={local:{get:async keys=>{
+  const out={};
+  for(const k of [].concat(keys||[]))if(k in stored)out[k]=stored[k];
+  return out;
+ },set:async obj=>{Object.assign(stored,obj);}}};
+ const {app}=await loadBackground(api);
+ fakeEngine(app,{config:{paused:false,hourly:true,sweepMinutes:60,moveMode:'read',dryRun:true,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0}});
+ app.lastAutoSweep=null;app.engine.lastSweep=null;
+ assert.equal(app.sweepOverdue(Date.now()),true,'utan sparat svep är det alltid dags');
+ await app.saveSweepState(1000);
+ assert.equal(stored.sweepAt,1000,'tiden skrivs till lagringen');
+ app.lastAutoSweep=null;app.engine.lastSweep=null;
+ assert.equal(await app.loadSweepState(),1000,'och läses tillbaka');
+ app.lastAutoSweep=Date.now()-30*60000;app.engine.lastSweep=null;
+ assert.equal(app.sweepOverdue(),false,'en halvtimme sedan är inte försenat med en timmes intervall');
+ app.lastAutoSweep=Date.now()-90*60000;
+ assert.equal(app.sweepOverdue(),true,'90 minuter sedan är försenat med en timmes intervall');
+ app.engine.config.hourly=false;
+ assert.equal(app.sweepOverdue(),false,'med timersvepet avstängt är inget försenat');
+});
+
+test('ett försenat svep tas igen direkt vid start i stället för att vänta en timme',async()=>{
+ const {api}=backupApi();
+ const stored={sweepAt:1000,config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,rules:[{id:'r1',name:'Test',enabled:true,scope:'folder',source:'inbox',sourceAccount:'a',target:'fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'x.se'}]}]}};
+ api.storage={local:{get:async keys=>{const out={};for(const k of [].concat(keys||[]))if(k in stored)out[k]=stored[k];return out;},set:async obj=>{Object.assign(stored,obj);}}};
+ const calls=[];
+ const {app,tick}=await loadBackground(api);
+ fakeEngine(app,{config:{paused:false,hourly:true,sweepMinutes:60,moveMode:'read',dryRun:true,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0},
+  sweepAll:async opts=>{calls.push(opts);return {scanned:5,queued:2,deferred:0,searchedFolders:3,skippedFolders:0,emptyFolders:0,cachedFolders:2};}});
+ app.lastAutoSweep=1000;
+ /* Starten har redan lagt sitt svep i timern (800 ms eftersom det är försenat). */
+ await tick.flush(20);
+ assert.ok(calls.length>=1,'starten sveper direkt när förra svepet är gammalt');
+ assert.equal(app.startSweepDone,true,'startsvepet markeras som gjort');
+ assert.equal(app.logs.some(l=>/forsenat/.test(l.data?.detail||'')),true,'loggen säger varför det kördes direkt');
+});
+
+test('startar alltid med ett svep när bevakningen är på, även utan timersvep',async()=>{
+ const {api}=backupApi();
+ const stored={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:false,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,rules:[{id:'r1',name:'Test',enabled:true,scope:'folder',source:'inbox',sourceAccount:'a',target:'fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'x.se'}]}]}};
+ api.storage={local:{get:async keys=>{const out={};for(const k of [].concat(keys||[]))if(k in stored)out[k]=stored[k];return out;},set:async obj=>{Object.assign(stored,obj);}}};
+ const calls=[];
+ const {app,tick}=await loadBackground(api);
+ fakeEngine(app,{config:{paused:false,hourly:false,sweepMinutes:60,moveMode:'read',dryRun:true,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0},
+  sweepAll:async opts=>{calls.push(opts);return {scanned:4,queued:1,deferred:0,searchedFolders:2,skippedFolders:0,emptyFolders:0,cachedFolders:1};}});
+ await tick.flush(20);
+ assert.equal(calls.length,1,'ett svep vid start även om timersvepet är avstängt');
+ assert.equal(app.startSweepDone,true);
+});
+
+test('pausad eller utan regler sveper starten aldrig',async()=>{
+ const {api}=backupApi();
+ api.storage={local:{get:async()=>({}),set:async()=>{}}};
+ const calls=[];
+ const {app,tick}=await loadBackground(api);
+ fakeEngine(app,{enabled:()=>false,config:{paused:true,hourly:true,sweepMinutes:60,moveMode:'read',dryRun:true,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0},
+  sweepAll:async opts=>{calls.push(opts);return {scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};}});
+ await tick.flush(20);
+ assert.equal(calls.length,0,'pausad bevakning ska vara tyst');
+});
+
+test('efter datorns sömn tas ett försenat svep igen vid första ticken',async()=>{
+ const {app,tick}=await loadBackground();
+ const calls=[];
+ fakeEngine(app,{config:{paused:false,hourly:true,sweepMinutes:60,moveMode:'read',dryRun:true,rules:[{id:'r1',enabled:true}],revision:0,rulesVersion:0},
+  sweepAll:async opts=>{calls.push(opts);return {scanned:4,queued:1,deferred:0,searchedFolders:2,skippedFolders:0,emptyFolders:0,cachedFolders:1};}});
+ app.lastAutoSweep=Date.now()-3*60*60000;app.engine.lastSweep=null;
+ /* Simulera tre timmars sömn: klockan hoppar fram och nästa tick ser ett stort glapp. */
+ app.lastTickAt=Date.now()-3*60*60000;
+ await tick.flush(5);
+ await tick.settle(app.autoSweep());
+ assert.ok(calls.length>=1,'glappet upptäcks och svepet tas igen');
 });
 
 test('pausad bevakning kör ingenting och larmar inte i loggen',async()=>{
@@ -586,7 +674,8 @@ test('startraden och loggfilen bär både tilläggets och Thunderbirds version',
  app.scheduleTextLog();
  await tick.flush(20);
  await tick.settle(Promise.resolve(),20);
- assert.deepEqual([...new Set(downloaded.map(d=>d.filename))],['Lasfilter/Loggar/lasfilter-logg.txt'],'loggfilen skrivs till Loggar-mappen, inte löst i appmappen');
+ const logs=[...new Set(downloaded.map(d=>d.filename))].filter(f=>/lasfilter-logg\.txt$/.test(f));
+ assert.deepEqual(logs,['Lasfilter/Loggar/lasfilter-logg.txt'],'loggfilen skrivs till Loggar-mappen, inte löst i appmappen');
  assert.match(logText,/Thunderbird: 140\.4\.2/,'loggfilens huvud visar Thunderbirds version');
  assert.match(logText,/sortbro /,'och startraden med båda versionerna finns i filen');
 });

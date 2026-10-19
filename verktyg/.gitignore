@@ -1,0 +1,4 @@
+# Skapas av pythonstart.py – hör till varje dator, inte till repot
+.venv/
+.setup/
+.python/

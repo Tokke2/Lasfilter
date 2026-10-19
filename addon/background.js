@@ -1,6 +1,6 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false};
 /* Allt SortBro skapar hamnar i undermappar till appmappen i Hämtade filer.
    En enda källa för sökvägarna, så att inget kan hamna utanför av misstag.
    Sökvägarna skrivs med / och fungerar på Windows, macOS och Linux –
@@ -138,6 +138,30 @@ App.log=(name,count=0,detail='')=>{
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
 App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
 App.emptySweep={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};
+/* Senaste svepet sparas i lagringen, inte bara i minnet: efter en omstart ska SortBro veta
+   om datorn varit avstängd länge och i så fall ta igen det direkt i stället för att vänta
+   en hel timme. Tiden skrivs som ett litet tal, inget annat följer med. */
+App.saveSweepState=async at=>{
+ try{await B.storage.local.set({sweepAt:Number.isFinite(at)?at:Date.now()});}catch{}
+};
+App.loadSweepState=async()=>{
+ try{const data=await B.storage.local.get(['sweepAt']);const at=Number(data?.sweepAt);if(Number.isFinite(at)&&at>0)return at;}catch{}
+ return 0;
+};
+/* Är det dags att ta igen ett svep? Sant när senaste svepet ligger längre tillbaka än intervallet. */
+App.sweepOverdue=(now=Date.now())=>{
+ const e=App.engine;if(!e?.config.hourly)return false;
+ const last=App.lastAutoSweep||e.lastSweep||0;
+ return !last||now-last>=e.config.sweepMinutes*60000;
+};
+/* Ett svep vid start när bevakningen är på och det finns regler. Det körs alltid en gång –
+   även om det bara gick en minut sedan – eftersom det är då kön från förra gången tas om hand. */
+App.startSweep=async()=>{
+ const e=App.engine;
+ if(!e||!e.enabled()||!e.config.rules.some(r=>r.enabled))return null;
+ App.startSweepDone=true;
+ return App.autoSweep({starting:true});
+};
 App.runAllRules=async(force=false)=>{
  const e=App.engine;if(!e)throw new C.RuleError('internal_error');
  /* Pausad eller stoppad motor är ett normalt läge – inget fel och inga nollor utan förklaring. */
@@ -165,21 +189,27 @@ App.runAllRules=async(force=false)=>{
    – tyst när bevakningen är pausad eller stoppad,
    – ett tyst andra försök när kontona inte svarar ännu (vanligt precis vid start),
    – och först därefter en läsbar felrad i loggen. */
-App.autoSweep=async()=>{
+App.autoSweep=async({starting=false}={})=>{
  const attempt=async()=>{
   try{return {result:await App.runAllRules()};}
   catch(error){return {code:error instanceof C.RuleError?error.code:(error?.name||'Error')};}
  };
+ /* Vid start får kontona ofta inte tid att svara ännu: försök igen efter 10 sekunder och
+   en sista gång efter en minut. Under drift räcker ett enda nytt försök efter 15 sekunder. */
+ const delays=starting?[10000,60000]:[15000];
  let {result,code}=await attempt();
- if(code&&!['paused','disabled','internal_error'].includes(code)){
-  await new Promise(res=>setTimeout(res,15000));
-  if(App.engine?.enabled())({result,code}=await attempt());
+ for(const delay of delays){
+  if(!code||['paused','disabled','internal_error'].includes(code))break;
+  await new Promise(res=>setTimeout(res,delay));
+  if(!App.engine?.enabled())break;
+  ({result,code}=await attempt());
  }
  if(result){
   if(result.skipped==='stopped'&&App.reportedStop!==App.engine?.fault){
    App.reportedStop=App.engine?.fault;
    App.log('debug',0,'automatiskt svep hoppades över: motorn är stoppad ('+(App.engine?.fault||'-')+') – rensa spärren under Avancerat');
   }
+  App.saveSweepState();
   return result;
  }
  if(code&&!['paused','disabled','internal_error'].includes(code))App.log('error',0,'Automatiskt svep misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');
@@ -659,7 +689,7 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','backups','prefs']);
+ const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt']);
  let cfg=C.defaults(),fault='';
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
  App.logs=C.cleanLogs(data.logs);App.backups=[];
@@ -692,6 +722,9 @@ App.ready=(async()=>{
  }
  await App.readTbVersion();
  await App.readSelfInfo();
+ /* Senaste svepet från förra gången, så att starten vet om det är dags att ta igen något. */
+ const savedSweep=Number(data.sweepAt);
+ if(Number.isFinite(savedSweep)&&savedSweep>0){App.lastAutoSweep=savedSweep;if(!App.engine.lastSweep)App.engine.lastSweep=savedSweep;}
  App.log('start');
  /* Är installationen tillfällig står det i klartext i loggfilen, så att nästa gång
     tillägget är borta går det att se varför i stället för att gissa. */
@@ -712,10 +745,22 @@ App.ready=(async()=>{
    B.tabs.reload(keep.id).catch(()=>{});
   }
  }catch{}
- App.timer=setInterval(()=>App.engine.tick().catch(()=>App.fail('internal_error')),2000);App.scheduleSweep();
+ App.timer=setInterval(()=>{
+  const now=Date.now(),gap=App.lastTickAt?now-App.lastTickAt:0;
+  App.lastTickAt=now;
+  /* Ett glapp på över två minuter betyder att datorn sovit eller att Thunderbird stått still.
+     Har svepet hunnit bli försenat tar vi igen det direkt i stället för att vänta på timern. */
+  if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
+  App.engine.tick().catch(()=>App.fail('internal_error'));
+ },2000);App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
- if(App.engine.enabled()&&App.engine.config.rules.some(r=>r.enabled)&&(needResweep||App.engine.config.hourly)){
-  setTimeout(()=>{if(App.engine?.enabled()&&App.engine.config.rules.some(r=>r.enabled))App.autoSweep();},needResweep?500:3000);
+ App.lastTickAt=Date.now();App.startedAt=Date.now();
+ /* Ett svep vid varje start när bevakningen är på: direkt (800 ms) om svepet är på tiden
+    efter en längre paus, annars lugnt efter tre sekunder så att kontona hinner svara. */
+ if(App.engine.enabled()&&App.engine.config.rules.some(r=>r.enabled)){
+  const overdue=needResweep||App.sweepOverdue();
+  setTimeout(()=>{if(App.engine?.enabled()&&!App.startSweepDone)App.startSweep().catch(()=>{});},overdue?800:3000);
+  if(overdue)App.log('debug',0,'svepet ar forsenat sedan forra gangen - tar igen det direkt vid start');
  }
 })().catch(()=>{
  if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});

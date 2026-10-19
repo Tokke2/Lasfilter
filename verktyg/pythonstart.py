@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -252,8 +253,50 @@ def discover_entry(base: Path | None = None) -> Path | None:
 
 # ── Nedladdning av Python (bara när man ber om det) ───────────────────────
 
+PYTHON_FTP_INDEX = "https://www.python.org/ftp/python/"
+# Används bara om listningen inte går att nå – en känd, stabil version.
+FALLBACK_VERSION = "3.13.0"
+
+
 def python_download_page() -> str:
     return "https://www.python.org/downloads/"
+
+
+def newest_version_from_index(html: str) -> str:
+    """Läs ut senaste 3.x.y ur python.orgs fil-listning.
+
+    Listningen innehåller rader som href="3.13.2/". Vi tar den högsta versionen
+    som är 3.10 eller senare, så att en gammal post inte kan vinna.
+    """
+    best: tuple[int, ...] = ()
+    for m in re.finditer(r'href="3\.(\d{1,2})\.(\d{1,2})/?["/]', html or ""):
+        v = (3, int(m.group(1)), int(m.group(2)))
+        if v[:2] >= MIN_VERSION and v > best:
+            best = v
+    return ".".join(str(x) for x in best) if best else ""
+
+
+def latest_installer_url(version: str, system: str | None = None) -> str:
+    """Adressen till installationsfilen för en viss version och ett visst system."""
+    system = system or platform.system()
+    base = PYTHON_FTP_INDEX + version + "/"
+    if system == "Windows":
+        return base + "python-" + version + "-amd64.exe"
+    if system == "Darwin":
+        return base + "python-" + version + "-macos11.pkg"
+    return ""
+
+
+def fetch_newest_version(timeout: float = 15.0) -> str:
+    """Fråga python.org vilken den senaste versionen är. Tom sträng om nätet saknas."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(PYTHON_FTP_INDEX, timeout=timeout) as response:  # noqa: S310
+            html = response.read().decode("utf-8", "replace")
+        return newest_version_from_index(html)
+    except Exception:
+        return ""
 
 
 def latest_python_hint() -> str:
@@ -278,16 +321,24 @@ def download_python_installer(base: Path | None = None) -> Path | None:
         raise SystemExit("Vägrar skriva utanför appmappen: " + str(setup))
     setup.mkdir(exist_ok=True)
     system = platform.system()
-    if system == "Windows":
-        target = setup / "python-installer.exe"
-        url = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe"
-    elif system == "Darwin":
-        target = setup / "python-installer.pkg"
-        url = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg"
-    else:
+    if system not in ("Windows", "Darwin"):
         print("På Linux installeras Python med systemets pakethanterare, inte här.")
         print("  Debian/Ubuntu:  sudo apt install python3 python3-venv python3-pip")
         print("  Fedora:         sudo dnf install python3 python3-pip")
+        return None
+    # Fråga python.org vilken version som är den senaste; gissa aldrig.
+    version = fetch_newest_version()
+    if version:
+        print("Senaste Python hos python.org: " + version)
+    else:
+        version = FALLBACK_VERSION
+        print("Kunde inte läsa listan hos python.org – använder kända versionen " + version)
+        print(latest_python_hint())
+    suffix = "python-installer.exe" if system == "Windows" else "python-installer.pkg"
+    target = setup / suffix
+    url = latest_installer_url(version, system)
+    if not url:
+        print(latest_python_hint())
         return None
     try:
         print("Hämtar " + url)

@@ -213,7 +213,8 @@ I repot ligger `verktyg/` – en liten samling filer för Python-appar (till exe
 - `start_windows.cmd`, `start_macos_linux.sh` och `start_macos.command` är dubbelklickbara startfiler för respektive system. De räknar alltid ut sökvägen från sin egen placering, så en flyttad mapp fungerar direkt.
 - Ingenting skrivs utanför appmappen: inget i registret, inget i `%APPDATA%`, inget i `~/.local`, ingen `PATH`-ändring.
 - En Python-miljö sparar absoluta sökvägar. Därför kontrollerar skriptet varje start om miljön pekar rätt och bygger om den automatiskt när mappen flyttats eller bas-Python försvunnit.
-- `python3 -m unittest -v verktyg/test_pythonstart.py` kör 12 tester, bland annat ett som flyttar hela appmappen och startar appen från den nya platsen.
+- `--install-python` läser python.orgs fillista och hämtar den **senaste** versionen till `.setup/` i appmappen (med en känd reservversion om nätet inte svarar).
+- `python3 -m unittest -v verktyg/test_pythonstart.py` kör 17 tester, bland annat ett som flyttar hela appmappen och startar appen från den nya platsen.
 
 Detaljer och kommandon finns i `verktyg/README.md`.
 

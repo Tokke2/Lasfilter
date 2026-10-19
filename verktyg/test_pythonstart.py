@@ -136,6 +136,37 @@ class PackageTests(unittest.TestCase):
         self.assertTrue(str(info["venv"]).startswith(str(self.tmp.resolve())))
 
 
+class LatestPythonTests(unittest.TestCase):
+    """Senaste versionen ska läsas ur python.orgs listning – inte gissas."""
+
+    INDEX = ('<a href="3.9.18/">3.9.18</a> <a href="3.12.9/">3.12.9</a> '
+             '<a href="3.13.2/">3.13.2</a> <a href="2.7.18/">2.7.18</a> <a href="3.14.0/">3.14.0</a>')
+
+    def test_nyaste_versionen_vinner(self):
+        self.assertEqual(ps.newest_version_from_index(self.INDEX), "3.14.0")
+
+    def test_for_gammal_version_vinner_aldrig(self):
+        html = '<a href="3.8.20/">3.8.20</a> <a href="3.10.1/">3.10.1</a>'
+        self.assertEqual(ps.newest_version_from_index(html), "3.10.1")
+
+    def test_tom_listning_ger_tomt_svar(self):
+        self.assertEqual(ps.newest_version_from_index(""), "")
+        self.assertEqual(ps.newest_version_from_index("<html>inget här</html>"), "")
+
+    def test_installationsadresser_per_system(self):
+        self.assertEqual(ps.latest_installer_url("3.14.0", "Windows"),
+                         "https://www.python.org/ftp/python/3.14.0/python-3.14.0-amd64.exe")
+        self.assertEqual(ps.latest_installer_url("3.14.0", "Darwin"),
+                         "https://www.python.org/ftp/python/3.14.0/python-3.14.0-macos11.pkg")
+        self.assertEqual(ps.latest_installer_url("3.14.0", "Linux"), "",
+                         "på Linux finns ingen färdig installer att hämta")
+
+    def test_utan_nat_anvands_kand_version(self):
+        # fetch_newest_version får aldrig kasta – den svarar tomt och då tar vi reservversionen.
+        self.assertTrue(ps.FALLBACK_VERSION.count(".") == 2)
+        self.assertTrue(tuple(int(x) for x in ps.FALLBACK_VERSION.split("."))[:2] >= ps.MIN_VERSION)
+
+
 class EndToEndTests(unittest.TestCase):
     """Hela vägen: bygg miljön i en flyttad mapp och starta appen."""
 

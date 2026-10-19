@@ -57,7 +57,7 @@ Paketen installeras bara om när `requirements.txt` faktiskt ändrats (jämförs
 
 Skriptet kräver **Python 3.10 eller senare** och letar i den här ordningen: en egen Python i appmappen (`.python/`), den som startade skriptet, `py -3`, `python`. Hittas ingen ny nog får du en tydlig instruktion i stället för ett kryptiskt fel.
 
-`--install-python` laddar ner Python-installeraren **till appmappen** (`.setup/`) och talar om vad du ska göra sedan. På Linux hänvisar skriptet till `apt`/`dnf` i stället, eftersom en installation där kräver administratörsrättigheter. Skriptet hämtar aldrig något annat och gör det bara när du själv ber om det.
+`--install-python` läser **python.orgs egen fillista** för att hitta den senaste versionen (ingen gissad siffra i koden – bara en känd reservversion om nätet inte svarar), laddar ner installationsfilen **till appmappen** (`.setup/`) och talar om vad du ska göra sedan. Testet `LatestPythonTests` kontrollerar att den högsta versionen vinner och att en för gammal aldrig kan väljas. På Linux hänvisar skriptet till `apt`/`dnf` i stället, eftersom en installation där kräver administratörsrättigheter. Skriptet hämtar aldrig något annat och gör det bara när du själv ber om det.
 
 Vill du ha en Python som bokstavligen flyttar med mappen kan du lägga en portabel Python i `.python/` – skriptet letar där först, före systemets.
 
@@ -67,7 +67,7 @@ Vill du ha en Python som bokstavligen flyttar med mappen kan du lägga en portab
 python3 -m unittest -v verktyg/test_pythonstart.py
 ```
 
-Testerna skapar en tillfällig appmapp, bygger miljön, **flyttar hela mappen** och startar appen igen från den nya platsen – och kontrollerar att inget hamnar utanför appmappen.
+Testerna skapar en tillfällig appmapp, bygger miljön, **flyttar hela mappen** och startar appen igen från den nya platsen – och kontrollerar att inget hamnar utanför appmappen. 17 tester, varav fem för versionsläsningen (helt utan nät).
 
 ## Vad som inte ingår
 

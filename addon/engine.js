@@ -14,6 +14,10 @@ class Engine {
   /* Årsmappar: mål som Arkiv/<år> hittas eller skapas en gång och återanvänds. */
   this.yearFolderIds=new Map();this.yearCreated=0;
   this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;this.lastSweep=null;
+  /* Säkerhetsbromsen: en regel som plötsligt matchar onormalt många mejl stoppas
+     och ligger kvar stoppad tills användaren svarar. Ingenting flyttas medan den
+     är stoppad – varken av svepet eller av inkommande mejl. */
+  this.ruleHolds=new Map();
  }
  /* Anropas när nya mejl kommer in, lässtatus ändras, mejl flyttas eller regler
     ändras – då är den sparade mappbilden inte längre pålitlig. */
@@ -33,6 +37,29 @@ class Engine {
  debug(t){this.hooks.debug?.(t);}
  change(){this.hooks.change?.();}
  async persist(){try{await this.hooks.persist?.();}catch{this.stop('storage_error');throw new C.RuleError('storage_error');}}
+ /* Bromsens gräns för en regel: {limit, median} eller null när den är avstängd. */
+ brakeFor(rule){
+  try{const b=this.hooks.brakeLimit?.(rule);return b&&Number.isFinite(b.limit)&&b.limit>0?b:null;}catch{return null;}
+ }
+ heldRule(ruleId){return this.ruleHolds.get(ruleId)||null;}
+ heldList(){return [...this.ruleHolds.entries()].map(([ruleId,h])=>({ruleId,...h}));}
+ releaseRule(ruleId){this.ruleHolds.delete(ruleId);this.change();}
+ /* Stoppa en regel och släpp de jobb som ännu inte påbörjats. Redan flyttade mejl
+    rörs aldrig – de är borta ur kön och kan inte tas tillbaka härifrån. */
+ holdRule(rule,info){
+  this.ruleHolds.set(rule.id,{matched:info.matched,limit:info.limit,median:info.median||0,at:this.now()});
+  let dropped=0;
+  for(const [id,job] of this.pending){
+   if(job.record.ruleId!==rule.id)continue;
+   if(job.record.stage!=='pending')continue;
+   this.pending.delete(id);this.records.delete(job.record.key);job.record.stage='held';dropped++;
+  }
+  this.log('brake',info.matched,'regeln "'+(rule.name||rule.id)+'" stoppades: '+info.matched+' mejl matchade (vanligtvis '+(info.median||'inget')+', gräns '+info.limit+'). '+(dropped?dropped+' väntande jobb släpptes. ':'')+'Inget mer flyttas förrän du svarar.');
+  this.debug('sakerhetsbromsen: regel '+rule.id+' matchade '+info.matched+' (grans '+info.limit+', median '+info.median+'), '+dropped+' jobb slappta');
+  this.change();
+  if(dropped)this.persist().catch(()=>{});
+  return dropped;
+ }
  stop(code){this.fault=code;this.epoch++;this.log('error',0,'motor_stoppad code='+code);this.debug('motorn stoppad: '+code);this.change();}
  enabled(){return !this.config.paused&&!this.fault&&!this.hold;}
  recordList(){return [...this.records.values()].map(r=>({...r}));}
@@ -138,6 +165,7 @@ class Engine {
  }
  firstMatchingRule(message,{allowUnread=false,inboxArrival=false}={}){
   return this.config.rules.find(r=>{
+   if(this.ruleHolds.has(r.id))return false; /* stoppad av säkerhetsbromsen */
    if(!C.match(r,message)||this.sameTarget(r,message))return false;
    const rf=this.ruleMode(r);
    if(inboxArrival){
@@ -366,7 +394,9 @@ class Engine {
    const direct=rf==='both'||rf==='unread'||(rf==='default'&&this.config.moveMode==='direct');
    const {account,excluded,folders}=await this.ruleFolders(rule);
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
-   for(const folder of folders){
+   const brake=this.brakeFor(rule);
+   let wouldQueue=0,tripped=false;
+   foldersLoop:for(const folder of folders){
     if(!this.enabled())break;
     const isInbox=this.inboxFolder(folder);
     const folderDirect=rf==='read'?false:rf==='both'||rf==='unread'?true:(direct||(includeInboxUnread&&this.config.newInboxDirect&&isInbox));
@@ -419,6 +449,13 @@ class Engine {
         }
         if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
        }
+       /* Säkerhetsbromsen räknar de mejl som faktiskt skulle flyttas – inte alla
+          träffar, för de som redan ligger i målmappen kostar ingenting. */
+       wouldQueue++;
+       if(brake&&wouldQueue>brake.limit){
+        this.holdRule(rule,{matched:wouldQueue,limit:brake.limit,median:brake.median});
+        tripped=true;break foldersLoop;
+       }
        if(await this.enqueue(m,{rule,target,allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true})){
         queued++;
         if(this.hooks.ackTimeout===undefined&&!this.config.dryRun){
@@ -441,21 +478,27 @@ class Engine {
     }
    }
    if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders===0)throw new C.RuleError('sweep_error');
+   if(tripped)return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue,held:true};
    this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' matchade='+matched+' i_mal='+inTarget+' klara='+handled+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last')+(force?' tvingad':''));
    this.log('catchup',queued);this.change();
-   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled};
+   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue};
   }finally{this.sweeping=Math.max(0,this.sweeping-1);if(this.pending.size)this.hooks.kick?.();}
  }
  async sweepAll({force=false}={}){
   if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {...ZERO_SWEEP};}
   this.lastSweep=this.now();
-  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
+  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0,held=0;
+  const heldRules=[];
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(!this.enabled())break;
-   try{const r=await this.sweepRule(rule,{includeInboxUnread:true,force});scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
+   if(this.ruleHolds.has(rule.id)){heldRules.push(rule.id);continue;}
+   try{const r=await this.sweepRule(rule,{includeInboxUnread:true,force});held+=r.held?1:0;
+    /* Ett avslutat svep blir regelns normalnivå – det är den bromsen jämför mot. */
+    try{this.hooks.ruleDone?.(rule,r);}catch{}
+    scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
    catch(error){const code=error?.code||error?.name||'Error';this.debug('svep_regel_misslyckades error_code='+code);this.log('error',0,'svep av regel misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');throw new C.RuleError('sweep_error');}
   }
-  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,heldRules,held};
  }
  async catchUp(ruleId){
   return this.sweepRule(this.config.rules.find(r=>r.id===ruleId),{includeInboxUnread:false});
@@ -517,6 +560,8 @@ class Engine {
   return shown;
  }
  async process(job,epoch,batchState=null){
+  /* Jobbet kan ha släppts av säkerhetsbromsen efter att ticken tog sin lista. */
+  if(this.pending.get(job.id)!==job||job.record.stage!=='pending')return;
   let called=false,op=null;
   try{
    let m;try{m=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet finns inte langre');await this.dropId(job.id);return;}

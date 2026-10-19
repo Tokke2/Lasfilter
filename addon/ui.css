@@ -1307,6 +1307,76 @@ th {
   line-height: 1.7;
 }
 
+/* Säkerhetsbromsen: raden högst upp som kräver ett svar innan något flyttas. */
+.brake-warns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+
+.brake-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #f0c36d;
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: #fff6e0;
+  color: #5b3d05;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.brake-warn-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.brake-warn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.brake-warn-body strong {
+  font-size: 0.9rem;
+}
+
+.brake-warn-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Konfliktvarningen under en regel i listan. */
+.rule-conflict {
+  margin: 2px 0 8px 34px;
+  padding: 6px 9px;
+  border-left: 3px solid #d9a441;
+  border-radius: 4px;
+  background: rgba(217, 164, 65, 0.12);
+  color: #6b4a06;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+body.dark .brake-warn {
+  background: #3a2c07;
+  border-color: #7a5c12;
+  color: #f6e2ac;
+}
+
+body.dark .rule-conflict {
+  background: rgba(217, 164, 65, 0.16);
+  color: #f0d79a;
+}
+
 .storage-note {
   border-left: 3px solid var(--line);
   padding: 6px 0 6px 10px;

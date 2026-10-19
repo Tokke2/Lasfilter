@@ -62,6 +62,28 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>rows()>0,'gränssnittet laddas med demon');
  check(true,'gränssnittet laddas utan skriptfel');
 
+ /* --- ⚠ Konfliktvarning: två regler som kan matcha samma mejl --- */
+ /* Spara demots egna regler före bytet – setState returnerar samma objekt, så en
+    kopia måste tas först. */
+ const originalConfig=JSON.parse(JSON.stringify(w.LasDemo.setState({}).config));
+ const conflictRules=[
+  {id:'k1',name:'Krock ett',enabled:true,scope:'folder',source:'demo-in',sourceAccount:'',target:'demo-fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'fortnox.se'}]},
+  {id:'k2',name:'Krock två',enabled:true,scope:'folder',source:'demo-in',sourceAccount:'',target:'demo-arkiv',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'fortnox.se'}]}
+ ];
+ w.LasDemo.setState({config:{...originalConfig,rules:conflictRules}});
+ el('pause').click();
+ await until(()=>/Kan krocka med/.test(el('ruleList').textContent),'konflikten syns i regellistan',false,6000);
+ const conflictNotes=[...doc.querySelectorAll('.rule-conflict')].map(n=>n.textContent);
+ check(conflictNotes.length===2,'båda reglerna får en varning ('+conflictNotes.length+')');
+ check(/Krock två/.test(conflictNotes[0])&&/Krock ett/.test(conflictNotes[1]),'varningen pekar på den andra regeln');
+ check(/Domän/i.test(conflictNotes[0]),'och namnger fältet som kan krocka: "'+conflictNotes[0].slice(0,110)+'"');
+ check(/ligger först och vinner/.test(conflictNotes[0]),'den första regeln säger att den vinner');
+ check(/Flytta upp den här/.test(conflictNotes[1]),'den andra säger hur man ändrar ordningen');
+ check(!/undefined|\{name\}|\{fields\}/.test(conflictNotes.join(' ')),'inga ofyllda platshållare');
+ /* Tillbaka till demots egna regler så att resten av kontrollerna ser dem. */
+ w.LasDemo.setState({config:originalConfig});
+ el('pause').click();
+
  /* --- ⚡ Snabbregeln: förslag, live-räkning, ett klick --- */
  await until(()=>doc.querySelectorAll('#quickChips .quick-chip').length>0,'Inkorgen läses för förslag');
  const chips=[...doc.querySelectorAll('#quickChips .quick-chip')];
@@ -344,6 +366,32 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
 
  /* --- ⚠ Installationen: tillägget avinstallerar sig inte, men kan stängas av --- */
  const pausedNow=()=>el('pause').textContent;
+ /* --- Säkerhetsbromsen: raden som kräver ett svar --- */
+ check(el('brakeWarns')!==null,'det finns en rad för säkerhetsbromsen');
+ check(el('brakeWarns').hidden===true,'den är tyst när ingen regel är stoppad');
+ check(el('brake')!==null&&el('brake').checked===true,'säkerhetsbromsen är på som standard');
+ el('brake').checked=false;fire(el('brake'),'change');
+ await until(()=>/Säkerhetsbromsen är av/.test(txt('toast')),'avstängd broms kvitteras',false,6000);
+ check(w.LasDemo.setState({}).config.brake===false,'inställningen sparades när rutan kryssades ur');
+ el('brake').checked=true;fire(el('brake'),'change');
+ await until(()=>/Säkerhetsbromsen är på/.test(txt('toast')),'påslagen broms kvitteras',false,6000);
+ check(w.LasDemo.setState({}).config.brake===true,'och när den kryssades i igen');
+ w.LasDemo.setState({brakeHolds:[{ruleId:'demo-1',matched:837,limit:50,median:5,at:Date.now(),name:'Fortnox fakturor',target:'demo-fin'}]});
+ el('pause').click();
+ await until(()=>el('brakeWarns').hidden===false,'stoppad regel syns',false,6000);
+ check(/Säkerhetsbromsen stoppade en regel/.test(el('brakeWarns').textContent),'rubriken säger att bromsen slog till');
+ check(/Fortnox fakturor/.test(el('brakeWarns').textContent),'regelns namn står där: "'+el('brakeWarns').textContent.slice(0,120)+'…"');
+ check(/837/.test(el('brakeWarns').textContent)&&/50/.test(el('brakeWarns').textContent),'antalet och gränsen syns');
+ check(/brukar flytta 5/.test(el('brakeWarns').textContent),'och vad regeln brukar göra');
+ check(!/undefined|\{n\}|\{median\}/.test(el('brakeWarns').textContent),'inga ofyllda platshållare');
+ const brakeBtns=[...el('brakeWarns').querySelectorAll('button')];
+ check(brakeBtns.length===2,'två svar: flytta ändå eller stäng av');
+ check(/Flytta ändå/.test(brakeBtns[0].textContent)&&/Stäng av regeln/.test(brakeBtns[1].textContent),'knapparna säger vad de gör');
+ brakeBtns[0].click();
+ await until(()=>el('brakeWarns').hidden===true,'svaret tar bort raden',false,6000);
+ check(el('brakeWarns').hidden===true,'ingen stoppad regel kvar efter svaret');
+ check(!/Säkerhetsbromsen stoppade/.test(el('brakeWarns').textContent),'raden är tom efter svaret');
+
  check(el('installWarn')!==null,'det finns en varningsrad för installationen');
  check(el('installWarn').hidden===true,'den är tyst när installationen är permanent');
  w.LasDemo.setState({installType:'development'});

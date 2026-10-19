@@ -141,6 +141,38 @@ App.emptySweep={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0
 /* Senaste svepet sparas i lagringen, inte bara i minnet: efter en omstart ska SortBro veta
    om datorn varit avstängd länge och i så fall ta igen det direkt i stället för att vänta
    en hel timme. Tiden skrivs som ett litet tal, inget annat följer med. */
+/* Säkerhetsbromsens minne: hur många mejl en regel brukar flytta per svep.
+   Bara de tio senaste talen per regel sparas, inget annat. */
+App.brakeHistory={};
+App.brakeMedian=ruleId=>{
+ const list=App.brakeHistory[ruleId]||[];
+ if(!list.length)return 0;
+ const sorted=[...list].sort((a,b)=>a-b);
+ return sorted[Math.floor(sorted.length/2)];
+};
+/* Gränsen: tio gånger det vanliga, men aldrig under 50 mejl i ett svep. */
+App.brakeLimit=rule=>{
+ if(App.engine?.config.brake===false)return null;
+ const median=App.brakeMedian(rule.id);
+ return {limit:median>0?Math.max(50,Math.ceil(median*10)):50,median};
+};
+App.saveBrakeHistory=()=>{
+ clearTimeout(App.brakeTimer);
+ App.brakeTimer=setTimeout(()=>{
+  const ids=new Set((App.engine?.config.rules||[]).map(r=>r.id));
+  const clean={};
+  for(const [id,list] of Object.entries(App.brakeHistory))if(ids.has(id)&&Array.isArray(list)&&list.length)clean[id]=list.slice(-10);
+  App.write(()=>B.storage.local.set({brake:clean})).catch(()=>{});
+ },1200);
+};
+/* Ett avslutat svep utan broms blir regelns nya normalnivå. */
+App.brakeRecord=(rule,result)=>{
+ if(App.engine?.config.brake===false||result?.held)return;
+ const n=Number(result?.wouldQueue);
+ if(!Number.isFinite(n)||n<=0)return;
+ App.brakeHistory[rule.id]=[...(App.brakeHistory[rule.id]||[]),n].slice(-10);
+ App.saveBrakeHistory();
+};
 App.saveSweepState=async at=>{
  try{await B.storage.local.set({sweepAt:Number.isFinite(at)?at:Date.now()});}catch{}
 };
@@ -480,7 +512,8 @@ App.snapshot=()=>{
  return {config:e.config,prefs:App.prefs,stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
    fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
-   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,
+   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,brake:e.config.brake!==false,
+   brakeHolds:(e.heldList?.()||[]).map(h=>{const rule=e.config.rules.find(r=>r.id===h.ruleId);return {...h,name:rule?.name||h.ruleId,target:rule?.target||''};}),
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),logs:App.logs};
 };
 App.mutate=fn=>{
@@ -595,6 +628,36 @@ App.handle=async msg=>{
    App.invalidateScan();
    return r;
   }
+  case 'brakeRelease':{
+   const e=App.engine;
+   const rule=e.config.rules.find(r=>r.id===msg.ruleId);
+   const held=rule?e.heldRule(rule.id):null;
+   if(!rule||!held)throw new C.RuleError('bad_rule');
+   /* Släpp spärren i en egen skrivning – mutatet pausar motorn och då kan inget svep köras. */
+   await App.mutate(async()=>{
+    e.releaseRule(rule.id);
+    /* Nivån användaren godkände blir regelns normalnivå, så bromsen inte slår till igen direkt. */
+    App.brakeHistory[rule.id]=[...(App.brakeHistory[rule.id]||[]),held.matched].slice(-10);
+    App.saveBrakeHistory();
+    App.log('debug',0,'sakerhetsbromsen slappt: du godkande att regeln "'+(rule.name||rule.id)+'" flyttar '+held.matched+' mejl');
+   });
+   const r=await e.sweepRule(rule,{includeInboxUnread:true,force:true});
+   for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
+   App.kick();App.invalidateScan();
+   await Promise.race([e.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
+   return {result:r,status:App.snapshot()};
+  }
+  case 'brakeCancel':return App.mutate(async()=>{
+   const e=App.engine;
+   const rule=e.config.rules.find(r=>r.id===msg.ruleId);
+   if(!rule||!e.heldRule(rule.id))throw new C.RuleError('bad_rule');
+   e.releaseRule(rule.id);
+   const rules=e.config.rules.map(r=>r.id===rule.id?{...r,enabled:false}:r);
+   await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+   App.log('debug',0,'sakerhetsbromsen: regeln "'+(rule.name||rule.id)+'" stangdes av efter ditt svar');
+   App.invalidateScan();App.scheduleAutoBackup();
+   return App.snapshot();
+  });
   case 'sweepNow':{
    const r=await App.runAllRules(true);
    App.invalidateScan();
@@ -606,11 +669,14 @@ App.handle=async msg=>{
   }
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
-   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean')throw new C.RuleError('bad_schema');
+   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean'||typeof msg.brake!=='boolean')throw new C.RuleError('bad_schema');
    const modeChanged=msg.moveMode!==e.config.moveMode;
    const verboseChanged=msg.verbose!==e.config.verbose;
    const backupChanged=msg.autoBackup!==e.config.autoBackup;
-   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});App.scheduleSweep();
+   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,brake:msg.brake,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});
+   /* Stängs bromsen av släpps alla stoppade regler direkt – annars skulle de ligga kvar stoppade utan broms. */
+   if(msg.brake===false)for(const h of e.heldList())e.releaseRule(h.ruleId);
+   App.scheduleSweep();
    if(backupChanged&&msg.autoBackup)App.scheduleAutoBackup();
    if(msg.verbose&&verboseChanged)App.log('debug',0,'detaljlogg aktiverad: svep, trafik och avvisningar visas utan mejlinnehall');
    App.log('settings_saved');return App.snapshot();
@@ -631,6 +697,8 @@ App.handle=async msg=>{
   case 'saveRules':return App.mutate(async()=>{
    App.checkRevision(msg.revision);const rules=C.validateRules(msg.rules);await App.checkRules(rules);
    await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+   /* En borttagen regel ska inte lämna en spärr efter sig i varningsraden. */
+   for(const h of e.heldList())if(!rules.some(r=>r.id===h.ruleId))e.releaseRule(h.ruleId);
    App.log('rules_saved',rules.length);App.scheduleAutoBackup();return App.snapshot();
   });
   case 'setMode':return App.mutate(async()=>{
@@ -689,7 +757,7 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt']);
+ const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake']);
  let cfg=C.defaults(),fault='';
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
  App.logs=C.cleanLogs(data.logs);App.backups=[];
@@ -703,7 +771,7 @@ App.ready=(async()=>{
  if(['auto',...SEASONS].includes(p.season))App.prefs.season=p.season;
  App.applySeasonIcon();
  App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
-  notify:App.openUnread});
+  notify:App.openUnread,brakeLimit:App.brakeLimit,ruleDone:App.brakeRecord});
  let needResweep=false;
  if(fault){App.engine.fault=fault;App.log('error');}
  else{
@@ -723,6 +791,10 @@ App.ready=(async()=>{
  await App.readTbVersion();
  await App.readSelfInfo();
  /* Senaste svepet från förra gången, så att starten vet om det är dags att ta igen något. */
+ App.brakeHistory={};
+ if(data.brake&&typeof data.brake==='object'&&!Array.isArray(data.brake)){
+  for(const [id,list] of Object.entries(data.brake))if(Array.isArray(list))App.brakeHistory[id]=list.filter(n=>Number.isFinite(n)&&n>0).slice(-10);
+ }
  const savedSweep=Number(data.sweepAt);
  if(Number.isFinite(savedSweep)&&savedSweep>0){App.lastAutoSweep=savedSweep;if(!App.engine.lastSweep)App.engine.lastSweep=savedSweep;}
  App.log('start');

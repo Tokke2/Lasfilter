@@ -36,7 +36,9 @@ function fixture(options={}){
  if(options.folderInfo)api.folders.getFolderInfo=async id=>{const list=[...messages.values()].filter(m=>m.folder?.id===id);return {totalMessageCount:list.length,unreadMessageCount:list.filter(m=>m.read!==true).length};};
  if(options.folderInfoReject)api.folders.getFolderInfo=async()=>{throw Error('folder info offline');};
  if(options.folderInfo){const queryInfo=api.folders.getFolderInfo;const queries=[];api.infoCalls=queries;api.folders.getFolderInfo=async id=>{queries.push(id);return queryInfo(id);};}
- engine=new Engine(api,cfg,{now:()=>now,ackTimeout:5,log:(n,c)=>logs.push(C.event(n,c,now)),notify:(...a)=>{notifications.push(a[0]);notifyArgs.push(a);},debug:t=>debugs.push(t),persist:async()=>{if(options.persistReject)throw Error('disk SECRET');saved.push(structuredClone(engine.recordList()));}});
+ engine=new Engine(api,cfg,{now:()=>now,ackTimeout:5,log:(n,c,d)=>logs.push(C.event(n,c,now,d)),notify:(...a)=>{notifications.push(a[0]);notifyArgs.push(a);},debug:t=>debugs.push(t),persist:async()=>{if(options.persistReject)throw Error('disk SECRET');saved.push(structuredClone(engine.recordList()));},
+  brakeLimit:options.brake?()=>options.brake:undefined,
+  ruleDone:options.onRuleDone});
  return {e:engine,api,messages,shown,logs,saved,notifications,notifyArgs,debugs,advance:(ms=2100)=>now+=ms,ready:async()=>{await engine.enqueue(messages.get(1));await engine.tick();now+=2100;await engine.tick();}};
 }
 for(const [author,expected] of [['Anna <Anna@EXAMPLE.SE>','anna@example.se'],['anna@example.se','anna@example.se'],['"Anna, A" <a@example.se>','a@example.se'],['A <a@example.se>, B <b@example.se>',''],['"space name"@example.se',''],['not an address',''],['evil <a@example.se> <b@evil.invalid>','']])test('conservative sender '+author,()=>assert.equal(C.email(author),expected));
@@ -994,4 +996,169 @@ test('mergeConditions hoppar över dubbletter och respekterar åtta villkor',()=
  const mixed=C.mergeConditions([{field:'subject',op:'contains',value:'Faktura'}],[{field:'subject',op:'contains',value:'Faktura'},{field:'domain',op:'equals',value:'ny.se'}]);
  assert.equal(mixed.added.length,1,'bara den nya läggs till');
  assert.equal(mixed.duplicates,1);
+});
+
+/* ── Konfliktvarning: två regler som kan matcha samma mejl ─────────────── */
+
+const mkRule=(id,{enabled=true,scope='folder',source='inbox',sourceAccount='',target='mål',match='all',conditions=[]}={})=>({
+ id,name:id,enabled,scope,source,sourceAccount,target,match,readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions
+});
+const cmp=(a,op,value)=>({field:a,op,value});
+const conflictIds=(rules,extra={})=>C.conflicts(rules,extra).map(c=>c.aId+'/'+c.bId);
+
+test('konflikt: samma avsändardomän till olika mappar varnas',()=>{
+ const a=mkRule('a',{target:'google',conditions:[cmp('domain','equals','gmail.com')]});
+ const b=mkRule('b',{target:'ovrigt',conditions:[cmp('domain','equals','gmail.com')]});
+ const found=C.conflicts([a,b]);
+ assert.equal(found.length,1,'en konflikt');
+ assert.equal(found[0].aId,'a','den som ligger först vinner');
+ assert.equal(found[0].bId,'b');
+ assert.equal(JSON.stringify(found[0].fields),JSON.stringify(['domain']),'fältet som krockar anges');
+});
+
+test('konflikt: samma mål är ingen konflikt',()=>{
+ const a=mkRule('a',{target:'samma',conditions:[cmp('domain','equals','gmail.com')]});
+ const b=mkRule('b',{target:'samma',conditions:[cmp('domain','equals','gmail.com')]});
+ assert.equal(C.conflicts([a,b]).length,0,'samma målmapp – då spelar ordningen ingen roll');
+});
+
+test('konflikt: olika domäner krockar inte',()=>{
+ const a=mkRule('a',{conditions:[cmp('domain','equals','gmail.com')]});
+ const b=mkRule('b',{target:'b-mål',conditions:[cmp('domain','equals','hotmail.com')]});
+ assert.equal(C.conflicts([a,b]).length,0);
+});
+
+test('konflikt: olika källmappar krockar inte',()=>{
+ const a=mkRule('a',{source:'inkorg',conditions:[cmp('domain','equals','gmail.com')]});
+ const b=mkRule('b',{source:'arkiv',conditions:[cmp('domain','equals','gmail.com')]});
+ assert.equal(C.conflicts([a,b]).length,0,'reglerna läser olika mappar');
+});
+
+test('konflikt: kontoregeln och mappregeln i samma konto krockar',()=>{
+ const account=mkRule('hela',{scope:'account',source:'',sourceAccount:'konto-1',conditions:[cmp('domain','equals','gmail.com')]});
+ const folder=mkRule('mapp',{source:'inkorg',target:'mapp-mal',conditions:[cmp('domain','equals','gmail.com')]});
+ const same=C.conflicts([account,folder],{accountOf:id=>id==='inkorg'?'konto-1':''});
+ assert.equal(same.length,1,'mappregeln ligger i kontoregeln');
+ const other=C.conflicts([account,folder],{accountOf:id=>id==='inkorg'?'konto-2':''});
+ assert.equal(other.length,0,'mappen ligger i ett annat konto');
+});
+
+test('konflikt: två kontoregler i olika konton krockar inte',()=>{
+ const a=mkRule('a',{scope:'account',source:'',sourceAccount:'k1',conditions:[cmp('domain','equals','gmail.com')]});
+ const b=mkRule('b',{scope:'account',source:'',sourceAccount:'k2',conditions:[cmp('domain','equals','gmail.com')]});
+ assert.equal(C.conflicts([a,b]).length,0);
+});
+
+test('konflikt: ELLER-regel krockar bara när något villkor kan sammanfalla',()=>{
+ const any=mkRule('any',{match:'any',conditions:[cmp('domain','equals','gmail.com'),cmp('domain','equals','hotmail.com')]});
+ const gmail=mkRule('gmail',{target:'gmail-mal',conditions:[cmp('domain','equals','gmail.com')]});
+ const yahoo=mkRule('yahoo',{target:'yahoo-mal',conditions:[cmp('domain','equals','yahoo.se')]});
+ assert.equal(C.conflicts([any,gmail]).length,1,'gmail-villkoret sammanfaller');
+ assert.equal(C.conflicts([any,yahoo]).length,0,'inget av villkoren kan gälla samma mejl');
+});
+
+test('konflikt: oförenliga villkor i samma regelpar varnar inte',()=>{
+ const a=mkRule('a',{conditions:[cmp('domain','equals','gmail.com'),cmp('subject','contains','faktura')]});
+ const b=mkRule('b',{target:'b-mål',conditions:[cmp('domain','equals','hotmail.com')]});
+ assert.equal(C.conflicts([a,b]).length,0,'olika domän kan aldrig båda stämma');
+});
+
+test('konflikt: textvillkor jämförs som text, inte som gissning',()=>{
+ const startsAnna=mkRule('anna',{conditions:[cmp('sender','starts','anna@')]});
+ const containsAnna=mkRule('anna2',{target:'b-mål',conditions:[cmp('sender','contains','anna@')]});
+ assert.equal(C.conflicts([startsAnna,containsAnna]).length,1,'anna@ uppfyller båda');
+ const startsBob=mkRule('bob',{target:'c-mål',conditions:[cmp('sender','starts','bob@')]});
+ assert.equal(C.conflicts([startsAnna,startsBob]).length,0,'en adress kan inte börja med både anna@ och bob@');
+ const ends=mkRule('ends',{target:'d-mål',conditions:[cmp('subject','ends','faktura')]});
+ const starts2=mkRule('starts2',{target:'e-mål',conditions:[cmp('subject','starts','Faktura')]});
+ assert.equal(C.conflicts([ends,starts2]).length,1,'"Faktura … faktura" uppfyller båda');
+});
+
+test('konflikt: storleksvillkor jämförs som intervall',()=>{
+ const big=mkRule('big',{conditions:[cmp('size','larger','100')]});
+ const small=mkRule('small',{target:'b-mål',conditions:[cmp('size','smaller','50')]});
+ assert.equal(C.conflicts([big,small]).length,0,'större än 100 kB och mindre än 50 kB kan aldrig båda gälla');
+ const mid=mkRule('mid',{target:'c-mål',conditions:[cmp('size','smaller','500')]});
+ assert.equal(C.conflicts([big,mid]).length,1,'50–500 kB ligger inom båda');
+});
+
+test('konflikt: avstängda regler varnar aldrig',()=>{
+ const a=mkRule('a',{enabled:false,conditions:[cmp('domain','equals','gmail.com')]});
+ const b=mkRule('b',{conditions:[cmp('domain','equals','gmail.com')]});
+ assert.equal(C.conflicts([a,b]).length,0);
+});
+
+test('konflikt: flera par rapporteras i listordning',()=>{
+ const a=mkRule('a',{target:'1',conditions:[cmp('domain','equals','x.se')]});
+ const b=mkRule('b',{target:'2',conditions:[cmp('domain','equals','x.se')]});
+ const c=mkRule('c',{target:'3',conditions:[cmp('domain','equals','x.se')]});
+ assert.equal(JSON.stringify(conflictIds([a,b,c])),JSON.stringify(['a/b','a/c','b/c']),'alla tre paren');
+});
+
+/* ── Säkerhetsbromsen: en regel som plötsligt matchar för många ────────── */
+
+function brakeFixture(limit,count){
+ const fx=fixture({brake:{limit,median:0}});
+ for(let i=2;i<=count;i++)fx.messages.set(i,{...msg(i),headerMessageId:'fake-'+i+'@example.invalid'});
+ return fx;
+}
+
+test('säkerhetsbromsen stoppar regeln och släpper de väntande jobben',async()=>{
+ const fx=brakeFixture(3,7);
+ const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
+ assert.equal(r.held,true,'regeln stoppades');
+ assert.equal(r.wouldQueue,4,'det fjärde mejlet utlöser bromsen');
+ assert.equal(fx.e.pending.size,0,'inga väntande jobb lämnas kvar');
+ assert.equal(fx.messages.get(1).folder.id,'inbox','ingenting flyttades');
+ const holds=fx.e.heldList();
+ assert.equal(holds.length,1);
+ assert.equal(holds[0].ruleId,'rule1');
+ assert.equal(holds[0].matched,4,'antalet som utlöste bromsen sparas');
+ assert.equal(holds[0].limit,3);
+ assert.equal(fx.logs.filter(l=>l.event==='brake').length,1,'exakt en rad i loggen');
+ assert.match(fx.logs.find(l=>l.event==='brake').data.detail,/stoppades/,'raden förklarar vad som hände');
+});
+
+test('en stoppad regel svepas inte och tar inga inkommande mejl',async()=>{
+ const fx=brakeFixture(1,3);
+ await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
+ assert.equal(fx.e.heldList().length,1,'regeln är stoppad');
+ const before=fx.e.pending.size;
+ const sweep=await fx.e.sweepAll({force:true});
+ assert.equal(JSON.stringify(sweep.heldRules),JSON.stringify(['rule1']),'svepet hoppar över regeln och säger det');
+ assert.equal(sweep.queued,0,'inget köas av en stoppad regel');
+ assert.equal(fx.e.pending.size,before,'kön rörs inte');
+ assert.equal(fx.e.firstMatchingRule(msg(1)),null,'inkommande mejl tas inte av en stoppad regel');
+});
+
+test('bromsen kan släppas och regeln sveper då som vanligt',async()=>{
+ const fx=brakeFixture(2,5);
+ await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
+ assert.equal(fx.e.heldList().length,1);
+ fx.e.releaseRule('rule1');
+ assert.equal(fx.e.heldList().length,0,'spärren är släppt');
+ const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
+ assert.equal(r.held,true,'men bromsen slår till igen om nivån inte godkänts');
+ assert.equal(fx.e.heldList()[0].matched,3);
+});
+
+test('utan broms (avstängd) hålls ingen regel',async()=>{
+ const fx=fixture({brake:null});
+ for(let i=2;i<=9;i++)fx.messages.set(i,{...msg(i),headerMessageId:'fake-'+i+'@example.invalid'});
+ const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
+ assert.equal(r.held,undefined,'ingen broms är ingen broms');
+ assert.equal(fx.e.heldList().length,0);
+ assert.ok(r.wouldQueue>=8,'alla mejl räknas');
+ assert.equal(fx.e.pending.size,9,'alla nio mejl köades');
+});
+
+test('bromsen räknar bara mejl som faktiskt skulle flyttas',async()=>{
+ /* Två av mejlen ligger redan i målmappen: de ska inte knuffa regeln över gränsen. */
+ const fx=fixture({brake:{limit:3,median:0}});
+ for(let i=2;i<=5;i++)fx.messages.set(i,{...msg(i),headerMessageId:'fake-'+i+'@example.invalid'});
+ fx.messages.set(6,{...msg(6),headerMessageId:'fake-6@example.invalid',folder:{id:'archive',accountId:'a'}});
+ fx.messages.set(7,{...msg(7),headerMessageId:'fake-7@example.invalid',folder:{id:'archive',accountId:'a'}});
+ const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
+ assert.equal(r.held,true,'fyra riktiga flyttar utlöser en gräns på 3');
+ assert.equal(r.wouldQueue,4);
 });

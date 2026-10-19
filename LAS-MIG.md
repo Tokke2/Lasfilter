@@ -149,6 +149,41 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
 - **Stöd SortBro** finns både i gränssnittet och i `stod.html`: 100 % lokalt genererad Swish-QR (ISO/IEC 18004-verifierad, `C0721817177;…` samt kameravy med `swish://`), PayPal och Ko-fi. Inget låses upp av en gåva.
 
+## Säkerhetsbromsen – när en regel plötsligt matchar för mycket
+
+Ett enda stavfel i en regel kan flytta tusentals mejl. Säkerhetsbromsen finns för att det aldrig ska hända utan att du får säga till.
+
+**Så fungerar den.** SortBro minns hur många mejl varje regel brukar flytta per svep (de tio senaste körningarna, bara antal – inget annat). Vill en regel plötsligt flytta **tio gånger fler** än vanligt, och minst **50** mejl, stoppas den mitt i svepet. Inget mer köas, väntande jobb som ännu inte påbörjats släpps, och en rad högst upp i fönstret säger vad som hänt:
+
+> ⚠ **Säkerhetsbromsen stoppade en regel**
+> Regeln "Google" ville flytta 837 mejl. Gränsen är 50 och regeln brukar flytta 5. Inget mer flyttas förrän du väljer.
+> **[Flytta ändå] [Stäng av regeln]**
+
+- **Flytta ändå** släpper spärren, kör regeln direkt och gör den nivån till regelns nya normalnivå – bromsen slår inte till igen för samma sak.
+- **Stäng av regeln** stänger av den i stället. Inget mer flyttas, och regeln ligger kvar med alla inställningar så att du kan rätta och slå på den igen.
+- Den stoppade regeln **sveps inte** och tar inte heller **inkommande mejl** förrän du har svarat. Andra regler fortsätter som vanligt.
+- Nya regler har ingen historik. Deras gräns är därför 50 mejl i första svepet – det är precis då ett stavfel brukar upptäckas.
+- Antalet räknar bara mejl som **faktiskt skulle flyttas**: sådant som redan ligger i målmappen kostar ingenting.
+- Bromsen stängs av under **Inställningar → Avancerat**. Stängs den av släpps också alla stoppade regler direkt. Kvittot säger rakt ut vad som då kan hända: *"En felaktig regel kan då flytta hela inkorgen utan att fråga."*
+- Stoppet skrivs i loggen som händelsen **Säkerhetsbromsen stoppade en regel**, med regelns namn, antalet, gränsen och hur många väntande jobb som släpptes.
+
+## Konfliktvarning – två regler, samma mejl
+
+Två aktiva regler kan matcha samma mejl och vilja skicka det till olika mappar. Då är det **ordningen** som avgör: svepet kör reglerna uppifrån och ned, och den första som matchar får mejlet. Det syns nu direkt i regellistan:
+
+> ⚠ Kan krocka med "Fakturor" – båda kan matcha samma mejl (Domän). Den här regeln ligger först och vinner.
+
+Den andra regeln får samma varning med omvänd förklaring: *"Den regeln ligger först och vinner. Flytta upp den här om den ska gälla i stället."* Pilarna i regellistan ändrar ordningen.
+
+**Varningen är försiktig med flit.** Den visas bara när SortBro kan visa att båda reglerna *kan* träffa samma mejl:
+
+- Reglerna måste läsa samma mapp (samma källmapp, eller en mapp som ligger i den kontoregel den andra regeln använder).
+- Villkoren måste kunna gälla samtidigt. *Domän = gmail.com* och *Domän = hotmail.com* varnar aldrig, och inte heller *större än 100 kB* mot *mindre än 50 kB*.
+- Reglerna måste ha **olika** målmappar. Samma mål är ingen konflikt – ordningen spelar då ingen roll.
+- Avstängda regler räknas inte.
+
+Villkoren jämförs som text och intervall: *börjar med anna@* och *innehåller anna@* kan båda stämma, men *börjar med anna@* och *börjar med bob@* kan aldrig gälla samma adress. En regel med **ELLER** prövas villkor för villkor – det räcker att ett av dem kan sammanfalla med den andra regeln.
+
 ## Säkerhetsmekaniker
 
 - Högst ett flyttförsök per meddelande. Journalen skrivs före försöket och rensas inte förrän Thunderbird har bekräftat flytthändelsen. Ett avbrutet eller osäkert försök pausar motorn och upprepas inte.
@@ -254,6 +289,8 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Snabbregeln (⚡ Skapa regel på tio sekunder):** klickbara förslag från Inkorgen (avsändare och ämnesord med antal), *Hämta från markerat mejl* för att fylla i avsändaren direkt från det mejl du har markerat, live-räkning av hur många mejl regeln träffar, en mening i klarspråk om vad regeln gör och två knappar – *Skapa regel* eller *Lägg till och flytta nu*. Villkoret räknas ut automatiskt: full domän/adress blir exakt träff, ett löst ord blir *innehåller*.
 - **Varför flyttas inte mejlen?:** läsbar diagnos per regel som förklarar om mejlen väntar på att bli lästa, redan ligger i målmappen, redan är hanterade eller inte matchar villkoren – med exempelrader och påminnelse om Testläge/paus.
 - **Automatiskt varje timme:** standardintervallet är 60 minuter och körs vid sidan av den händelsestyrda bevakningen av inkommande mejl. Statusraden visar nästa automatiska körning.
+- **Säkerhetsbromsen:** en regel som plötsligt vill flytta tio gånger fler mejl än vanligt – och minst 50 – stoppas innan något flyttas. Raden högst upp erbjuder *Flytta ändå* eller *Stäng av regeln*, och ingenting rör sig förrän du har svarat.
+- **Konfliktvarning:** två aktiva regler som kan träffa samma mejl och skicka det till olika mappar får en varning i regellistan, med förklaring om vilken som ligger först och vinner. Analysen är försiktig och varnar bara när den kan visa att båda verkligen kan matcha.
 - **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.
 
 ## Nyheter i 1.3

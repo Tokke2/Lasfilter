@@ -291,7 +291,7 @@ function validatePair(source,target,sourceCaps,targetCaps){
  if(source.id===target.id)fail('same_folder');
  if(sourceCaps.canDeleteMessages!==true||targetCaps.canAddMessages!==true)fail('read_only');
 }
-function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,rules:[]};}
+function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,brake:true,rules:[]};}
 function config(raw){
  if(!raw||raw.schema!==1)fail('bad_schema');
  if(!Number.isSafeInteger(raw.revision)||raw.revision<0||!Number.isSafeInteger(raw.rulesVersion)||raw.rulesVersion<0)fail('bad_schema');
@@ -300,22 +300,124 @@ function config(raw){
  if(typeof raw.hourly!=='boolean'||typeof raw.openWindow!=='boolean'||typeof raw.verbose!=='boolean')fail('bad_schema');
  const fileLog=raw.fileLog===undefined?true:raw.fileLog;if(typeof fileLog!=='boolean')fail('bad_schema');
  const autoBackup=raw.autoBackup===undefined?true:raw.autoBackup;if(typeof autoBackup!=='boolean')fail('bad_schema');
+ /* Säkerhetsbromsen är på som standard. Konfigurationer från tidigare versioner
+    saknar fältet och får då true, precis som när det infördes. */
+ const brake=raw.brake===undefined?true:raw.brake;if(typeof brake!=='boolean')fail('bad_schema');
  const sweepMinutes=raw.sweepMinutes===undefined?60:raw.sweepMinutes;if(!Number.isInteger(sweepMinutes)||sweepMinutes<15||sweepMinutes>1440||sweepMinutes%15)fail('bad_schema');
  const newInboxDirect=raw.newInboxDirect===undefined?true:raw.newInboxDirect;if(typeof newInboxDirect!=='boolean')fail('bad_schema');
- return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,autoBackup,rules:validateRules(raw.rules)};
+ return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,autoBackup,brake,rules:validateRules(raw.rules)};
+}
+
+/* ── Konfliktvarning: kan två regler matcha samma mejl? ────────────────────
+   Analysen är medvetet försiktig: den varnar bara när den kan visa att båda
+   reglerna kan träffa samma mejl och skickar det till olika mappar. Hellre
+   tyst än en falsk varning. Fälten är oberoende av varandra (ett mejl har en
+   avsändare, ett ämne, en storlek …), så varje fält prövas för sig. */
+
+/* Textvillkor på samma fält: finns det någon sträng som uppfyller alla? */
+function textSetPossible(conds){
+ const eq=conds.filter(c=>c.op==='equals');
+ if(eq.length){
+  const v=norm(eq[0].value);
+  if(eq.some(c=>norm(c.value)!==v))return false; /* två olika equals kan aldrig båda stämma */
+  return conds.every(c=>{
+   const n=norm(c.value);
+   if(c.op==='equals')return true;
+   if(c.op==='contains')return v.includes(n);
+   if(c.op==='starts')return v.startsWith(n);
+   return v.endsWith(n);
+  });
+ }
+ const starts=conds.filter(c=>c.op==='starts').map(c=>norm(c.value));
+ if(starts.length){
+  const longest=starts.reduce((a,b)=>b.length>=a.length?b:a);
+  if(!starts.every(x=>longest.startsWith(x)))return false; /* "anna" och "bob" kan inte båda vara början */
+ }
+ const ends=conds.filter(c=>c.op==='ends').map(c=>norm(c.value));
+ if(ends.length){
+  const longest=ends.reduce((a,b)=>b.length>=a.length?b:a);
+  if(!ends.every(x=>longest.endsWith(x)))return false;
+ }
+ return true;
+}
+/* Datumvillkor blir intervall: date > low och date < high. */
+function datePossible(conds,now){
+ const y=new Date(now).getFullYear(),jan1=year=>new Date(year,0,1).getTime();
+ let low=-Infinity,high=Infinity;
+ for(const c of conds){
+  const n=Number(c.value);
+  if(c.op==='older')high=Math.min(high,now-n*86400000);
+  else if(c.op==='newer')low=Math.max(low,now-n*86400000);
+  else if(c.op==='before')high=Math.min(high,jan1(n));
+  else if(c.op==='after')low=Math.max(low,jan1(n+1));
+  else if(c.op==='beforeThisYear')high=Math.min(high,jan1(y));
+  else if(c.op==='afterThisYear')low=Math.max(low,jan1(y+1));
+ }
+ return low<high;
+}
+/* Kan alla villkor i listan gälla för samma mejl? */
+function conditionsPossible(conds,now){
+ const byField=new Map();
+ for(const c of conds){const key=c.field;if(!byField.has(key))byField.set(key,[]);byField.get(key).push(c);}
+ for(const [field,list] of byField){
+  if(field==='size'){
+   let low=0,high=Infinity;
+   for(const c of list){const bytes=Number(c.value)*1024;if(c.op==='larger')low=Math.max(low,bytes);else high=Math.min(high,bytes);}
+   if(!(low<high))return false;
+  }else if(field==='date'){if(!datePossible(list,now))return false;}
+  else if(!textSetPossible(list))return false;
+ }
+ return true;
+}
+/* Ett "vittne" per regel: match='all' kräver alla villkor, match='any' räcker ett. */
+function ruleWitnesses(rule){
+ return rule.match==='any'?rule.conditions.map(c=>[c]):[rule.conditions];
+}
+function rulesCanCollide(a,b,now){
+ for(const A of ruleWitnesses(a))for(const B of ruleWitnesses(b))if(conditionsPossible([...A,...B],now))return true;
+ return false;
+}
+/* Läser samma mappar? folder+account avgörs med en uppslagning av mappens konto. */
+function sourcesOverlap(a,b,accountOf){
+ const af=a.scope==='folder'?a.source:'',bf=b.scope==='folder'?b.source:'';
+ if(af&&bf)return af===bf;
+ if(!af&&!bf)return !!a.sourceAccount&&a.sourceAccount===b.sourceAccount;
+ const folder=af||bf,account=af?b.sourceAccount:a.sourceAccount;
+ const owner=typeof accountOf==='function'?accountOf(folder):'';
+ return !!account&&!!owner&&owner===account;
+}
+function sharedFields(a,b){
+ const bf=new Set(b.conditions.map(c=>c.field));
+ return [...new Set(a.conditions.map(c=>c.field))].filter(f=>bf.has(f));
+}
+/* Alla par av aktiva regler som kan träffa samma mejl och har olika mål.
+   Den regel som ligger först i listan vinner – svepet kör reglerna i ordning. */
+function conflicts(rules,{accountOf,now=Date.now()}={}){
+ const list=Array.isArray(rules)?rules:[],out=[];
+ for(let i=0;i<list.length;i++){
+  const a=list[i];if(!a||a.enabled!==true)continue;
+  for(let j=i+1;j<list.length;j++){
+   const b=list[j];if(!b||b.enabled!==true)continue;
+   if(a.target===b.target)continue; /* samma mål: ingen konflikt */
+   if(!sourcesOverlap(a,b,accountOf))continue;
+   if(!rulesCanCollide(a,b,now))continue;
+   out.push({aId:a.id,bId:b.id,fields:sharedFields(a,b)});
+  }
+ }
+ return out;
 }
 function fingerprint(m){return typeof m.headerMessageId==='string'&&m.headerMessageId.length<=4096&&m.headerMessageId?JSON.stringify([m.headerMessageId,+new Date(m.date),m.size]):'';}
-const EVENTS=new Set(['start','settings_saved','rules_saved','restored','queued','simulated','moved','skipped','error','queue_full','backup_restored','catchup','debug']);
+const EVENTS=new Set(['start','settings_saved','rules_saved','restored','queued','simulated','moved','skipped','error','queue_full','backup_restored','catchup','debug','brake']);
 function event(name,count=0,now=Date.now(),detail=''){
  if(!EVENTS.has(name))return null;
  const data={count:Number.isSafeInteger(count)&&count>=0?count:0};
- if(['debug','error'].includes(name)&&typeof detail==='string'&&detail.trim())data.detail=detail.trim().replace(/[^a-zA-Z0-9åäöÅÄÖ _:=,.;+()/-]/g,'?').slice(0,500);
+ if(['debug','error','brake'].includes(name)&&typeof detail==='string'&&detail.trim())data.detail=detail.trim().replace(/[^a-zA-Z0-9åäöÅÄÖ _:=,.;+()/-]/g,'?').slice(0,500);
  return {time:new Date(now).toISOString(),app:'lasfilter',level:['error','queue_full'].includes(name)?'ERROR':'INFO',event:name,data};
 }
 function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

@@ -10,6 +10,7 @@
 </head>
 <body>
   <div id="demoBanner" class="demo-banner" data-i18n="demoBanner" hidden>FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.</div>
+  <div id="brakeWarns" class="brake-warns" role="alert" hidden></div>
   <div id="installWarn" class="install-warn" role="status" hidden>
     <span class="install-warn-icon" aria-hidden="true">⚠</span>
     <div class="install-warn-body">
@@ -450,6 +451,11 @@
               <span data-i18n="autoBackupLabel">Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/Regelbackuper/</span>
             </label>
             <p class="muted" data-i18n="autoBackupNote">Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad kopia sparas en gång per dag – de senaste 30 dagarna behålls. Under Regler importerar du filen och får tillbaka reglerna.</p>
+            <label class="toggle-label">
+              <input id="brake" type="checkbox" checked>
+              <span data-i18n="brakeLabel">Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl</span>
+            </label>
+            <p class="muted" data-i18n="brakeNote">Om en regel vill flytta tio gånger fler mejl än vanligt – och minst 50 – stoppas den innan något flyttas. Du får då välja: flytta ändå eller stäng av regeln. Nya regler har gränsen 50 mejl per svep.</p>
             <div class="backup-actions">
               <button id="backupNow" type="button" class="button small secondary" data-i18n="backupNowBtn">⇩ Backa upp reglerna nu</button>
               <span id="backupInfo" class="muted"></span>

@@ -159,6 +159,17 @@ globalThis.LasDemo=(()=>{
     /* Manuell körning läser om allt – därför inga cachade mappar i svaret. */
     else{data={scanned:90,queued:1,matched:6,inTarget:3,handled:2,searchedFolders:10,skippedFolders:0,emptyFolders:3,cachedFolders:0,deferred:0};state.queued+=1;}
     break;
+   case 'whyHere':{
+    /* Demon svarar som bakgrunden gör – med demots egna mejl och regler. */
+    /* Demons markerade mejl anger mappen som `source`; bakgrunden får `folder`
+       från Thunderbird. Normalisera här så att uppslaget räknar på samma sak. */
+    const raw=m.message&&typeof m.message==='object'?m.message:selected;
+    const msg={...raw,folder:raw.folder||{id:raw.source||raw.folderId||'demo-in',accountId:raw.sourceAccount||'demo'}};
+    const result=LasCore.whyHere(state.config.rules,msg,{moveMode:state.moveMode,displayed:false,queueContains:false,recordsContains:false,heldIds:(state.brakeHolds||[]).map(h=>h.ruleId)});
+    const nameOf=id=>folders.find(f=>f.id===id)?.label||'';
+    data={...result,message:{id:msg.id||1,author:msg.author||'',subject:msg.subject||'',read:msg.read===true,folderId:msg.folder?.id||msg.source||'',folderName:nameOf(msg.folder?.id||msg.source||'')},
+     winnerName:nameOf(result.winnerTarget),folderNames:folders.map(f=>({id:f.id,label:f.label}))};break;
+   }
    case 'brakeRelease':{
     const hold=(state.brakeHolds||[]).find(h=>h.ruleId===m.ruleId);
     if(!hold)throw new LasCore.RuleError('bad_rule');

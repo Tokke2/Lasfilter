@@ -685,6 +685,26 @@ App.handle=async msg=>{
    App.invalidateScan();
    return r;
   }
+  /* "Varför ligger det här mejlet här?" – ett omvänt uppslag för markat mejl,
+     eller för ett mejl som skickats in från demot. Svarar med allt gränssnittet
+     behöver: vilken regel som vinner, vart den skickar mejlet och vad som stoppar. */
+  case 'whyHere':{
+   const e=App.engine;
+   const message=msg.message&&typeof msg.message==='object'?msg.message:await App.selected();
+   let displayed=false;
+   try{displayed=(await e.displayed()).has(message.id);}catch{}
+   const queueContains=!!e.pending?.has?.(message.id);
+   const key=C.fingerprint(message);
+   /* Tål att motorn är på väg upp: då finns varken kön eller journalen ännu. */
+   const recordsContains=!!(key&&((e.records?.has?.(key))||(e.done?.has?.(key))));
+   const heldIds=(e.heldList?.()||[]).map(h=>h.ruleId);
+   const result=C.whyHere(e.config.rules,message,{moveMode:e.config.moveMode,displayed,queueContains,recordsContains,heldIds});
+   /* Mappnamnen behövs för att kunna skriva "skulle flyttas till Fakturor" i klartext. */
+   const folders=await App.folderList().catch(()=>[]);
+   const nameOf=id=>folders.find(f=>f.id===id)?.label||'';
+   return {...result,message:{id:message.id,author:message.author||'',subject:message.subject||'',read:message.read===true,folderId:message.folder?.id||'',folderName:nameOf(message.folder?.id||'')},
+    winnerName:nameOf(result.winnerTarget),folderNames:folders.map(f=>({id:f.id,label:f.label}))};
+  }
   case 'diagnose':{
    const rule=C.validateRule(msg.rule);
    return App.engine.diagnose(rule);

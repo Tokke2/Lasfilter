@@ -406,6 +406,103 @@ function conflicts(rules,{accountOf,now=Date.now()}={}){
  }
  return out;
 }
+
+/* ── "Varför ligger det här mejlet här?" ───────────────────────────────────
+   Ett omvänt uppslag: givet ett mejl, vilken regel gäller det, vad skulle
+   hända, och vad stoppar det? Analytisk hjälp som i dag bara finns som
+   diagnose efter en sparning – men här för ALLA regler, även de som inte
+   matchar, så att man ser vilket villkor som fällde avgörandet.
+
+   Tre listor ges ett eget villkor, så att svaret kan säga exakt vad som
+   gäller: "regelns källmapp" (måste läsa mejlets mapp), "oläst" (lässtatus),
+   och "regeln är avstängd". Allt annat följer av de vanliga villkoren. */
+
+/* Ett villkor som beskriver ett läge som inte står i regeln men som kan stoppa den. */
+function pseudoCondition(text){
+ return {field:'rule',op:'state',value:text,pseudo:true};
+}
+function conditionText(c){
+ if(c.pseudo)return c.value;
+ const v=String(c.value??'');
+ if(c.field==='size')return (c.op==='larger'?'större än ':'mindre än ')+v+' kB';
+ if(c.field==='date'){
+  if(c.op==='older')return 'äldre än '+v+' dagar';
+  if(c.op==='newer')return 'nyare än '+v+' dagar';
+  if(c.op==='beforeThisYear')return 'från ett tidigare år';
+  if(c.op==='afterThisYear')return 'från ett senare år';
+  return c.op==='before'?'före '+v:'efter '+v;
+ }
+ const field={sender:'Avsändare',domain:'Domän',subject:'Ämne',recipient:'Till',cc:'Kopia'}[c.field]||c.field;
+ const op={equals:'är',contains:'innehåller',starts:'börjar med',ends:'slutar med'}[c.op]||c.op;
+ return field+' '+op+' '+v;
+}
+/* Varför en regel inte kan gälla mejlet – eller tom sträng om den kan. */
+function blockReason(rule,message,{arrived=false}={}){
+ if(rule.enabled!==true)return pseudoCondition('regeln är avstängd');
+ if(arrived)return '';
+ if(rule.scope==='account'){
+  if(message.folder?.accountId!==rule.sourceAccount)return pseudoCondition('regeln gäller ett annat konto');
+ }else if(message.folder?.id!==rule.source){
+  return pseudoCondition('regeln läser en annan mapp än mejlet ligger i');
+ }
+ return '';
+}
+/* Ett villkor är uppfyllt eller inte – med pseudo-villkoren ovan som "uppfyllda". */
+function conditionPass(c,values,now){
+ if(c.pseudo)return true; /* pseudovillkor är redan prövade i blockReason */
+ return condHit(c,values,now);
+}
+function explainRule(rule,message,{now=Date.now(),moveMode='read',displayed=false,queueContains=false,recordsContains=false,arrived=false}={}){
+ const reason=blockReason(rule,message,{arrived});
+ const values=valuesFor(message);
+ const rows=rule.conditions.map(c=>({text:conditionText(c),ok:conditionPass(c,values,now)}));
+ const hits=rule.conditions.filter(c=>conditionPass(c,values,now)).length;
+ const ruleHit=rule.match==='any'?hits>0:hits===rule.conditions.length;
+ /* Lägesvillkoren prövas bara om regeln i övrigt matchar. */
+ const state=[];
+ const rf=rule.readFilter||'default';
+ const direct=rf==='both'||rf==='unread'||(rf==='default'&&moveMode==='direct');
+ const allowUnread=rf==='both'||rf==='unread'||(rf==='default'&&moveMode==='direct');
+ if(ruleHit&&!reason){
+  if(arrived)state.push({text:'mejlet ligger i regelns målmapp – det är hit regeln skickar det',ok:true});
+  if(message.read!==true&&!allowUnread)state.push({text:'mejlet är oläst och regeln flyttar bara lästa',ok:false});
+  if(message.read===true&&rf==='unread')state.push({text:'regeln flyttar bara olästa, mejlet är läst',ok:false});
+  if(displayed&&!direct)state.push({text:'mejlet visas just nu – flytten väntar tills du stänger det',ok:false});
+  if(recordsContains)state.push({text:'mejlet är redan hanterat av SortBro',ok:false});
+  else if(queueContains)state.push({text:'mejlet ligger redan i kön',ok:true});
+ }else if(!ruleHit&&!reason){
+  /* Låt den som undrar se vad som fällde avgörandet: de villkor som inte stämde. */
+  for(const row of rows)if(!row.ok)state.push({text:row.text+' – stämmer inte på det här mejlet',ok:false});
+ }
+ const target=ruleHit?targetFor(rule,message):'';
+ return {id:rule.id,name:rule.name,enabled:rule.enabled,scope:rule.scope,matches:ruleHit,
+  conditions:rows,state,reason:reason?reason.value:'',target,arrived:!!arrived};
+}
+/* Vilken regel som faktiskt skulle flytta mejlet: första aktiva träff i listordning. */
+function whyHere(rules,message,{now=Date.now(),moveMode='read',displayed=false,queueContains=false,recordsContains=false,heldIds=[],sourceOk=true}={}){
+ const held=new Set(heldIds);
+ const list=Array.isArray(rules)?rules:[];
+ const here=message.folder?.id||'';
+ /* Ligger mejlet redan i en regels målmapp? Då är det den regelns förklaring –
+    frågan "varför ligger det här" gäller oftast ett mejl som redan är flyttat. */
+ const targetsOf=r=>[r.target,...(r.branches||[]).map(b=>b.target)];
+ const all=list.map(r=>{
+  const arrived=!!here&&targetsOf(r).includes(here);
+  const item=explainRule(r,message,{now,moveMode,displayed,queueContains,recordsContains,arrived});
+  if(held.has(r.id)&&item.matches&&!item.reason)item.state=[...item.state,{text:'regeln är stoppad av säkerhetsbromsen',ok:false}];
+  /* blocked räknas om sist, när alla lägesvillkor är på plats – annars kan en regel
+     se fri ut trots att den stoppas av läget (oläst, visad, bromsad). */
+  item.blocked=!!(item.reason||item.state.some(x=>!x.ok));
+  return item;
+ });
+ /* Den regel som ligger först och inte är stoppad av något annat än läget. */
+ const winner=all.find(r=>r.matches&&!r.reason)||null;
+ return {folderId:message.folder?.id||'',folderSourceOk:sourceOk!==false,
+  matches:all.filter(r=>r.matches).map(r=>r.id),
+  winner:winner?winner.id:'',winnerTarget:winner?winner.target:'',
+  alreadyThere:!!(winner&&winner.target&&winner.target===here)||!!(here&&all.some(r=>r.arrived&&r.matches)),
+  rules:all};
+}
 function fingerprint(m){return typeof m.headerMessageId==='string'&&m.headerMessageId.length<=4096&&m.headerMessageId?JSON.stringify([m.headerMessageId,+new Date(m.date),m.size]):'';}
 const EVENTS=new Set(['start','settings_saved','rules_saved','restored','queued','simulated','moved','skipped','error','queue_full','backup_restored','catchup','debug','brake']);
 function event(name,count=0,now=Date.now(),detail=''){
@@ -418,6 +515,7 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide};
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

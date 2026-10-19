@@ -1162,3 +1162,135 @@ test('bromsen räknar bara mejl som faktiskt skulle flyttas',async()=>{
  assert.equal(r.held,true,'fyra riktiga flyttar utlöser en gräns på 3');
  assert.equal(r.wouldQueue,4);
 });
+
+/* ── "Varför ligger det här mejlet här?" ──────────────────────────────── */
+
+const whyMsg=(over={})=>({id:1,read:true,folder:{id:'inbox',accountId:'a'},author:'Anna <anna@example.se>',
+ subject:'Faktura 1042',date:new Date('2026-10-01T08:00:00Z'),size:2000,headerMessageId:'w1@example.se',...over});
+
+test('whyHere: pekar ut regeln som gäller och vart mejlet skulle flyttas',()=>{
+ const rule=mkRule('fakturor',{target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([rule],whyMsg());
+ assert.equal(out.winner,'fakturor','rätt regel vinner');
+ assert.equal(out.winnerTarget,'fin','och målmappen anges');
+ assert.equal(out.alreadyThere,false);
+ assert.equal(out.rules.length,1);
+});
+
+test('whyHere: en regel som läser en annan mapp kan inte gälla – och säger det',()=>{
+ const rule=mkRule('annanstans',{source:'arkiv',target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([rule],whyMsg());
+ assert.equal(out.winner,'','ingen regel gäller');
+ const info=out.rules[0];
+ assert.equal(info.matches,true,'villkoren stämmer visst');
+ assert.match(info.reason,/annan mapp/,'men regeln läser fel mapp');
+ assert.equal(info.blocked,true);
+});
+
+test('whyHere: avstängd regel rapporteras som avstängd, inte som omatch',()=>{
+ const rule=mkRule('av',{enabled:false,target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([rule],whyMsg());
+ assert.equal(out.winner,'');
+ assert.match(out.rules[0].reason,/avstängd/);
+});
+
+test('whyHere: kontoregel gäller bara sitt eget konto',()=>{
+ const rule=mkRule('konto',{scope:'account',source:'',sourceAccount:'b',target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([rule],whyMsg());
+ assert.match(out.rules[0].reason,/annat konto/);
+});
+
+test('whyHere: oläst mejl med regel som bara flyttar lästa – förklaringen säger varför',()=>{
+ const rule={...mkRule('lasta',{target:'fin',conditions:[cmp('domain','equals','example.se')]}),readFilter:'read'};
+ const out=C.whyHere([rule],whyMsg({read:false}),{moveMode:'read'});
+ assert.equal(out.winner,'lasta','regeln matchar');
+ assert.equal(out.rules[0].blocked,true,'men flytten stoppas');
+ assert.ok(out.rules[0].state.some(s=>/oläst/.test(s.text)),'och texten säger att mejlet är oläst');
+});
+
+test('whyHere: mejlet som visas just nu får egen förklaring',()=>{
+ const rule={...mkRule('fakturor',{target:'fin',conditions:[cmp('domain','equals','example.se')]}),readFilter:'default'};
+ const out=C.whyHere([rule],whyMsg(),{moveMode:'read',displayed:true});
+ assert.ok(out.rules[0].state.some(s=>/visas just nu/.test(s.text)));
+});
+
+test('whyHere: redan hanterade och köade mejl känns igen',()=>{
+ const rule=mkRule('fakturor',{target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const queued=C.whyHere([rule],whyMsg(),{queueContains:true});
+ assert.ok(queued.rules[0].state.some(s=>/ligger redan i kön/.test(s.text)&&s.ok),'köat är ett besked, inte ett fel');
+ const done=C.whyHere([rule],whyMsg(),{recordsContains:true});
+ assert.ok(done.rules[0].state.some(s=>/redan hanterat/.test(s.text)&&!s.ok));
+});
+
+test('whyHere: ett mejl som redan ligger i målmappen får sin förklaring',()=>{
+ const rule=mkRule('fakturor',{target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([rule],whyMsg({folder:{id:'fin',accountId:'a'}}));
+ assert.equal(out.alreadyThere,true,'det ligger redan rätt');
+ assert.equal(out.winner,'fakturor','och vi vet vilken regel som skickade det dit');
+ assert.ok(out.rules[0].state.some(s=>/ligger i regelns målmapp/.test(s.text)),'förklaringen säger varför');
+ assert.equal(out.rules[0].blocked,false,'det är inget fel – det är meningen');
+});
+
+test('whyHere: en förgrening kan också förklara var mejlet ligger',()=>{
+ const rule={...mkRule('gren',{target:'fin',conditions:[cmp('domain','equals','example.se')]}),
+  branches:[{condition:{field:'subject',op:'contains',value:'faktura'},target:'fakturor-gren'}]};
+ const out=C.whyHere([rule],whyMsg({folder:{id:'fakturor-gren',accountId:'a'}}));
+ assert.equal(out.alreadyThere,true,'grenens mål räknas som regelns mål');
+ assert.ok(out.rules[0].arrived);
+});
+
+test('whyHere: en stoppad regel sägs vara stoppad',()=>{
+ const rule=mkRule('stoppad',{target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([rule],whyMsg(),{heldIds:['stoppad']});
+ assert.ok(out.rules[0].state.some(s=>/säkerhetsbromsen/.test(s.text)),'bromsen nämns');
+ assert.equal(out.rules[0].blocked,true);
+});
+
+test('whyHere: visar vilka villkor som stämde, villkor för villkor',()=>{
+ const rule=mkRule('blandad',{target:'fin',conditions:[cmp('domain','equals','example.se'),cmp('subject','contains','faktura'),cmp('size','larger','5000')]});
+ const out=C.whyHere([rule],whyMsg());
+ const info=out.rules[0];
+ assert.equal(info.conditions.length,3);
+ assert.equal(JSON.stringify(info.conditions.map(c=>c.ok)),JSON.stringify([true,true,false]),'storleken stämmer inte');
+ assert.equal(info.matches,false,'match=all kräver alla tre');
+ assert.ok(info.state.some(s=>/större än 5000 kB/.test(s.text)&&/stämmer inte/.test(s.text)),'och det sägs i klartext: '+JSON.stringify(info.state));
+});
+
+test('whyHere: ELLER-regel matchar på ett enda villkor',()=>{
+ const rule=mkRule('eller',{match:'any',target:'fin',conditions:[cmp('domain','equals','annan.se'),cmp('subject','contains','faktura')]});
+ const out=C.whyHere([rule],whyMsg());
+ assert.equal(out.rules[0].matches,true,'ämnet räckte');
+ assert.equal(out.winner,'eller');
+});
+
+test('whyHere: flera regler listas i ordning och den första vinner',()=>{
+ const first=mkRule('forst',{target:'a',conditions:[cmp('domain','equals','example.se')]});
+ const second=mkRule('andra',{target:'b',conditions:[cmp('domain','equals','example.se')]});
+ const out=C.whyHere([first,second],whyMsg());
+ assert.equal(out.winner,'forst','ordningen avgör');
+ assert.equal(JSON.stringify(out.matches),JSON.stringify(['forst','andra']),'båda matchar');
+ assert.equal(out.winnerTarget,'a');
+});
+
+test('whyHere: förgreningens mål används när den gäller',()=>{
+ const rule={...mkRule('gren',{target:'fin',conditions:[cmp('domain','equals','example.se')]}),
+  branches:[{condition:{field:'subject',op:'contains',value:'faktura'},target:'fakturor-gren'}]};
+ const out=C.whyHere([rule],whyMsg());
+ assert.equal(out.winnerTarget,'fakturor-gren','grenen skickar mejlet till sitt eget mål');
+});
+
+
+test('villkorstexterna är läsbar svenska',()=>{
+ assert.equal(C.conditionText({field:'subject',op:'contains',value:'faktura'}),'Ämne innehåller faktura');
+ assert.equal(C.conditionText({field:'size',op:'larger',value:'100'}),'större än 100 kB');
+ assert.equal(C.conditionText({field:'date',op:'older',value:'90'}),'äldre än 90 dagar');
+ assert.equal(C.conditionText(C.pseudoCondition('regeln är avstängd')),'regeln är avstängd');
+});
+
+test('whyHere rör aldrig mejlet – bara läser',()=>{
+ const rule=mkRule('fakturor',{target:'fin',conditions:[cmp('domain','equals','example.se')]});
+ const before=JSON.stringify(whyMsg());
+ const out=C.whyHere([rule],whyMsg());
+ assert.equal(JSON.stringify(whyMsg()),before,'inget i mejlet ändras');
+ assert.equal(typeof out.winner,'string');
+});

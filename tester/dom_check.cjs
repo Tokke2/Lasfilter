@@ -62,6 +62,20 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>rows()>0,'gränssnittet laddas med demon');
  check(true,'gränssnittet laddas utan skriptfel');
 
+ /* --- 🔍 Varför ligger det här mejlet här? --- */
+ check(el('whyBtn')!==null,'det finns en knapp för uppslaget');
+ check(el('whyPanel')!==null&&el('whyPanel').hidden===true,'panelen är tyst innan man frågar');
+ el('whyBtn').click();
+ await until(()=>el('whyPanel').hidden===false&&/Varför ligger mejlet här/.test(el('whyPanel').textContent),'uppslaget svarar',false,6000);
+ const whyText=()=>el('whyPanel').textContent;
+ check(/Varför ligger mejlet här\?/.test(whyText()),'panelen har en rubrik');
+ check(/faktura@fortnox\.se|fiktivt testmeddelande/.test(whyText()),'den visar vilket mejl det gäller: "'+whyText().slice(0,110)+'…"');
+ check(/Fortnox fakturor/.test(whyText()),'den namnger regeln som gäller');
+ check(/skulle flytta mejlet till|ligger i målmappen|ligger redan/.test(whyText()),'och säger vad som händer med mejlet');
+ check(!/undefined|\{name\}|\{subject\}/.test(whyText()),'inga ofyllda platshållare');
+ check(doc.querySelector('.why-all')!==null,'alla prövade regler går att fälla ut');
+ check(/Uppslaget läser bara mejlets huvuden/.test(whyText()),'och panelen lovar att ingenting ändras');
+
  /* --- ⚠ Konfliktvarning: två regler som kan matcha samma mejl --- */
  /* Spara demots egna regler före bytet – setState returnerar samma objekt, så en
     kopia måste tas först. */

@@ -1377,6 +1377,91 @@ body.dark .rule-conflict {
   color: #f0d79a;
 }
 
+/* "Varför ligger det här mejlet här?" – panelen under regellistan. */
+.why-panel {
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent, #4a7c59);
+  border-radius: 6px;
+  background: var(--panel, rgba(0, 0, 0, 0.02));
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.why-panel strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.why-panel p {
+  margin: 3px 0;
+}
+
+.why-subject {
+  font-weight: 600;
+}
+
+.why-ok {
+  color: #2f6b46;
+}
+
+.why-wait {
+  color: #8a5b00;
+}
+
+.why-block {
+  margin-top: 10px;
+}
+
+.why-block > strong {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.why-list {
+  margin: 4px 0 0;
+  padding-left: 1.2em;
+}
+
+.why-list li {
+  margin: 2px 0;
+}
+
+.why-cond {
+  opacity: 0.8;
+  font-size: 0.8rem;
+}
+
+.why-all {
+  margin-top: 10px;
+}
+
+.why-all summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.why-footer {
+  margin-top: 10px;
+  font-size: 0.75rem;
+}
+
+body.dark .why-panel {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.dark .why-ok {
+  color: #8fd4a8;
+}
+
+body.dark .why-wait {
+  color: #e8c07a;
+}
+
 .storage-note {
   border-left: 3px solid var(--line);
   padding: 6px 0 6px 10px;

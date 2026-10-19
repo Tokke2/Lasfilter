@@ -167,6 +167,22 @@ Ett enda stavfel i en regel kan flytta tusentals mejl. Säkerhetsbromsen finns f
 - Bromsen stängs av under **Inställningar → Avancerat**. Stängs den av släpps också alla stoppade regler direkt. Kvittot säger rakt ut vad som då kan hända: *"En felaktig regel kan då flytta hela inkorgen utan att fråga."*
 - Stoppet skrivs i loggen som händelsen **Säkerhetsbromsen stoppade en regel**, med regelns namn, antalet, gränsen och hur många väntande jobb som släpptes.
 
+## "Varför ligger det här mejlet här?"
+
+Knappen **🔍 Varför ligger mejlet här?** i regellistan svarar på den fråga man ställer sig mest när man börjar lita på automatiken. Markera ett mejl i Thunderbird – i vilken mapp som helst – och tryck på knappen.
+
+Panelen svarar på tre saker:
+
+1. **Vilken regel som gäller** och vart mejlet skulle flyttas: *"Regeln 'Fakturor' gäller och skulle flytta mejlet till Jobb · Fakturor."*
+2. **Vad som stoppar flytten**, om något gör det: mejlet är oläst men regeln flyttar bara lästa, mejlet visas just nu, det ligger redan i kön, det är redan hanterat, regeln är stoppad av säkerhetsbromsen, eller målmappen hittades inte.
+3. **Varför ingen regel matchar**, när ingen gör det – med de tre närmaste reglerna och de villkor som fällde avgörandet: *"'Nyhetsbrev' – 1 av 3 villkor stämmer · Ämne innehåller nyhetsbrev – matchar inte."*
+
+Under **Alla regler som prövas** listas varje regel med en rad: *matchar*, *matchar inte*, *annan mapp*, *avstängd* eller *stoppad*. Där ser man direkt om en annan regel tog mejlet före.
+
+**Ett mejl som redan ligger i sin målmapp får också ett svar.** Då är det ingen konflikt att regelns källmapp är en annan – tvärtom är det förklaringen: *"Mejlet ligger i målmappen Jobb · Fakturor – det är hit regeln 'Fakturor' skickar det."* Förgreningar räknas: ligger mejlet i grenens mål, är det grenen som förklarar det.
+
+Uppslaget **läser bara mejlets huvuden** (avsändare, ämne, datum, storlek, mapp och lässtatus). Det ändrar ingenting, flyttar ingenting och sparar ingenting. Det kräver ingen ny behörighet – `messagesRead` räcker, och det är samma behörighet som svepet redan använder.
+
 ## Konfliktvarning – två regler, samma mejl
 
 Två aktiva regler kan matcha samma mejl och vilja skicka det till olika mappar. Då är det **ordningen** som avgör: svepet kör reglerna uppifrån och ned, och den första som matchar får mejlet. Det syns nu direkt i regellistan:
@@ -292,6 +308,7 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Automatiskt varje timme:** standardintervallet är 60 minuter och körs vid sidan av den händelsestyrda bevakningen av inkommande mejl. Statusraden visar nästa automatiska körning.
 - **Säkerhetsbromsen:** en regel som plötsligt vill flytta tio gånger fler mejl än vanligt – och minst 50 – stoppas innan något flyttas. Raden högst upp erbjuder *Flytta ändå* eller *Stäng av regeln*, och ingenting rör sig förrän du har svarat.
 - **Konfliktvarning:** två aktiva regler som kan träffa samma mejl och skicka det till olika mappar får en varning i regellistan, med förklaring om vilken som ligger först och vinner. Analysen är försiktig och varnar bara när den kan visa att båda verkligen kan matcha.
+- **"Varför ligger det här mejlet här?":** markera ett mejl och få veta vilken regel som gäller, vart det skulle flyttas och vad som i så fall stoppar – villkor för villkor, med de närmaste reglerna när ingen matchar.
 - **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.
 
 ## Nyheter i 1.3

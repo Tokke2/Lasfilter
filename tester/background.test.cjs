@@ -984,3 +984,44 @@ test('veckokopior behålls i tolv veckor',async()=>{
  const {app}=await loadBackground();
  assert.equal(app.backupKeepWeeks,12,'tolv veckor sparas');
 });
+
+/* ── "Varför ligger det här mejlet här?" ──────────────────────────────── */
+
+test('uppslaget svarar med mappnamn i klartext, inte bara id',async()=>{
+ const {app}=await loadBackground();
+ const engine=fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,
+  rules:[{id:'r1',name:'Fakturor',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'fin',match:'all',readFilter:'read',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'x.se'}]}]},
+  displayed:async()=>new Set()});
+ app.folderList=async()=>[{id:'inbox',accountId:'a',accountName:'Jobb',name:'Inkorg',label:'Jobb · Inkorg'},
+  {id:'fin',accountId:'a',accountName:'Jobb',name:'Fakturor',label:'Jobb · Fakturor'}];
+ const out=await app.handle({type:'whyHere',message:{id:1,read:true,folder:{id:'inbox',accountId:'a'},author:'Anna <anna@x.se>',subject:'Faktura 1',date:new Date(),size:900,headerMessageId:'h@x'}});
+ assert.equal(out.winner,'r1','regeln hittas');
+ assert.equal(out.winnerTarget,'fin');
+ assert.equal(out.winnerName,'Jobb · Fakturor','målmappen skrivs i klartext');
+ assert.equal(out.message.folderName,'Jobb · Inkorg','och källmappen likaså');
+ assert.equal(out.message.subject,'Faktura 1','ämnet följer med');
+ assert.equal(engine.config.rules.length,1);
+});
+
+test('uppslaget använder markerat mejl när inget skickas in',async()=>{
+ const {app,api}=await loadBackground();
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,rules:[]},displayed:async()=>new Set()});
+ const picked={id:7,read:true,folder:{id:'inbox',accountId:'a'},author:'Bo <bo@x.se>',subject:'Hej',date:new Date(),size:10,headerMessageId:'p@x'};
+ api.tabs.query=async()=>[{id:1,type:'mail',active:true}];
+ api.tabs.get=async()=>({id:1,type:'mail'});
+ api.mailTabs.getSelectedMessages=async()=>({messages:[{id:7}]});
+ api.messages.get=async()=>picked;
+ const out=await app.handle({type:'whyHere'});
+ assert.equal(out.message.subject,'Hej','det markerade mejlet läses');
+ assert.equal(out.winner,'','inga regler – ingen vinnare');
+ assert.equal(out.rules.length,0);
+});
+
+test('uppslaget avvisar när inget mejl är markerat',async()=>{
+ const {app,api}=await loadBackground();
+ fakeEngineWithRules(app,{displayed:async()=>new Set()});
+ api.tabs.query=async()=>[];
+ await assert.rejects(()=>app.handle({type:'whyHere'}),'inget markerat mejl');
+});

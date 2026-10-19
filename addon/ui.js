@@ -277,6 +277,29 @@ const I18N={
   conflictTitle:'Kan krocka med "{name}" – båda kan matcha samma mejl ({fields}).',
   conflictWinner:'Den här regeln ligger först och vinner.',
   conflictLoser:'Den regeln ligger först och vinner. Flytta upp den här om den ska gälla i stället.',
+  whyBtn:'🔍 Varför ligger mejlet här?',
+  whyRunning:'Läser det markerade mejlet…',
+  whyTitle:'Varför ligger mejlet här?',
+  whySubject:'"{subject}" från {author}',
+  whyNoRule:'Ingen aktiv regel matchar det här mejlet. Det ligger där det ligger.',
+  whyWinner:'Regeln "{name}" gäller och skulle flytta mejlet till {target}.',
+  whyWinnerHeld:'Regeln "{name}" gäller men är stoppad av säkerhetsbromsen – inget flyttas förrän du svarar.',
+  whyAlready:'Mejlet ligger i målmappen {target} – det är hit regeln "{name}" skickar det.',
+  whyArrived:'Mejlet ligger redan på plats.',
+  whyNoTarget:'Regeln "{name}" gäller men målmappen hittades inte.',
+  whyBlockedBy:'Det som stoppar flytten:',
+  whyNoMatch:'Ingen regel matchar. Så här nära var de:',
+  whyClosest:'{name} – {hit} av {total} villkor stämmer',
+  whyAllRules:'Alla regler som prövas',
+  whyRuleOk:'matchar',
+  whyRuleNo:'matchar inte',
+  whyRuleOff:'avstängd',
+  whyRuleOtherFolder:'annan mapp',
+  whyRuleHeld:'stoppad',
+  whyNoSelection:'Markera ett mejl i Thunderbird först – ett enda mejl.',
+  whyFooter:'Uppslaget läser bara mejlets huvuden och ändrar ingenting.',
+  conflictWinner:'Den här regeln ligger först och vinner.',
+  conflictLoser:'Den regeln ligger först och vinner. Flytta upp den här om den ska gälla i stället.',
   autoBackupNote:'Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad veckokopia sparas automatiskt en gång i veckan – de senaste 12 veckorna behålls. Knappen nedan skriver båda direkt, när du vill. Under Regler importerar du filen och får tillbaka reglerna.',
   backupLastWeek:'Senaste veckokopian skrevs: {week}',
   backupNoWeek:'Ingen veckokopia skriven än – den skrivs automatiskt vid första starten i en ny vecka, eller direkt med knappen nedan.',
@@ -879,6 +902,29 @@ const I18N={
   brakeReleased:'The rule "{name}" was released and now moves {n} emails.',
   brakeStopped:'The rule "{name}" was switched off. Nothing was moved.',
   conflictTitle:'May collide with "{name}" – both can match the same email ({fields}).',
+  conflictWinner:'This rule comes first and wins.',
+  conflictLoser:'That rule comes first and wins. Move this one up to let it apply instead.',
+  whyBtn:'🔍 Why is this email here?',
+  whyRunning:'Reading the selected email…',
+  whyTitle:'Why is this email here?',
+  whySubject:'"{subject}" from {author}',
+  whyNoRule:'No active rule matches this email. It is where it is.',
+  whyWinner:'The rule "{name}" applies and would move the email to {target}.',
+  whyWinnerHeld:'The rule "{name}" applies but is stopped by the safety brake – nothing moves until you answer.',
+  whyAlready:'The email is in the target folder {target} – that is where the rule "{name}" sends it.',
+  whyArrived:'The email is already in place.',
+  whyNoTarget:'The rule "{name}" applies but the target folder was not found.',
+  whyBlockedBy:'What stops the move:',
+  whyNoMatch:'No rule matches. This is how close they were:',
+  whyClosest:'{name} – {hit} of {total} conditions match',
+  whyAllRules:'Every rule that was tested',
+  whyRuleOk:'matches',
+  whyRuleNo:'no match',
+  whyRuleOff:'disabled',
+  whyRuleOtherFolder:'other folder',
+  whyRuleHeld:'stopped',
+  whyNoSelection:'Select an email in Thunderbird first – a single email.',
+  whyFooter:'The lookup reads only the email headers and changes nothing.',
   conflictWinner:'This rule comes first and wins.',
   conflictLoser:'That rule comes first and wins. Move this one up to let it apply instead.',
   autoBackupNote:'The copy lives outside the Thunderbird profile, so it survives the add-on being removed or switched off. sortbro-regler-backup.json is always the latest, and a dated weekly copy is written automatically once a week – the last 12 weeks are kept. The button below writes both right away, whenever you want. Import the file under Rules to get the rules back.',
@@ -2471,6 +2517,77 @@ async function runAllRules(){
  }
 }
 
+/* 🔍 Varför ligger det här mejlet här? Ett omvänt uppslag för det mejl du markerat:
+   vilken regel som gäller, vart mejlet skulle ta vägen, och vad som i så fall stoppar. */
+async function whyIsHere(){
+ const panel=$('whyPanel');if(!panel)return;
+ panel.hidden=false;panel.className='why-panel';
+ panel.replaceChildren(el('p','muted',T('whyRunning')));
+ let r;
+ try{r=await rpc('whyHere');}
+ catch(err){
+  panel.className='why-panel error';
+  panel.textContent=err?.code==='one_message'||err?.code==='no_selection'?T('whyNoSelection'):Terr(err.code||err.message);
+  return;
+ }
+ const lines=[];
+ const ruleById=id=>(r.rules||[]).find(x=>x.id===id)||null;
+ panel.replaceChildren();
+ panel.append(el('strong','',T('whyTitle')));
+ panel.append(el('p','why-subject',T('whySubject').replace('{subject}',r.message.subject||'(inget ämne)').replace('{author}',r.message.author||'(okänd avsändare)')));
+ if(r.message.folderName)panel.append(el('p','muted',r.message.folderName));
+ /* 1. Den regel som gäller – eller beskedet att ingen gör det. */
+ const winner=ruleById(r.winner);
+ if(winner){
+  const held=(winner.state||[]).some(x=>/bromsen/.test(x.text));
+  if(held)lines.push([T('whyWinnerHeld').replace('{name}',winner.name),'wait']);
+  else if(winner.arrived)lines.push([T('whyAlready').replace('{name}',winner.name).replace('{target}',r.winnerName||winner.target||'?'),'ok']);
+  else if(winner.target)lines.push([T('whyWinner').replace('{name}',winner.name).replace('{target}',r.winnerName||winner.target),'ok']);
+  else lines.push([T('whyNoTarget').replace('{name}',winner.name),'wait']);
+ }else{
+  lines.push([T('whyNoRule'),'wait']);
+ }
+ /* 2. Vad som stoppar regeln som gäller. */
+ if(winner&&winner.blocked&&winner.state?.length){
+  const box=el('div','why-block');
+  box.append(el('strong','',T('whyBlockedBy')));
+  const ul=el('ul','why-list');
+  for(const st of winner.state)ul.append(el('li','why-'+st.ok?'ok':'wait',st.text));
+  box.append(ul);panel.append(...lines.map(([text,kind])=>el('p','why-'+kind,text)),box);
+ }else{
+  panel.append(...lines.map(([text,kind])=>el('p','why-'+kind,text)));
+ }
+ /* 3. Närmast, när ingen regel matchar: hur många villkor som stämde. */
+ if(!r.winner){
+  const near=(r.rules||[]).filter(x=>x.enabled&&!x.reason&&x.matches===false)
+   .map(x=>({x,hit:x.conditions.filter(c=>c.ok).length,total:x.conditions.length}))
+   .filter(e=>e.hit>0).sort((a,b)=>b.hit-a.hit||b.total-a.total).slice(0,3);
+  if(near.length){
+   const box=el('div','why-block');
+   box.append(el('strong','',T('whyNoMatch')));
+   const ul=el('ul','why-list');
+   for(const e of near){
+    ul.append(el('li','why-wait',T('whyClosest').replace('{name}',e.x.name).replace('{hit}',e.hit).replace('{total}',e.total)));
+    /* Vilket villkor som fällde avgörandet – det är själva svaret. */
+    for(const c of e.x.conditions.filter(c=>!c.ok).slice(0,3))ul.append(el('li','why-cond','· '+c.text+' – '+T('whyRuleNo')));
+   }
+   box.append(ul);panel.append(box);
+  }
+ }
+ /* 4. Alla regler som prövades, med en rad var. */
+ if(r.rules?.length){
+  const box=el('details','why-all');
+  box.append(el('summary','',T('whyAllRules')+' ('+r.rules.length+')'));
+  const ul=el('ul','why-list');
+  for(const x of r.rules){
+   const label=x.enabled===false?T('whyRuleOff'):x.reason&&/mapp/.test(x.reason)?T('whyRuleOtherFolder'):x.matches?T('whyRuleOk'):T('whyRuleNo');
+   ul.append(el('li',x.matches?'why-ok':'why-no',x.name+' – '+label));
+  }
+  box.append(ul);panel.append(box);
+ }
+ panel.append(el('p','muted why-footer',T('whyFooter')));
+}
+
 /* 🔎 Varför flyttas inte mejlen? Read-only diagnos av den regel du redigerar. */
 async function diagnoseCurrentRule(){
  const panel=$('diagnosePanel');if(!panel)return;
@@ -2578,6 +2695,7 @@ async function diagnoseCurrentRule(){
  panel.append(cta);
 }
 if($('diagnoseBtn'))handle('diagnoseBtn','click',diagnoseCurrentRule);
+if($('whyBtn'))handle('whyBtn','click',whyIsHere);
 handle('catchUp','click',async()=>{
  if(dirty){toast(T('saveFirst'));return;}
  if(!selectedId){toast(T('openRuleFirst'));return;}

@@ -205,19 +205,6 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 
 Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen ovan och kvittot visar hela sökvägen. Vill du i stället välja plats själv vid export, säg till – då blir det en kryssruta för det.
 
-## Verktygsmappen: `verktyg/`
-
-I repot ligger `verktyg/` – en liten samling filer för Python-appar (till exempel ArkivPiloten) som **följer med sin mapp om den flyttas**:
-
-- `pythonstart.py` hittar en Python som är ny nog, skapar miljön `.venv` i appmappen, installerar `requirements.txt` bara när filen ändrats och startar appens huvudfil.
-- `start_windows.cmd`, `start_macos_linux.sh` och `start_macos.command` är dubbelklickbara startfiler för respektive system. De räknar alltid ut sökvägen från sin egen placering, så en flyttad mapp fungerar direkt.
-- Ingenting skrivs utanför appmappen: inget i registret, inget i `%APPDATA%`, inget i `~/.local`, ingen `PATH`-ändring.
-- En Python-miljö sparar absoluta sökvägar. Därför kontrollerar skriptet varje start om miljön pekar rätt och bygger om den automatiskt när mappen flyttats eller bas-Python försvunnit.
-- `--install-python` läser python.orgs fillista och hämtar den **senaste** versionen till `.setup/` i appmappen (med en känd reservversion om nätet inte svarar).
-- `python3 -m unittest -v verktyg/test_pythonstart.py` kör 17 tester, bland annat ett som flyttar hela appmappen och startar appen från den nya platsen.
-
-Detaljer och kommandon finns i `verktyg/README.md`.
-
 ## Om tillägget försvinner ur Thunderbird
 
 **SortBro avinstallerar aldrig sig självt.** Tillägget innehåller inga anrop som kan ta bort eller stänga av ett tillägg (`uninstallSelf`, `management.uninstall`, `management.setEnabled`) och saknar medvetet behörigheten `management` – utan den är en avinstallation tekniskt omöjlig inifrån. Det kontrolleras av ett eget test vid varje bygge (`tester/safety.test.cjs`).

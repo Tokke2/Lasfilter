@@ -1,8 +1,2 @@
 # Utvecklingsberoenden för testkörning – hör inte till tillägget
 tester/node_modules/
-
-# Python-startens egna filer (skapas per dator)
-verktyg/.venv/
-verktyg/.setup/
-verktyg/.python/
-__pycache__/

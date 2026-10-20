@@ -61,7 +61,7 @@ const I18N={
   supFaq3A:'Nej – alla funktioner i SortBro är 100 % gratis för alla, alltid. En gåva är helt frivillig och ett varmt tack som gör det möjligt att fortsätta utveckla och underhålla tillägget.',
   sidebarNoteTitle:'Du läser i lugn och ro.',
   sidebarNoteBody:'Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.',
-  versionText:'Lokal behandling · v1.1.0 · Inga molntjänster',
+  versionText:'Lokal behandling · v1.0.0 · Inga molntjänster',
   topbarTitle:'THUNDERBIRD / SORTBRO',
   themeQuickTitle:'Växla ljust/mörkt tema',
   introEyebrow:'ENKEL AUTOMATISK SORTERING',

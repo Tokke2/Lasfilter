@@ -257,6 +257,38 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 
 Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen ovan och kvittot visar hela sökvägen. Vill du i stället välja plats själv vid export, säg till – då blir det en kryssruta för det.
 
+## Uppdatera tillägget på din dator
+
+Tillägget installeras manuellt och har ingen automatisk uppdatering. I repot ligger **`Uppdatera-SortBro.bat`** som hämtar den senaste XPI-filen från GitHub.
+
+Dubbelklicka på den. Den hämtar filen, kontrollerar att den är hel (SHA-256 mot en publicerad kontrollsumma), jämför med den du redan har och säger till om du redan har senaste versionen. Sedan installerar du den:
+
+1. Thunderbird → **Verktyg → Tillägg och teman** (Ctrl+Skift+A)
+2. **Kugghjulet** uppe till höger → **Installera tillägg från fil…**
+3. Välj filen och starta om Thunderbird.
+
+```
+Uppdatera-SortBro.bat                    hämtar till skrivbordet
+Uppdatera-SortBro.bat "D:\Mina filer"    hämtar till den mappen
+Uppdatera-SortBro.bat "" /force           skriver om även om filen är samma
+```
+
+Reglerna rörs aldrig av en ominstallation – de ligger i `Hämtade filer/Lasfilter/Regelbackuper/`.
+
+### Varför filen inte uppdaterar tillägget av sig själv
+
+Att byta ut en fil på disken ändrar ingenting i Thunderbird. Tillägget är installerat i Thunderbirds **profil**, inte i den mapp du laddar ner till, och Thunderbird läser inte av någon XPI-fil på skrivbordet.
+
+Att i stället lägga in filen i profilens `extensions`-mapp är **precis den sidoladdning** som gör att Thunderbird stänger av osignerade tillägg vid omstart – samma sak som varningsraden i SortBro varnar för. Det är därför filen hämtas separat och installeras genom tilläggshanteraren.
+
+**Riktig automatisk uppdatering** kräver tre saker som inte finns i dag:
+
+1. `browser_specific_settings.gecko.update_url` i `manifest.json` som pekar på en `updates.json` med nya versioner,
+2. att **versionsnumret höjs** för varje släpp (Thunderbird jämför versionsnummer, inte filinnehåll),
+3. att XPI:n är **signerad** (AMO som "unlisted", eller via `web-ext sign`).
+
+Först då kontrollerar Thunderbird själv med jämna mellanrum och uppdaterar tyst. Säger du till bygger jag den vägen – men den kräver att versionen slutar stå still på 1.0.0.
+
 ## Om tillägget försvinner ur Thunderbird
 
 **SortBro avinstallerar aldrig sig självt.** Tillägget innehåller inga anrop som kan ta bort eller stänga av ett tillägg (`uninstallSelf`, `management.uninstall`, `management.setEnabled`) och saknar medvetet behörigheten `management` – utan den är en avinstallation tekniskt omöjlig inifrån. Det kontrolleras av ett eget test vid varje bygge (`tester/safety.test.cjs`).

@@ -259,21 +259,19 @@ Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen o
 
 ## Uppdatera tillägget på din dator
 
-Tillägget installeras manuellt och har ingen automatisk uppdatering. I repot ligger **`Uppdatera-SortBro.bat`** som hämtar den senaste XPI-filen från GitHub.
+Tillägget installeras manuellt och har ingen automatisk uppdatering. Hämta den senaste filen här:
 
-Dubbelklicka på den. Den hämtar filen, kontrollerar att den är hel (SHA-256 mot en publicerad kontrollsumma), jämför med den du redan har och säger till om du redan har senaste versionen. Sedan installerar du den:
+`https://github.com/Tokke2/Lasfilter/blob/v1.0.0/SortBro-Thunderbird.xpi`
+
+Sedan:
 
 1. Thunderbird → **Verktyg → Tillägg och teman** (Ctrl+Skift+A)
 2. **Kugghjulet** uppe till höger → **Installera tillägg från fil…**
 3. Välj filen och starta om Thunderbird.
 
-```
-Uppdatera-SortBro.bat                    hämtar till skrivbordet
-Uppdatera-SortBro.bat "D:\Mina filer"    hämtar till den mappen
-Uppdatera-SortBro.bat "" /force           skriver om även om filen är samma
-```
+**Avinstallera inte först.** Regler, inställningar, logg och kö ligger i tilläggets eget lager inuti Thunderbird, och det lagret töms vid en avinstallation. Filen har samma id som den installerade versionen, så Thunderbird byter ut den gamla rakt över – det är allt som behövs. Tryck gärna *⇩ Backa upp reglerna nu* före uppdateringen; det kostar tre sekunder och ger en fil i `Hämtade filer/Lasfilter/Regelbackuper/` om något skulle gå snett.
 
-Reglerna rörs aldrig av en ominstallation – de ligger i `Hämtade filer/Lasfilter/Regelbackuper/`.
+Kontrollsumman för filen ligger i `SortBro-Thunderbird.xpi.sha256` om du vill kontrollera den manuellt.
 
 ### Varför filen inte uppdaterar tillägget av sig själv
 

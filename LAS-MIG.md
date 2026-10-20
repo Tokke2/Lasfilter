@@ -259,33 +259,43 @@ Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen o
 
 ## Uppdatera tillägget på din dator
 
-Tillägget installeras manuellt och har ingen automatisk uppdatering. Hämta den senaste filen här:
+**Första gången måste du installera filen för hand.** Den version du har installerad nu vet inte var den ska leta efter nya versioner — den kunskapen kom först med den här byggden. Efter det sköter Thunderbird uppdateringarna själv.
+
+### En gång, för hand
+
+Hämta `SortBro-Thunderbird.xpi` här:
 
 `https://github.com/Tokke2/Lasfilter/blob/v1.0.0/SortBro-Thunderbird.xpi`
-
-Sedan:
 
 1. Thunderbird → **Verktyg → Tillägg och teman** (Ctrl+Skift+A)
 2. **Kugghjulet** uppe till höger → **Installera tillägg från fil…**
 3. Välj filen och starta om Thunderbird.
 
-**Avinstallera inte först.** Regler, inställningar, logg och kö ligger i tilläggets eget lager inuti Thunderbird, och det lagret töms vid en avinstallation. Filen har samma id som den installerade versionen, så Thunderbird byter ut den gamla rakt över – det är allt som behövs. Tryck gärna *⇩ Backa upp reglerna nu* före uppdateringen; det kostar tre sekunder och ger en fil i `Hämtade filer/Lasfilter/Regelbackuper/` om något skulle gå snett.
+**Avinstallera inte först.** Regler, inställningar, logg och kö ligger i tilläggets eget lager inuti Thunderbird, och det lagret töms vid en avinstallation. Filen har samma id som den installerade versionen, så Thunderbird byter ut den gamla rakt över. Tryck gärna *⇩ Backa upp reglerna nu* före uppdateringen; det kostar tre sekunder.
 
 Kontrollsumman för filen ligger i `SortBro-Thunderbird.xpi.sha256` om du vill kontrollera den manuellt.
 
-### Varför filen inte uppdaterar tillägget av sig själv
+### Sedan automatiskt
 
-Att byta ut en fil på disken ändrar ingenting i Thunderbird. Tillägget är installerat i Thunderbirds **profil**, inte i den mapp du laddar ner till, och Thunderbird läser inte av någon XPI-fil på skrivbordet.
+Manifestet innehåller en uppdateringsadress:
 
-Att i stället lägga in filen i profilens `extensions`-mapp är **precis den sidoladdning** som gör att Thunderbird stänger av osignerade tillägg vid omstart – samma sak som varningsraden i SortBro varnar för. Det är därför filen hämtas separat och installeras genom tilläggshanteraren.
+```
+https://raw.githubusercontent.com/Tokke2/Lasfilter/v1.0.0/updates.json
+```
 
-**Riktig automatisk uppdatering** kräver tre saker som inte finns i dag:
+Filen `updates.json` i repot talar om vilken version som är nyast, var XPI-filen ligger och vilken SHA-256 den har. Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart. Inget mer klickande.
 
-1. `browser_specific_settings.gecko.update_url` i `manifest.json` som pekar på en `updates.json` med nya versioner,
-2. att **versionsnumret höjs** för varje släpp (Thunderbird jämför versionsnummer, inte filinnehåll),
-3. att XPI:n är **signerad** (AMO som "unlisted", eller via `web-ext sign`).
+Tre saker måste stämma vid varje släpp, annars uteblir uppdateringen **tyst**:
 
-Först då kontrollerar Thunderbird själv med jämna mellanrum och uppdaterar tyst. Säger du till bygger jag den vägen – men den kräver att versionen slutar stå still på 1.0.0.
+1. **Versionen i `manifest.json` måste vara högre** än den installerade. Thunderbird jämför versionsnummer, inte filinnehåll — en ny fil med samma nummer räknas inte som en uppdatering.
+2. **`updates.json` måste ha samma version och samma SHA-256** som den XPI som `update_link` pekar på.
+3. **Id:t måste vara exakt** `lasfilter@lokala-verktyg.invalid` — det är nyckeln i `updates.json`.
+
+Alla tre kontrolleras av tester i `tester/safety.test.cjs` vid varje bygge, tillsammans med en kontroll att versionsnumret i gränssnittets sidfot är samma som i manifestet.
+
+**Varför adressen pekar på taggen `v1.0.0`:** varje släpp flyttar taggen till den nya commiten, så samma adress ger alltid senaste `updates.json` och senaste XPI. En gren hade också fungerat, men taggen är den stabila punkten i det här repot. GitHub kan cacha innehållet i några minuter, så en alldeles färsk uppdatering kan dröja en stund innan Thunderbird ser den.
+
+**Signering:** Thunderbird kräver i dag inte signerade tillägg (till skillnad från Firefox), så det här fungerar med vår osignerade fil — det är samma förutsättning som gjorde att du kunde installera den för hand. Skulle Mozilla börja kräva signatur måste XPI:n signeras hos AMO som *unlisted*, och då måste `update_url` samtidigt tas bort: AMO avvisar paket som pekar på en egen uppdateringsfil.
 
 ## Om tillägget försvinner ur Thunderbird
 

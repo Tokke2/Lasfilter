@@ -135,3 +135,56 @@ test('status till gränssnittet bär installationstypen',async()=>{
  fakeEngine(app);
  assert.equal(app.snapshot().installType,'sideload','gränssnittet får veta hur tillägget är installerat');
 });
+
+/* ---- Automatisk uppdatering -------------------------------------------------
+   Tre saker måste stämma samtidigt, annars uppdaterar Thunderbird aldrig:
+   manifestet måste peka på en HTTPS-adress, updates.json måste beskriva SAMMA
+   tillägg, och versionen där måste vara den som filen faktiskt innehåller.
+   Ett tyst fel här syns inte förrän en uppdatering uteblir – därför testas det. */
+const crypto=require('node:crypto');
+
+function gecko(){
+ return (manifest.browser_specific_settings||manifest.applications||{}).gecko;
+}
+
+test('manifestet pekar på en HTTPS-adress för uppdateringar',()=>{
+ const g=gecko();
+ assert.ok(g,'manifestet saknar gecko-inställningar');
+ assert.equal(g.id,'lasfilter@lokala-verktyg.invalid','id:t får aldrig byta – det är nyckeln i updates.json');
+ assert.match(g.update_url,/^https:\/\//,'Thunderbird kräver https');
+ assert.match(g.update_url,/\/updates\.json$/,'adressen ska peka på uppdateringsfilen');
+});
+
+test('updates.json beskriver samma tillägg som manifestet',()=>{
+ const g=gecko();
+ const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
+ const entry=(u.addons&&u.addons[g.id])||null;
+ assert.ok(entry,'updates.json saknar en post för '+g.id);
+ const list=Array.isArray(entry.updates)?entry.updates:[];
+ assert.ok(list.length>=1,'minst en version måste listas');
+ for(const item of list){
+  assert.match(item.version,/^\d+\.\d+\.\d+$/,'versionen ska vara ett riktigt versionsnummer');
+  assert.match(item.update_link,/^https:\/\//,'nedladdningslänken måste vara https');
+  assert.match(item.update_hash,/^sha256:[0-9a-f]{64}$/,'hashningen ska vara sha256 i hex');
+ }
+});
+
+test('updates.json är i takt med den XPI som ligger i repot',()=>{
+ const g=gecko();
+ const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
+ const item=u.addons[g.id].updates[0];
+ assert.equal(item.version,manifest.version,'updates.json och manifestet måste ha samma version');
+ const hash=crypto.createHash('sha256')
+  .update(fs.readFileSync(path.join(ROOT,'SortBro-Thunderbird.xpi')))
+  .digest('hex');
+ assert.equal(item.update_hash,'sha256:'+hash,'annars avvisar Thunderbird filen som uppdatering');
+ const sidecar=fs.readFileSync(path.join(ROOT,'SortBro-Thunderbird.xpi.sha256'),'utf8').trim();
+ assert.equal(sidecar.split(/\s+/)[0],hash,'kontrollsumman bredvid filen ska vara samma');
+});
+
+test('versionsnumret i gränssnittet är manifestets version',()=>{
+ const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
+ const found=[...ui.matchAll(/· v(\d+\.\d+\.\d+) ·/g)].map(m=>m[1]);
+ assert.ok(found.length>=2,'både svensk och engelsk text ska visa versionen');
+ assert.deepEqual([...new Set(found)],[manifest.version],'sidfoten får inte säga en annan version än manifestet');
+});

@@ -1,0 +1,14 @@
+{
+  "addons": {
+    "lasfilter@lokala-verktyg.invalid": {
+      "updates": [
+        {
+          "version": "1.0.0",
+          "update_link": "https://raw.githubusercontent.com/Tokke2/Lasfilter/v1.0.0/SortBro-Thunderbird.xpi",
+          "update_hash": "sha256:0cb8de24172be1c41de544cbd07e852af06390ec82b918e4909913ae923ba5b5",
+          "update_info_url": "https://github.com/Tokke2/Lasfilter/blob/v1.0.0/LAS-MIG.md"
+        }
+      ]
+    }
+  }
+}

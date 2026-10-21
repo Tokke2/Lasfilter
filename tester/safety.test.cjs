@@ -184,6 +184,18 @@ test('uppdateringsfilen är en tillgång i releasen, inte en fil på en gren',()
  assert.equal(u.addons[g.id].updates[0].version,manifest.version);
 });
 
+test('releasen får sina filer automatiskt när taggen flyttas',()=>{
+ const wf=path.join(ROOT,'.github','workflows','release-assets.yml');
+ assert.ok(fs.existsSync(wf),'arbetsflödet som lägger filerna på releasen saknas');
+ const text=fs.readFileSync(wf,'utf8');
+ for(const file of ['SortBro-Thunderbird.xpi','SortBro-Thunderbird.xpi.sha256','updates.json']){
+  assert.ok(text.includes(file),'arbetsflödet måste ladda upp '+file);
+ }
+ assert.match(text,/tags:/,'ska köras när en tagg flyttas');
+ assert.match(text,/contents:\s*write/,'behöver skrivrättighet till releasen');
+ assert.match(text,/sha256sum/,'ska kontrollera hashen före uppladdning');
+});
+
 test('updates.json beskriver samma tillägg som manifestet',()=>{
  const g=gecko();
  const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));

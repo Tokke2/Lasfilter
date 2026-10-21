@@ -329,6 +329,10 @@ Alla tre kontrolleras av tester i `tester/safety.test.cjs` vid varje bygge, till
 
 Ett test i `tester/safety.test.cjs` avvisar bygget om adressen skulle peka på `main`, på en rå fil (`raw.githubusercontent.com`) eller på olika taggar i manifestet och `updates.json`. GitHub kan cacha release-filer i några minuter, så en alldeles färsk uppdatering kan dröja en stund innan Thunderbird ser den.
 
+### Filerna läggs på releasen automatiskt
+
+Inget laddas upp för hand. När versionstaggen flyttas körs `.github/workflows/release-assets.yml`, som kontrollerar att `SortBro-Thunderbird.xpi.sha256` stämmer med filen och sedan lägger **XPI:n, kontrollsumman och `updates.json`** som bilagor på releasen (och skriver över förra omgångens filer). Skulle releasen saknas skapas den. Därför är `releases/download/v1.0.0/...` alltid samma tre filer som ligger i repot på taggen — och det är den adressen Thunderbird använder.
+
 **Signering:** Thunderbird kräver i dag inte signerade tillägg (till skillnad från Firefox), så det här fungerar med vår osignerade fil — det är samma förutsättning som gjorde att du kunde installera den för hand. Skulle Mozilla börja kräva signatur måste XPI:n signeras hos AMO som *unlisted*, och då måste `update_url` samtidigt tas bort: AMO avvisar paket som pekar på en egen uppdateringsfil.
 
 ## Om tillägget försvinner ur Thunderbird

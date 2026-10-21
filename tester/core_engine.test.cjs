@@ -1294,3 +1294,75 @@ test('whyHere rör aldrig mejlet – bara läser',()=>{
  assert.equal(JSON.stringify(whyMsg()),before,'inget i mejlet ändras');
  assert.equal(typeof out.winner,'string');
 });
+
+/* ── Provkörning per regel ────────────────────────────────────────────────
+   En regel kan gå i testläge en vecka: den räknar vad den skulle flytta men
+   rör ingenting och påverkar inte de andra reglerna. */
+test('trialUntil är 0 när fältet saknas och ett heltal annars',()=>{
+ assert.equal(C.validateRule(base()).trialUntil,0,'gamla regler får ingen provkörning');
+ const until=Date.UTC(2026,9,20);
+ assert.equal(C.validateRule({...base(),trialUntil:until}).trialUntil,until);
+ assert.throws(()=>C.validateRule({...base(),trialUntil:'snart'}),'text avvisas');
+ assert.throws(()=>C.validateRule({...base(),trialUntil:-5}),'negativ tid avvisas');
+});
+
+test('trialActive och trialDaysLeft räknar mot klockan',()=>{
+ const now=Date.UTC(2026,9,8,12);
+ const active={trialUntil:now+3*86400000};
+ assert.equal(C.trialActive(active,now),true);
+ assert.equal(C.trialDaysLeft(active,now),3);
+ assert.equal(C.trialActive({trialUntil:now-1},now),false,'utgången tid är ingen provkörning');
+ assert.equal(C.trialDaysLeft({trialUntil:now-1},now),0);
+ assert.equal(C.trialActive({},now),false);
+ assert.equal(C.trialDaysLeft({},now),0);
+});
+
+test('regel i provkörning räknar men flyttar ingenting',async()=>{
+ const f=fixture();
+ f.e.config.rules=[C.validateRule({...base(),trialUntil:Date.UTC(2026,9,20)})];
+ const r=await f.e.sweepRule(f.e.config.rules[0],{force:true});
+ assert.equal(r.trial,true);
+ assert.equal(r.trialNew,1,'mejlet räknas som nytt');
+ assert.equal(r.trialTotal,1);
+ assert.equal(f.api.calls.length,0,'ingen flytt begärdes');
+ assert.equal(f.e.pending.size,0,'inget köades');
+ assert.equal(f.e.stats.moved,0);
+});
+
+test('samma mejl räknas bara en gång under provkörningen',async()=>{
+ const f=fixture();
+ f.e.config.rules=[C.validateRule({...base(),trialUntil:Date.UTC(2026,9,20)})];
+ await f.e.sweepRule(f.e.config.rules[0],{force:true});
+ const r=await f.e.sweepRule(f.e.config.rules[0],{force:true});
+ assert.equal(r.trialNew,0,'andra svepet räknar inte om mejlet');
+ assert.equal(r.trialTotal,1);
+});
+
+test('regel i provkörning släpper fram nästa regel',async()=>{
+ const f=fixture();
+ f.e.config.rules=C.validateRules([{...base(),id:'trial',trialUntil:Date.UTC(2026,9,20)},{...base(),id:'second',target:'third'}]);
+ const found=f.e.firstMatchingRule(msg());
+ assert.equal(found?.id,'second','testregeln får inte skugga en riktig regel');
+});
+
+test('provkörningen flyttar igen när tiden är ute',async()=>{
+ const f=fixture();
+ f.e.config.rules=[C.validateRule({...base(),trialUntil:Date.UTC(2026,9,1)})];
+ const r=await f.e.sweepRule(f.e.config.rules[0],{force:true});
+ assert.equal(r.trial,undefined);
+ assert.equal(f.e.pending.size,1,'utgången provkörning är en vanlig regel igen');
+});
+
+test('provkörningens räkning följer med i minnet och kan tömmas',()=>{
+ const f=fixture();
+ const rule=C.validateRule({...base(),trialUntil:Date.UTC(2026,9,20)});
+ f.e.noteTrial(rule,msg());
+ assert.equal(f.e.trialCount(rule.id),1);
+ const list=f.e.trialList();
+ assert.deepEqual(list[rule.id].length,1);
+ const other=new Engine({},C.defaults());
+ other.trialRestore(list);
+ assert.equal(other.trialCount(rule.id),1,'räkningen kan läsas tillbaka från lagringen');
+ other.clearTrial(rule.id);
+ assert.equal(other.trialCount(rule.id),0);
+});

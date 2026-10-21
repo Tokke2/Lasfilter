@@ -1,6 +1,9 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false};
+const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
+ /* "Lär av din flytt": domäner du själv flyttat till en mapp. Bara domän, mapp
+    och antal sparas – aldrig ämne, namn eller mejltext. */
+ learned:{off:false,entries:[],snooze:{}}};
 /* Allt SortBro skapar hamnar i undermappar till appmappen i Hämtade filer.
    En enda källa för sökvägarna, så att inget kan hamna utanför av misstag.
    Sökvägarna skrivs med / och fungerar på Windows, macOS och Linux –
@@ -188,11 +191,125 @@ App.saveBrakeHistory=()=>{
 };
 /* Ett avslutat svep utan broms blir regelns nya normalnivå. */
 App.brakeRecord=(rule,result)=>{
+ /* Provkörning: resultatet är en räkning, inte en flytt. Den sparas som sådan och
+    får aldrig bli regelns normalnivå för säkerhetsbromsen. */
+ if(result?.trial){
+  App.write(()=>B.storage.local.set({trial:App.engine.trialList()})).catch(()=>{});
+  return;
+ }
  if(App.engine?.config.brake===false||result?.held)return;
  const n=Number(result?.wouldQueue);
  if(!Number.isFinite(n)||n<=0)return;
  App.brakeHistory[rule.id]=[...(App.brakeHistory[rule.id]||[]),n].slice(-10);
  App.saveBrakeHistory();
+};
+/* ── "Lär av din flytt" ────────────────────────────────────────────────────
+   När du själv drar mejl till en mapp sparas bara domän, källmapp, målmapp och
+   antal. Efter tre likadana flyttar inom en vecka föreslår SortBro en regel.
+   Ingenting skapas utan att du trycker, och inget sparas om en enskild mejl. */
+App.learnKey=e=>e.domain+'|'+e.target;
+App.cleanLearned=raw=>{
+ const out={off:false,entries:[],snooze:{}};
+ if(!raw||typeof raw!=='object')return out;
+ out.off=raw.off===true;
+ const now=Date.now(),maxAge=C.LIMITS.learnDays*86400000;
+ for(const e of Array.isArray(raw.entries)?raw.entries:[]){
+  if(!e||typeof e!=='object')continue;
+  const domain=typeof e.domain==='string'?e.domain.trim().toLowerCase():'';
+  if(!domain||domain.length>253||!/^[a-z0-9.-]+$/.test(domain))continue;
+  if(typeof e.source!=='string'||typeof e.target!=='string'||!e.source||!e.target)continue;
+  const count=Number.isInteger(e.count)&&e.count>0?e.count:0;
+  const last=Number.isFinite(e.last)?e.last:0;
+  if(!count||!last||now-last>maxAge)continue;
+  out.entries.push({domain,source:e.source,target:e.target,count,first:Number.isFinite(e.first)?e.first:last,last});
+ }
+ out.entries.sort((a,b)=>b.last-a.last).splice(C.LIMITS.learnEntries);
+ if(raw.snooze&&typeof raw.snooze==='object'){
+  for(const [key,v] of Object.entries(raw.snooze)){
+   if(typeof key!=='string'||key.length>600)continue;
+   const at=Number(v?.at),count=Number(v?.count);
+   if(!Number.isFinite(at)||now-at>maxAge)continue;
+   out.snooze[key]={at,count:Number.isFinite(count)?count:0};
+  }
+ }
+ return out;
+};
+App.saveLearned=()=>App.write(()=>B.storage.local.set({learned:App.learned})).catch(()=>{});
+App.learnSuggestions=()=>{
+ if(App.learned.off)return [];
+ const now=Date.now(),maxAge=C.LIMITS.learnDays*86400000;
+ return App.learned.entries
+  .filter(e=>e.count>=C.LIMITS.learnCount&&now-e.last<=maxAge)
+  .filter(e=>{
+   const s=App.learned.snooze[App.learnKey(e)];
+   if(!s)return true;
+   return now-s.at>=maxAge&&e.count>=s.count+C.LIMITS.learnCount;
+  })
+  .slice(0,3)
+  .map(e=>({...e,key:App.learnKey(e)}));
+};
+App.learnMove=async(original,moved,{ours=false}={})=>{
+ if(App.learned.off)return false;
+ const before=Array.isArray(original?.messages)?original.messages:[];
+ const after=Array.isArray(moved?.messages)?moved.messages:[];
+ if(!before.length||!after.length)return false;
+ /* SortBros egna flyttar räknas aldrig. Flaggan fångas före motorns bekräftelse,
+    för då är jobbet redan borta ur kön. */
+ if(ours)return false;
+ if(before.some(m=>App.engine?.inflight?.has(m.id)||App.engine?.pending?.has(m.id)))return false;
+ const targets=new Set(after.map(m=>m?.folder?.id).filter(Boolean));
+ if(targets.size!==1)return false;
+ const target=[...targets][0];
+ const folder=after[0]?.folder||{};
+ const uses=[...(folder.specialUse||[]),folder.type].map(x=>C.norm(String(x||'')));
+ if(uses.includes('trash')||uses.includes('junk')||uses.includes('deleted'))return false;
+ const source=before[0]?.folder?.id||'';
+ if(!source||source===target)return false;
+ const counts=new Map();
+ for(const m of before.slice(0,50)){
+  const domain=(C.email(m?.author)||'').split('@')[1]||'';
+  if(domain)counts.set(domain,(counts.get(domain)||0)+1);
+ }
+ if(!counts.size)return false;
+ const now=Date.now();
+ for(const [domain,add] of counts){
+  const hit=App.learned.entries.find(e=>e.domain===domain&&e.target===target&&e.source===source);
+  if(hit){hit.count+=add;hit.last=now;}
+  else App.learned.entries.unshift({domain,source,target,count:add,first:now,last:now});
+ }
+ App.learned=App.cleanLearned(App.learned);
+ await App.saveLearned();
+ App.log('debug',0,'lar av din flytt: '+counts.size+' doman(er) till en mapp');
+ App.changed();
+ return true;
+};
+App.learnCreate=async key=>{
+ const entry=App.learned.entries.find(e=>App.learnKey(e)===key);
+ if(!entry)throw new C.RuleError('bad_id');
+ const e=App.engine;
+ const duplicate=e.config.rules.find(r=>r.target===entry.target&&(r.conditions||[]).some(c=>c.field==='domain'&&c.op==='equals'&&C.norm(c.value)===C.norm(entry.domain)));
+ if(duplicate){
+  App.learned.entries=App.learned.entries.filter(x=>App.learnKey(x)!==key);
+  await App.saveLearned();App.changed();
+  return {ruleId:duplicate.id,existing:true,snapshot:App.snapshot()};
+ }
+ let sourceAccount='';
+ try{const src=await B.folders.get(entry.source,false);sourceAccount=src?.accountId||'';}catch{}
+ if(!sourceAccount)throw new C.RuleError('choose_source');
+ const rule=C.validateRule({
+  id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+  name:entry.domain,enabled:true,scope:'account',source:entry.source,sourceAccount,target:entry.target,
+  match:'all',readFilter:'default',unreadAction:'default',yearFolders:false,
+  conditions:[{field:'domain',op:'equals',value:entry.domain}],branches:[]
+ });
+ await App.checkRules([rule]);
+ const rules=[...e.config.rules,rule];
+ await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+ App.learned.entries=App.learned.entries.filter(x=>App.learnKey(x)!==key);
+ await App.saveLearned();
+ App.log('rules_saved',rules.length);
+ App.log('debug',0,'regel skapad av din flytt: '+entry.domain);
+ return {ruleId:rule.id,rule,snapshot:App.snapshot()};
 };
 App.saveSweepState=async at=>{
  try{await B.storage.local.set({sweepAt:Number.isFinite(at)?at:Date.now()});}catch{}
@@ -536,6 +653,10 @@ App.snapshot=()=>{
    enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,brake:e.config.brake!==false,
    brakeHolds:(e.heldList?.()||[]).map(h=>{const rule=e.config.rules.find(r=>r.id===h.ruleId);return {...h,name:rule?.name||h.ruleId,target:rule?.target||''};}),
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),
+   /* Provkörning och inlärda förslag följer med i statusen så att gränssnittet
+      kan visa dem utan ett extra anrop. */
+   trials:(e.config.rules||[]).filter(r=>r.trialUntil>0).map(r=>({ruleId:r.id,name:r.name,left:C.trialDaysLeft(r),until:r.trialUntil,active:C.trialActive(r),count:e.trialCount?.(r.id)||0,target:r.target})),
+   learn:{off:App.learned.off,suggestions:App.learnSuggestions()},
    lastBackupWeek:App.lastBackupWeek||'',logs:App.logs};
 };
 App.mutate=fn=>{
@@ -741,6 +862,14 @@ App.handle=async msg=>{
    await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
    /* En borttagen regel ska inte lämna en spärr efter sig i varningsraden. */
    for(const h of e.heldList())if(!rules.some(r=>r.id===h.ruleId))e.releaseRule(h.ruleId);
+   /* Borttagen regel eller avslutad provkörning: räkningen ska inte ligga kvar
+      och spöka om samma regel börjar provköras igen. */
+   let trialDropped=false;
+   for(const ruleId of [...(e.trialKeys?.keys?.()||[])]){
+    const rule=rules.find(r=>r.id===ruleId);
+    if(!rule||!rule.trialUntil){e.clearTrial(ruleId);trialDropped=true;}
+   }
+   if(trialDropped)await App.write(()=>B.storage.local.set({trial:e.trialList()})).catch(()=>{});
    App.log('rules_saved',rules.length);App.scheduleAutoBackup();return App.snapshot();
   });
   case 'setMode':return App.mutate(async()=>{
@@ -790,6 +919,45 @@ App.handle=async msg=>{
    }
    await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;App.applySeasonIcon();return next;
   }
+  /* Provkörning är slut: aktivera, förläng en vecka eller stäng av regeln. */
+  case 'trialResolve':return App.mutate(async()=>{
+   const ruleId=String(msg.ruleId||'');
+   const action=['activate','extend','off'].includes(msg.action)?msg.action:'';
+   if(!action)throw new C.RuleError('bad_request');
+   const r=e.config.rules.find(x=>x.id===ruleId);
+   if(!r)throw new C.RuleError('bad_id');
+   const next={...r,trialUntil:action==='extend'?Date.now()+C.LIMITS.trialDays*86400000:0,enabled:action!=='off'};
+   const rules=e.config.rules.map(x=>x.id===ruleId?next:x);
+   await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+   e.clearTrial(ruleId);
+   await App.write(()=>B.storage.local.set({trial:e.trialList()})).catch(()=>{});
+   App.log('settings_saved');
+   App.log('debug',0,'provkorning '+action+': '+r.name);
+   return {rule:next,snapshot:App.snapshot()};
+  });
+  case 'learnCreate':return App.mutate(()=>App.learnCreate(String(msg.key||'')));
+  case 'learnSnooze':{
+   const key=String(msg.key||'');
+   const entry=App.learned.entries.find(x=>App.learnKey(x)===key);
+   if(!entry)throw new C.RuleError('bad_id');
+   App.learned.snooze[key]={at:Date.now(),count:entry.count};
+   await App.saveLearned();App.changed();
+   return App.snapshot();
+  }
+  /* Samma väg som knappen i förslagsraden, men styrd från Inställningar. */
+  case 'learnToggle':{
+   const off=msg.off===true;
+   App.learned={off,entries:off?[]:App.learned.entries,snooze:off?{}:App.learned.snooze};
+   await App.saveLearned();App.changed();
+   App.log('settings_saved');
+   return App.snapshot();
+  }
+  case 'learnOff':{
+   App.learned={off:true,entries:[],snooze:{}};
+   await App.saveLearned();App.changed();
+   App.log('settings_saved');
+   return App.snapshot();
+  }
   default:throw new C.RuleError('bad_request');
  }
 };
@@ -799,7 +967,7 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake','backupWeek']);
+ const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake','backupWeek','trial','learned']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  let cfg=C.defaults(),fault='';
@@ -816,6 +984,8 @@ App.ready=(async()=>{
  App.applySeasonIcon();
  App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
   notify:App.openUnread,brakeLimit:App.brakeLimit,ruleDone:App.brakeRecord});
+ App.engine.trialRestore?.(data.trial);
+ App.learned=App.cleanLearned(data.learned);
  let needResweep=false;
  if(fault){App.engine.fault=fault;App.log('error');}
  else{
@@ -901,7 +1071,14 @@ B.messages.onUpdated.addListener((m,props,old)=>App.ready.then(async()=>{
  await App.engine.readChanged(m,props,old);
 }).catch(()=>App.fail('internal_error')));
 B.messages.onNewMailReceived.addListener((folder,list)=>App.onNewMail(folder,list).catch(()=>App.log('error',0,'nyinkommet_misslyckades')));
-B.messages.onMoved.addListener((old,moved)=>App.ready.then(()=>{App.invalidateScan();return App.engine.onMoved(old,moved);}).catch(()=>App.fail('internal_error')));
+B.messages.onMoved.addListener((old,moved)=>App.ready.then(async()=>{
+ App.invalidateScan();
+ /* Fånga först om flytten var vår egen – efter bekräftelsen är jobbet borta ur kön. */
+ const ours=(old?.messages||[]).some(m=>App.engine.inflight.has(m.id)||App.engine.pending.has(m.id));
+ const done=await App.engine.onMoved(old,moved);
+ await App.learnMove(old,moved,{ours});
+ return done;
+}).catch(()=>App.fail('internal_error')));
 B.messageDisplay.onMessagesDisplayed.addListener(()=>App.ready.then(()=>App.engine.tick()).catch(()=>App.fail('display_error')));
 /* Kvitto på att fönstret visade något: samma meddelande som vi just öppnade ska
    dyka upp i visningen. Loggen kan då svara på om en tom ruta kom från oss eller ej. */

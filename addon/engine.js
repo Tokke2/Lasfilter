@@ -18,6 +18,33 @@ class Engine {
      och ligger kvar stoppad tills användaren svarar. Ingenting flyttas medan den
      är stoppad – varken av svepet eller av inkommande mejl. */
   this.ruleHolds=new Map();
+  /* Provkörning: vilka mejl en regel i testläge skulle ha flyttat. Fingeravtrycken
+     sparas så att samma mejl inte räknas om vid varje svep. */
+  this.trialKeys=new Map();
+ }
+ /* Regel i provkörning flyttar ingenting: den räknar bara. */
+ trialActive(rule){return !!(rule&&rule.trialUntil&&rule.trialUntil>this.now());}
+ trialRestore(obj){
+  if(!obj||typeof obj!=='object')return;
+  for(const [ruleId,keys] of Object.entries(obj)){
+   if(typeof ruleId!=='string'||!Array.isArray(keys))continue;
+   this.trialKeys.set(ruleId,new Set(keys.filter(k=>typeof k==='string').slice(0,C.LIMITS.trialKeys)));
+  }
+ }
+ trialList(){
+  const out={};
+  for(const [ruleId,set] of this.trialKeys){if(set.size)out[ruleId]=[...set].slice(0,C.LIMITS.trialKeys);}
+  return out;
+ }
+ trialCount(ruleId){return this.trialKeys.get(ruleId)?.size||0;}
+ clearTrial(ruleId){this.trialKeys.delete(ruleId);}
+ /* Räknar ett mejl en gång per regel och provkörning. */
+ noteTrial(rule,message){
+  const key=C.fingerprint(message);if(!key)return 0;
+  let set=this.trialKeys.get(rule.id);
+  if(!set){set=new Set();this.trialKeys.set(rule.id,set);}
+  if(set.has(key)||set.size>=C.LIMITS.trialKeys)return 0;
+  set.add(key);return 1;
  }
  /* Anropas när nya mejl kommer in, lässtatus ändras, mejl flyttas eller regler
     ändras – då är den sparade mappbilden inte längre pålitlig. */
@@ -166,6 +193,7 @@ class Engine {
  firstMatchingRule(message,{allowUnread=false,inboxArrival=false}={}){
   return this.config.rules.find(r=>{
    if(this.ruleHolds.has(r.id))return false; /* stoppad av säkerhetsbromsen */
+   if(this.trialActive(r))return false; /* provkörning flyttar ingenting */
    if(!C.match(r,message)||this.sameTarget(r,message))return false;
    const rf=this.ruleMode(r);
    if(inboxArrival){
@@ -199,7 +227,7 @@ class Engine {
   if(changed.read===false){
    await this.dropId(m.id);
    if(!this.enabled())return false;
-   const unreadRule=this.config.rules.find(r=>r.readFilter==='unread'&&C.match(r,m)&&m.folder?.id!==C.targetFor(r,m));
+   const unreadRule=this.config.rules.find(r=>r.readFilter==='unread'&&!this.trialActive(r)&&C.match(r,m)&&m.folder?.id!==C.targetFor(r,m));
    if(unreadRule)return this.enqueue(m,{rule:unreadRule,target:await this.resolveTarget(unreadRule,m),allowUnread:true,notify:true});
    return false;
   }
@@ -390,12 +418,13 @@ class Engine {
   if(!rule||!rule.enabled)throw new C.RuleError('disabled');
   this.sweeping++;
   try{
+   const trial=this.trialActive(rule);
    const rf=this.ruleMode(rule);
    const direct=rf==='both'||rf==='unread'||(rf==='default'&&this.config.moveMode==='direct');
    const {account,excluded,folders}=await this.ruleFolders(rule);
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
-   const brake=this.brakeFor(rule);
-   let wouldQueue=0,tripped=false;
+   const brake=trial?null:this.brakeFor(rule);
+   let wouldQueue=0,tripped=false,trialNew=0;
    foldersLoop:for(const folder of folders){
     if(!this.enabled())break;
     const isInbox=this.inboxFolder(folder);
@@ -436,6 +465,9 @@ class Engine {
        const target=await this.resolveTarget(rule,m);
        if(!target)continue;
        if(target===m.folder.id){inTarget++;continue;}
+       /* Provkörning: räkna mejlet och gå vidare. Inget köas, inget flyttas,
+          och säkerhetsbromsen rörs inte – den vaktar flyttar, inte räkning. */
+       if(trial){wouldQueue++;trialNew+=this.noteTrial(rule,m);continue;}
        const fk=C.fingerprint(m);
        if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id)){handled++;continue;}
        if(this.records.size>=C.LIMITS.queue){
@@ -479,6 +511,13 @@ class Engine {
    }
    if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders===0)throw new C.RuleError('sweep_error');
    if(tripped)return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue,held:true};
+   if(trial){
+    const trialTotal=this.trialCount(rule.id);
+    this.log('simulated',trialNew);
+    this.debug('provkorning regel '+rule.id+': nya='+trialNew+' totalt='+trialTotal+' skulle_flyttats='+wouldQueue);
+    this.change();
+    return {scanned,queued:0,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue,trial:true,trialNew,trialTotal};
+   }
    this.debug('svep regel '+rule.id+' ('+rule.name+'): mappar='+folders.length+' lyckade='+searchedFolders+' hoppade='+skippedFolders+' tomma='+emptyFolders+' cachade='+cachedFolders+' skannade='+scanned+' matchade='+matched+' i_mal='+inTarget+' klara='+handled+' koade='+queued+' nasta_batch='+deferred+' lage='+(this.config.dryRun?'torrprov':'flytt')+(direct?' direkt':' last')+(force?' tvingad':''));
    this.log('catchup',queued);this.change();
    return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue};
@@ -488,8 +527,9 @@ class Engine {
   if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {...ZERO_SWEEP};}
   this.lastSweep=this.now();
   let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0,held=0;
-  const heldRules=[];
+  const heldRules=[],trialRules=[];
   for(const rule of this.config.rules.filter(r=>r.enabled)){
+   if(this.trialActive(rule))trialRules.push(rule.id);
    if(!this.enabled())break;
    if(this.ruleHolds.has(rule.id)){heldRules.push(rule.id);continue;}
    try{const r=await this.sweepRule(rule,{includeInboxUnread:true,force});held+=r.held?1:0;
@@ -498,7 +538,7 @@ class Engine {
     scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
    catch(error){const code=error?.code||error?.name||'Error';this.debug('svep_regel_misslyckades error_code='+code);this.log('error',0,'svep av regel misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');throw new C.RuleError('sweep_error');}
   }
-  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,heldRules,held};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,heldRules,trialRules,held};
  }
  async catchUp(ruleId){
   return this.sweepRule(this.config.rules.find(r=>r.id===ruleId),{includeInboxUnread:false});

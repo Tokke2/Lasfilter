@@ -1025,3 +1025,127 @@ test('uppslaget avvisar när inget mejl är markerat',async()=>{
  api.tabs.query=async()=>[];
  await assert.rejects(()=>app.handle({type:'whyHere'}),'inget markerat mejl');
 });
+
+/* ── Provkörning och "lär av din flytt" ─────────────────────────────────── */
+function storeApi(){
+ const api=stubApi();
+ const stored={};
+ api.storage={local:{get:async keys=>{const out={};for(const k of [].concat(keys||[]))if(k in stored)out[k]=stored[k];return out;},set:async obj=>{Object.assign(stored,obj);}}};
+ return {api,stored};
+}
+const trialRule=over=>C.validateRule({id:'r1',name:'Fakturor',enabled:true,scope:'account',source:'inbox',sourceAccount:'a',target:'fin',
+ match:'all',readFilter:'default',unreadAction:'default',conditions:[{field:'domain',op:'equals',value:'klarna.se'}],branches:[],...over});
+
+test('provkörning: aktivera, förläng och stäng av',async()=>{
+ const {api}=storeApi();
+ const {app,tick}=await loadBackground(api);
+ const rule=trialRule({trialUntil:Date.now()-1000});
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[rule]}});
+ app.engine.clearTrial=()=>{};app.engine.trialList=()=>({});
+ const act=await tick.settle(app.handle({type:'trialResolve',ruleId:'r1',action:'activate'}));
+ assert.equal(act.rule.trialUntil,0,'aktiverad regel har ingen provkörning kvar');
+ assert.equal(act.rule.enabled,true);
+ const ext=await tick.settle(app.handle({type:'trialResolve',ruleId:'r1',action:'extend'}));
+ assert.ok(ext.rule.trialUntil>Date.now()+6*86400000,'förlängningen är en vecka');
+ assert.equal(ext.rule.enabled,true);
+ const off=await tick.settle(app.handle({type:'trialResolve',ruleId:'r1',action:'off'}));
+ assert.equal(off.rule.enabled,false,'avstängd regel flyttar inget');
+ assert.equal(off.rule.trialUntil,0);
+});
+
+test('provkörningen syns i statusen med dagar kvar',async()=>{
+ const {api}=storeApi();
+ const {app}=await loadBackground(api);
+ const rule=trialRule({trialUntil:Date.now()+2*86400000});
+ fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:true,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,rules:[rule]}});
+ app.engine.trialCount=()=>4;
+ const snap=app.snapshot();
+ assert.equal(snap.trials.length,1);
+ assert.equal(snap.trials[0].active,true);
+ assert.equal(snap.trials[0].left,2);
+ assert.equal(snap.trials[0].count,4,'räkningen följer med till gränssnittet');
+});
+
+test('inlärda flyttar: gamla och trasiga poster rensas',async()=>{
+ const {app}=await loadBackground();
+ const now=Date.now();
+ const clean=app.cleanLearned({off:false,entries:[
+  {domain:'klarna.se',source:'inbox',target:'fin',count:3,first:now,last:now},
+  {domain:'gammal.se',source:'inbox',target:'fin',count:9,first:now-30*86400000,last:now-30*86400000},
+  {domain:'utan-mapp.se',source:'',target:'fin',count:2,first:now,last:now},
+  {domain:'<script>',source:'inbox',target:'fin',count:2,first:now,last:now}
+ ],snooze:{}});
+ assert.equal(clean.entries.length,1,'bara den färska, giltiga posten blir kvar');
+ assert.equal(clean.entries[0].domain,'klarna.se');
+});
+
+test('lär av din flytt: egen flytt räknas, vår egen räknas inte',async()=>{
+ const {api}=storeApi();
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ const before={messages:[{id:1,author:'A <a@klarna.se>',folder:{id:'inbox'}},{id:2,author:'B <b@klarna.se>',folder:{id:'inbox'}}]};
+ const after={messages:[{id:11,folder:{id:'fin',specialUse:[]}},{id:12,folder:{id:'fin',specialUse:[]}}]};
+ await tick.settle(app.learnMove(before,after));
+ assert.equal(app.learned.entries.length,1);
+ assert.equal(app.learned.entries[0].domain,'klarna.se');
+ assert.equal(app.learned.entries[0].count,2,'båda mejlen från samma domän räknas');
+ await tick.settle(app.learnMove(before,after,{ours:true}));
+ assert.equal(app.learned.entries[0].count,2,'SortBros egen flytt räknas aldrig');
+});
+
+test('papperskorgen lär inte ut någon regel',async()=>{
+ const {api}=storeApi();
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ await tick.settle(app.learnMove({messages:[{id:1,author:'a@klarna.se',folder:{id:'inbox'}}]},{messages:[{id:2,folder:{id:'trash',specialUse:['trash']}}]}));
+ assert.equal(app.learned.entries.length,0);
+});
+
+test('tre likadana flyttar blir ett förslag – två blir inget',async()=>{
+ const {api}=storeApi();
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ const before={messages:[{id:1,author:'a@klarna.se',folder:{id:'inbox'}}]};
+ const after={messages:[{id:2,folder:{id:'fin',specialUse:[]}}]};
+ await tick.settle(app.learnMove(before,after));
+ await tick.settle(app.learnMove(before,after));
+ assert.equal(app.learnSuggestions().length,0,'två flyttar är ingen vana');
+ await tick.settle(app.learnMove(before,after));
+ const list=app.learnSuggestions();
+ assert.equal(list.length,1);
+ assert.equal(list[0].domain,'klarna.se');
+ assert.equal(list[0].target,'fin');
+ assert.equal(list[0].key,'klarna.se|fin');
+});
+
+test('"inte nu" döljer förslaget och "sluta föreslå" stänger av',async()=>{
+ const {api}=storeApi();
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ const before={messages:[{id:1,author:'a@klarna.se',folder:{id:'inbox'}}]};
+ const after={messages:[{id:2,folder:{id:'fin',specialUse:[]}}]};
+ for(let i=0;i<3;i++)await tick.settle(app.learnMove(before,after));
+ assert.equal(app.learnSuggestions().length,1);
+ await tick.settle(app.handle({type:'learnSnooze',key:'klarna.se|fin'}));
+ assert.equal(app.learnSuggestions().length,0,'"inte nu" döljer förslaget');
+ await tick.settle(app.handle({type:'learnOff'}));
+ assert.equal(app.learned.off,true);
+ assert.equal(app.learnSuggestions().length,0);
+});
+
+test('skapa regel av en inlärd flytt',async()=>{
+ const {api}=storeApi();
+ api.folders.get=async id=>({id,accountId:'a',name:id,specialUse:[]});
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ app.learned={off:false,entries:[{domain:'klarna.se',source:'inbox',target:'fin',count:4,first:Date.now(),last:Date.now()}],snooze:{}};
+ const out=await tick.settle(app.handle({type:'learnCreate',key:'klarna.se|fin'}));
+ assert.equal(out.rule.conditions[0].field,'domain');
+ assert.equal(out.rule.conditions[0].value,'klarna.se');
+ assert.equal(out.rule.target,'fin');
+ assert.equal(out.rule.sourceAccount,'a');
+ assert.equal(out.rule.enabled,true);
+ assert.equal(app.learned.entries.length,0,'förslaget försvinner när regeln finns');
+});

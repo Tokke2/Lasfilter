@@ -2637,3 +2637,55 @@ select.needs-target {
 .backup-actions .muted {
   font-size: 0.78rem;
 }
+
+/* ── Provkörning och inlärda förslag ──────────────────────────────────────
+   Två lugna rader ovanför regellistan. Ingen modal, inget som skymmer. */
+.trial-box {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+.trial-box .muted { margin: 6px 0 0; }
+.trial-left { color: var(--accent); }
+.unread-toggles-title {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #6b7280);
+  margin-bottom: 4px;
+}
+.muted-out { opacity: 0.55; }
+.trial-tag {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.trial-bar,
+.learn-bar {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+.trial-row,
+.learn-row {
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--panel, rgba(0, 0, 0, 0.03));
+}
+.learn-row { border-color: var(--line); }
+.trial-row p,
+.learn-row p { margin: 4px 0 10px; }
+.learn-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

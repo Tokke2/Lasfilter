@@ -95,7 +95,7 @@ SortBro arkiverar **ingenting av sig självt**. Det finns ingen inbyggd årsarki
 
 Kryssrutan **Flytta även olästa mejl direkt** i steg 3 styr läsläget för regeln:
 
-- **Kryssad** → olästa mejl som matchar regeln flyttas **direkt**, utan att vänta på att bli lästa. Det gäller i alla mappar regeln söker i, inte bara i Inkorgen. Flytten sker omedelbart när mejlet kommer in eller vid nästa svep – och kryssrutan **Öppna flyttade olästa mejl i nytt fönster** avgör om ett oläst mejl också öppnas i ett fönster (annars ligger det kvar som oläst i målmappen).
+- **Kryssad** → olästa mejl som matchar regeln flyttas **direkt**, utan att vänta på att bli lästa. Det gäller i alla mappar regeln söker i, inte bara i Inkorgen. Flytten sker omedelbart när mejlet kommer in eller vid nästa svep. Den andra kryssrutan, **Öppna olästa mejl i ett nytt fönster efter flytten**, är regelns eget val: kryssad öppnas mejlet i ett fönster när det väl ligger i målmappen, omarkerad ligger det kvar som oläst utan fönster. Valet görs alltså **när regeln skapas** och gäller bara den regeln – det är inte en global inställning. Är *Flytta även olästa mejl direkt* omarkerad är fönstervalet gråtonat, eftersom det då inte finns någon flytt att öppna efter.
 - **Fönstret öppnas först när mejlet ligger i målmappen – och bara om det går att visa.** SortBro väntar in flytten och letar upp mejlet i målmappen (via Message-ID om id:t bytts). Sedan krävs **två** saker innan fönstret öppnas: mejlet ska ligga i målmappen **och** innehållet ska gå att läsa. Ett oläst mejl som ännu inte hämtats hem från servern skulle annars ge just en tom ruta. Går något av kraven inte igenom inom några sekunder öppnas **inget** fönster alls – hellre inget fönster än ett tomt – och orsaken skrivs i loggen: `olasta mejlet kunde inte hittas i malmappen` respektive `olasta mejlet gick inte att lasa an`. Även när fönstret öppnas skrivs ett kvitto (`olasta mejlet oppnat i malmappen` och `olasta mejlet visades i fonstret`), så loggen kan svara på om en tom ruta alls kom från SortBro eller från Thunderbird själv. Skulle id:t bytas i samma sekund som fönstret öppnas görs ett andra försök på mejlets identitet (Message-ID), som alltid följer med flytten.
 - **Omarkerad** → olästa mejl ligger kvar och flyttas först när du har läst dem och lämnat dem (minst två sekunder utan visning i någon flik eller något fönster).
 
@@ -199,6 +199,32 @@ Den andra regeln får samma varning med omvänd förklaring: *"Den regeln ligger
 - Avstängda regler räknas inte.
 
 Villkoren jämförs som text och intervall: *börjar med anna@* och *innehåller anna@* kan båda stämma, men *börjar med anna@* och *börjar med bob@* kan aldrig gälla samma adress. En regel med **ELLER** prövas villkor för villkor – det räcker att ett av dem kan sammanfalla med den andra regeln.
+
+## Provkörning – regeln räknar innan den flyttar
+
+En ny regel är den enda som är osäker. Därför kan du i steg 3 kryssa **Provkör i 7 dagar innan regeln flyttar något**. Regeln är då aktiv och räknar som vanligt, men flyttar ingenting.
+
+- **Provkörningen påverkar inte dina andra regler.** En regel i provkörning hoppas över när mejlen ska sorteras, så ett mejl som skulle ha fångats av en provkörande regel går vidare till nästa regel precis som om den inte fanns. Inget mejl blir liggande för att du testar.
+- **Räkningen är ärlig.** SortBro sparar fingeravtrycket på varje mejl som regeln skulle ha flyttat, så samma mejl räknas bara en gång – även om svepet går varje timme i en vecka.
+- **Säkerhetsbromsen rörs inte.** En provkörning flyttar inget, och räknas därför aldrig som regelns normalnivå.
+- **I regellistan** bär regeln märket **TEST · 3 dagar kvar**.
+- **När veckan är slut** dyker en rad upp ovanför regellistan: *Regeln "Fakturor" skulle ha flyttat 34 mejl.* med tre val – **Aktivera regeln**, **Förläng 7 dagar** eller **Stäng av regeln**. Ingenting händer förrän du svarar.
+
+Kryssrutan sparar ett slutdatum i regeln. Den som redan har en pågående provkörning ser dagarna kvar bredvid rutan, och att kryssa ur den avslutar provkörningen direkt.
+
+## SortBro lär av dina egna flyttar
+
+När du själv drar mejl till en mapp lägger SortBro märke till det. Efter **tre likadana flyttar inom sju dagar** – samma avsändardomän till samma mapp – dyker en rad upp i regellistan:
+
+> **Lär av din flytt** – Du har flyttat 3 mejl från klarna.se till Fakturor. Vill du att SortBro sköter det åt dig?
+
+med **Skapa regel**, **Inte nu** och **Sluta föreslå**.
+
+- **Bara det nödvändiga sparas:** avsändardomän, källmapp, målmapp, antal och tidpunkt. Aldrig ämnesrad, namn, adress eller mejltext – och posterna gallras automatiskt efter sju dagar.
+- **SortBros egna flyttar räknas aldrig.** Bara flyttar som du gjort själv i Thunderbird.
+- **Papperskorgen och Skräppost lär inte ut något.** En flytt dit är en rensning, inte en sortering.
+- **Ingenting skapas utan ett klick.** Regeln som skapas får domänvillkoret *är lika med* och målmappen du själv använde; den granskas innan den sparar något. Finns redan en likadan regel skapas ingen dubblett.
+- **Sluta föreslå** stänger av funktionen permanent tills du slår på den igen (den finns kvar i inställningarna).
 
 ## Säkerhetsmekaniker
 
@@ -349,6 +375,9 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 - **Säkerhetsbromsen:** en regel som plötsligt vill flytta tio gånger fler mejl än vanligt – och minst 50 – stoppas innan något flyttas. Raden högst upp erbjuder *Flytta ändå* eller *Stäng av regeln*, och ingenting rör sig förrän du har svarat.
 - **Konfliktvarning:** två aktiva regler som kan träffa samma mejl och skicka det till olika mappar får en varning i regellistan, med förklaring om vilken som ligger först och vinner. Analysen är försiktig och varnar bara när den kan visa att båda verkligen kan matcha.
 - **"Varför ligger det här mejlet här?":** markera ett mejl och få veta vilken regel som gäller, vart det skulle flyttas och vad som i så fall stoppar – villkor för villkor, med de närmaste reglerna när ingen matchar.
+- **Provkörning per regel:** kryssa *Provkör i 7 dagar* och regeln räknar vad den skulle ha flyttat utan att röra något. Efter veckan väljer du aktivera, förlänga eller stänga av – och räkningen är exakt, aldrig samma mejl två gånger.
+- **Lär av din flytt:** flyttar du själv tre mejl från samma domän till samma mapp föreslår SortBro en regel. Bara domän, mapp och antal sparas, och inget skapas utan ett klick.
+- **Fönstervalet vid regelskapning:** *Öppna olästa mejl i ett nytt fönster efter flytten* är regelns eget val, gråtonat när regeln inte flyttar olästa mejl.
 - **Öppna `ui.html`-flikar laddas om** automatiskt när tillägget installeras eller startas om.
 
 ## Nyheter i 1.3

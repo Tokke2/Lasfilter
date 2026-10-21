@@ -11,7 +11,7 @@ globalThis.LasDemo=(()=>{
   {id:'demo-3',name:'Arkivera äldre mejl',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',conditions:[{field:'date',op:'older',value:'90'}]}]},
   prefs:{theme:'light',fontSize:14,lastRule:'demo-1',lang:'sv'},installType:'normal',
   paths:{root:'Lasfilter/',logs:'Lasfilter/Loggar/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'},
-  brake:true,brakeHolds:[],lastBackupWeek:'2026-W42',
+  brake:true,brakeHolds:[],lastBackupWeek:'2026-W42',trials:[],learn:{off:false,suggestions:[]},
   moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];let mockPrefill=null;
@@ -151,6 +151,27 @@ globalThis.LasDemo=(()=>{
     const combined=m.merge===true?[...state.config.rules,...rawRules]:rawRules;
     saveRules(combined);state.config.paused=true;state.config.dryRun=true;data=state;break;
    }
+   /* Provkörning och inlärda förslag: samma svar som bakgrunden, med tomma listor
+      i förhandsvisningen så att inget ser ut att hända av sig själv. */
+   case 'trialResolve':{
+    const rule=state.config.rules.find(r=>r.id===m.ruleId);if(!rule)throw new LasCore.RuleError('bad_id');
+    rule.trialUntil=m.action==='extend'?Date.now()+7*86400000:0;
+    if(m.action==='off')rule.enabled=false;
+    state.trials=(state.trials||[]).filter(t=>t.ruleId!==m.ruleId);
+    data={rule,snapshot:state};break;
+   }
+   case 'learnCreate':{
+    const s=(state.learn?.suggestions||[]).find(x=>x.key===m.key);if(!s)throw new LasCore.RuleError('bad_id');
+    const rule=LasCore.ruleFromChoice({name:s.domain,field:'domain',value:s.domain,target:s.target,source:s.source,sourceAccount:'demo',moveUnread:false});
+    saveRules([...state.config.rules,rule]);
+    state.learn.suggestions=(state.learn.suggestions||[]).filter(x=>x.key!==m.key);
+    data={ruleId:rule.id,rule,snapshot:state};break;
+   }
+   case 'learnSnooze':{
+    state.learn.suggestions=(state.learn.suggestions||[]).filter(x=>x.key!==m.key);data=state;break;
+   }
+   case 'learnOff':{state.learn={off:true,suggestions:[]};data=state;break;}
+   case 'learnToggle':{const off=m.off===true;state.learn={off,suggestions:off?[]:(state.learn?.suggestions||[])};data=state;break;}
    case 'restoreBackup':if(!snapshots[m.index])throw new LasCore.RuleError('bad_request');saveRules(snapshots[m.index].rules);state.config.paused=true;state.config.dryRun=true;data=state;break;
    case 'clearBlocked':data=state;break;
    case 'sweepNow':

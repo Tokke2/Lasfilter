@@ -209,7 +209,34 @@ const I18N={
   chooseTarget:'Välj en målmapp…',
   ruleMoveUnreadLabel:'Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)',
   unreadMoveNote:'Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.',
-  ruleOpenWindowLabel:'Öppna flyttade olästa mejl i nytt fönster',
+  ruleOpenWindowLabel:'Öppna olästa mejl i ett nytt fönster efter flytten',
+  unreadChoiceTitle:'Olästa mejl – välj vad som ska hända',
+  unreadChoiceNote:'Fönstervalet gäller bara när olästa mejl flyttas direkt. Då öppnas mejlet först när det ligger i målmappen – aldrig som en tom ruta.',
+  ruleTrialLabel:'Provkör i 7 dagar innan regeln flyttar något',
+  trialNote:'Under provkörningen räknar regeln bara hur många mejl den skulle flytta. Ingenting flyttas, och regeln påverkar inte de andra reglerna. Efter sju dagar frågar SortBro om du vill aktivera den.',
+  trialBadge:'TEST',
+  trialDaysLeft:'{n} dagar kvar',
+  trialDayLeft:'1 dag kvar',
+  trialTitle:'Provkörningen är slut',
+  trialWould:'Regeln ”{name}” skulle ha flyttat {n} mejl.',
+  trialWouldOne:'Regeln ”{name}” skulle ha flyttat 1 mejl.',
+  trialWouldNone:'Regeln ”{name}” matchade inga mejl under provkörningen.',
+  trialActivate:'Aktivera regeln',
+  trialExtend:'Förläng 7 dagar',
+  trialOff:'Stäng av regeln',
+  trialActivated:'Regeln är aktiverad.',
+  trialExtended:'Provkörningen fortsätter i 7 dagar.',
+  trialOffDone:'Regeln är avstängd.',
+  learnTitle:'Lär av din flytt',
+  learnBody:'Du har flyttat {n} mejl från {domain} till {target}. Vill du att SortBro sköter det åt dig?',
+  learnCreate:'Skapa regel',
+  learnSnooze:'Inte nu',
+  learnOff:'Sluta föreslå',
+  learnCreated:'Regeln är skapad. Granska den innan den flyttar något.',
+  learnExisting:'Det finns redan en regel för den här avsändaren och mappen.',
+  learnOffDone:'SortBro föreslår inga fler regler från dina flyttar.',
+  learnOnLabel:'Lär av mina egna flyttar och föreslå regler',
+  learnOnNote:'Flyttar du själv tre mejl från samma avsändare till samma mapp föreslår SortBro en regel. Bara domän, mapp och antal sparas, i högst sju dagar – aldrig ämne, namn eller mejltext.',
   inlineMoveUnread:'Flytta även olästa mejl direkt',
   inlineOpenWindow:'Öppna i nytt fönster',
   readFilterLabel:'Flytta olästa / lästa mejl för denna regel',
@@ -497,6 +524,7 @@ const I18N={
   runAllCached:'{n} oförändrade mappar hoppades över.',
   runAllSkipped:'{n} otillgängliga mappar hoppades över.',
   runAllTestMode:'Testläge: inga mejl flyttades.',
+  runAllTrial:'{n} regel är i provkörning och räknade bara.',
   runAllPaused:'Bevakningen är pausad – inga regler kördes. Tryck Pausa igen för att återuppta.',
   runAllInTarget:'{n} matchade reglerna men ligger redan i målmappen (eller i sin årsmapp).',
   runAllHandled:'{n} var redan hanterade sedan tidigare.',
@@ -836,7 +864,34 @@ const I18N={
   chooseTarget:'Select a target folder…',
   ruleMoveUnreadLabel:'Move unread emails right away too (otherwise they wait until you have read them)',
   unreadMoveNote:'Box ticked: unread emails matching the rule are moved right away. Cleared: they stay put and move only after you have read them.',
-  ruleOpenWindowLabel:'Open moved unread emails in a new window',
+  ruleOpenWindowLabel:'Open unread emails in a new window after the move',
+  unreadChoiceTitle:'Unread emails – choose what should happen',
+  unreadChoiceNote:'The window choice applies only when unread emails move right away. The email opens first when it is in the target folder – never as an empty window.',
+  ruleTrialLabel:'Trial run for 7 days before the rule moves anything',
+  trialNote:'During the trial the rule only counts how many emails it would move. Nothing moves, and the rule does not affect your other rules. After seven days SortBro asks whether to activate it.',
+  trialBadge:'TEST',
+  trialDaysLeft:'{n} days left',
+  trialDayLeft:'1 day left',
+  trialTitle:'The trial run has ended',
+  trialWould:'The rule “{name}” would have moved {n} emails.',
+  trialWouldOne:'The rule “{name}” would have moved 1 email.',
+  trialWouldNone:'The rule “{name}” matched no emails during the trial.',
+  trialActivate:'Activate the rule',
+  trialExtend:'Extend by 7 days',
+  trialOff:'Turn the rule off',
+  trialActivated:'The rule is active.',
+  trialExtended:'The trial continues for 7 days.',
+  trialOffDone:'The rule is turned off.',
+  learnTitle:'Learn from your move',
+  learnBody:'You moved {n} emails from {domain} to {target}. Want SortBro to handle it for you?',
+  learnCreate:'Create rule',
+  learnSnooze:'Not now',
+  learnOff:'Stop suggesting',
+  learnCreated:'The rule is created. Review it before it moves anything.',
+  learnExisting:'A rule for this sender and folder already exists.',
+  learnOffDone:'SortBro will not suggest rules from your moves.',
+  learnOnLabel:'Learn from my own moves and suggest rules',
+  learnOnNote:'If you move three emails from the same sender to the same folder yourself, SortBro suggests a rule. Only domain, folder and count are saved, for at most seven days – never subject, name or message text.',
   inlineMoveUnread:'Move unread mail',
   inlineOpenWindow:'Open in new window',
   readFilterLabel:'Move unread / read emails for this rule',
@@ -1124,6 +1179,7 @@ const I18N={
   runAllCached:'{n} unchanged folders were skipped.',
   runAllSkipped:'{n} unavailable folders were skipped.',
   runAllTestMode:'Test mode: no emails were moved.',
+  runAllTrial:'{n} rule is on a trial run and only counted.',
   runAllPaused:'Monitoring is paused – no rules were run. Press Pause again to resume.',
   runAllInTarget:'{n} matched the rules but are already in the target folder (or in their year folder).',
   runAllHandled:'{n} had already been handled.',
@@ -1287,6 +1343,11 @@ function updateReadPolicy(){
  const ua=$('ruleUnreadAction')?.value||'default';
  if($('ruleMoveUnread'))$('ruleMoveUnread').checked=(rf==='both'||rf==='unread'||(rf==='default'&&state?.moveMode==='direct'));
  if($('ruleOpenWindow'))$('ruleOpenWindow').checked=(ua==='window'||(ua==='default'&&state?.openWindow!==false));
+ /* Fönstervalet betyder bara något när olästa mejl flyttas. Annars är det en
+    död ruta som ser ut som en inställning som inte gör något. */
+ const movesUnread=$('ruleMoveUnread')?.checked===true;
+ if($('ruleOpenWindow'))$('ruleOpenWindow').disabled=!movesUnread;
+ if($('unreadChoiceNote'))$('unreadChoiceNote').classList.toggle('muted-out',!movesUnread);
  const map={
   default:['policyDefaultTitle','policyDefaultBody'],
   read:['policyReadTitle','policyReadBody'],
@@ -1759,6 +1820,8 @@ function renderStatus(next){
  if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
  if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
+ if($('learnOn'))$('learnOn').checked=!(state.learn&&state.learn.off);
+ renderTrialBar();renderLearnBar();
  renderRules();renderActivity();renderBackups();renderQuickExisting();renderTbAccounts();quickHintsOnce();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
@@ -1768,6 +1831,84 @@ function ruleTagText(rule){
  const rf=rule.readFilter||'default';
  const modeText=rf==='read'?T('tagRead'):rf==='both'?T('tagBoth'):rf==='unread'?T('tagUnread'):T('tagDefault');
  return scopeText+' · '+modeText+(rule.yearFolders?' · '+T('tagYearFolders'):'');
+}
+/* Provkörning i editorn: rutan och antalet dagar som är kvar. */
+function setTrialFields(rule){
+ const box=$('ruleTrial'),left=$('trialLeft');
+ if(!box)return;
+ const active=!!(rule&&C.trialActive(rule));
+ box.checked=active;
+ if(left){
+  const days=active?C.trialDaysLeft(rule):0;
+  left.hidden=!days;
+  left.textContent=days?T(days===1?'trialDayLeft':'trialDaysLeft').replace('{n}',days):'';
+ }
+}
+/* Provkörda regler vars tid har gått ut: en rad med tre tydliga val. */
+function renderTrialBar(){
+ const bar=$('trialBar');if(!bar)return;
+ const expired=(state.trials||[]).filter(t=>!t.active);
+ bar.replaceChildren();bar.hidden=!expired.length;
+ for(const t of expired){
+  const row=el('div','trial-row');
+  row.append(el('strong','',T('trialTitle')+' · '+t.name));
+  const msg=t.count===0?T('trialWouldNone').replace('{name}',t.name):T(t.count===1?'trialWouldOne':'trialWould').replace('{name}',t.name).replace('{n}',t.count);
+  row.append(el('p','',msg));
+  const actions=el('div','bar-actions');
+  const add=(label,action,cls,toastKey)=>{
+   const b=el('button','button small '+cls,label);b.type='button';
+   b.addEventListener('click',async()=>{
+    b.disabled=true;
+    try{const r=await rpc('trialResolve',{ruleId:t.ruleId,action});renderStatus(r.snapshot);toast(T(toastKey));}
+    catch(err){b.disabled=false;alertError(err);}
+   });
+   actions.append(b);
+  };
+  add(T('trialActivate'),'activate','primary','trialActivated');
+  add(T('trialExtend'),'extend','secondary','trialExtended');
+  add(T('trialOff'),'off','secondary','trialOffDone');
+  row.append(actions);
+  bar.append(row);
+ }
+}
+/* Inlärda förslag: domän + mapp + antal. Bara ett förslag – inget skapas utan klick. */
+function renderLearnBar(){
+ const bar=$('learnBar');if(!bar)return;
+ const list=(state.learn&&!state.learn.off)?state.learn.suggestions||[]:[];
+ bar.replaceChildren();bar.hidden=!list.length;
+ if(!list.length)return;
+ const head=el('div','learn-head');
+ head.append(el('strong','',T('learnTitle')));
+ const off=el('button','text-button',T('learnOff'));off.type='button';
+ off.addEventListener('click',async()=>{
+  try{renderStatus(await rpc('learnOff'));toast(T('learnOffDone'));}catch(err){alertError(err);}
+ });
+ head.append(off);
+ bar.append(head);
+ for(const s of list){
+  const row=el('div','learn-row');
+  const folder=folders.find(f=>f.id===s.target);
+  row.append(el('p','',T('learnBody').replace('{n}',s.count).replace('{domain}',s.domain).replace('{target}',folder?.name||folder?.label||T('missingFolderShort'))));
+  const actions=el('div','bar-actions');
+  const create=el('button','button small primary',T('learnCreate'));create.type='button';
+  create.addEventListener('click',async()=>{
+   create.disabled=true;
+   try{
+    const r=await rpc('learnCreate',{key:s.key});
+    renderStatus(r.snapshot);
+    toast(T(r.existing?'learnExisting':'learnCreated'));
+    if(!r.existing)loadRule(r.ruleId);
+   }catch(err){create.disabled=false;alertError(err);}
+  });
+  const snooze=el('button','button small secondary',T('learnSnooze'));snooze.type='button';
+  snooze.addEventListener('click',async()=>{
+   snooze.disabled=true;
+   try{renderStatus(await rpc('learnSnooze',{key:s.key}));}catch(err){snooze.disabled=false;alertError(err);}
+  });
+  actions.append(create,snooze);
+  row.append(actions);
+  bar.append(row);
+ }
 }
 function renderRules(){
  const list=$('ruleList');list.replaceChildren();const search=C.norm($('ruleSearch').value);
@@ -1797,6 +1938,10 @@ function renderRules(){
   btn.append(el('small','',fieldName+' · '+valueText+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+T('moreConditionsSuffix'):'')));
   const f=folders.find(f=>f.id===rule.target);btn.append(el('small','','↳ '+(f?.label||T('missingFolderShort'))));
   btn.append(el('span','rule-tag',ruleTagText(rule)));
+  if(rule.trialUntil>0){
+   const days=C.trialDaysLeft(rule);
+   btn.append(el('span','rule-tag trial-tag',T('trialBadge')+(days?' · '+T(days===1?'trialDayLeft':'trialDaysLeft').replace('{n}',days):'')));
+  }
   btn.addEventListener('click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule(rule.id);});
   const opts=el('div','rule-inline-opts');
   const moveUnreadLbl=el('label'),moveUnreadChk=el('input');moveUnreadChk.type='checkbox';
@@ -1944,6 +2089,7 @@ function addCondition(c={field:'domain',op:'equals',value:''}){
  row.append(field,op,value,remove);$('conditions').append(row);
 }
 function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',yearFolders:$('ruleYearFolders')?.checked===true,
+  trialUntil:$('ruleTrial')?.checked===true?(old?.trialUntil&&old.trialUntil>Date.now()?old.trialUntil:Date.now()+C.LIMITS.trialDays*86400000):0,
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.children[3].value}))});}
 /* Enkel regel-export använder samma validerade utkast som sparningen. */
@@ -1955,6 +2101,7 @@ function loadRule(id='',presetAccount=''){
  if($('ruleReadFilter'))$('ruleReadFilter').value=rule?.readFilter||'default';
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=rule?.unreadAction||'default';
  if($('ruleYearFolders'))$('ruleYearFolders').checked=rule?.yearFolders===true;
+ setTrialFields(rule);
  updateReadPolicy();
  const ruleAccount=rule?(rule.sourceAccount||folders.find(f=>f.id===rule.source)?.accountId||''):(presetAccount||accounts()[0]?.id||'');
  accountOptions(ruleAccount);targetOptions(rule?.target||'');
@@ -2462,7 +2609,12 @@ if($('quickHintsBtn'))handle('quickHintsBtn','click',()=>loadQuickHints(true));
 if($('quickValue'))$('quickValue').addEventListener('input',scheduleQuickPreview);
 if($('quickField'))$('quickField').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
 if($('quickTarget'))$('quickTarget').addEventListener('change',()=>{rememberQuickTarget($('quickTarget').value);updateQuickPreview().catch(()=>{});});
-if($('quickMoveUnread'))$('quickMoveUnread').addEventListener('change',()=>updateQuickPreview().catch(()=>{}));
+if($('quickMoveUnread'))$('quickMoveUnread').addEventListener('change',()=>{
+ /* Fönstervalet gäller bara när olästa mejl flyttas – annars är rutan död. */
+ if($('quickOpenWindow'))$('quickOpenWindow').disabled=!$('quickMoveUnread').checked;
+ updateQuickPreview().catch(()=>{});
+});
+if($('quickOpenWindow')&&$('quickMoveUnread'))$('quickOpenWindow').disabled=!$('quickMoveUnread').checked;
 if($('quickValue'))$('quickValue').addEventListener('keydown',e=>{
  if(e.key==='Enter'){e.preventDefault();$('quickAddBtn')?.click();}
  else if(e.key==='Escape'){e.preventDefault();$('quickValue').value='';updateQuickPreview().catch(()=>{});}
@@ -2484,6 +2636,10 @@ handle('mode','click',async()=>{
  renderStatus(await rpc('setMode',{revision:state.config.revision,paused:false,dryRun:!becomingLive}));toast(becomingLive?T('toastLiveOn'):T('toastTestOn'));
 });
 handle('queueSelected','click',async()=>{const r=await rpc('queueSelected');toast(r.queued?T('toastQueued'):T('toastAlreadyQueued'));});
+handle('learnOn','change',async()=>{
+ try{renderStatus(await rpc('learnToggle',{off:!$('learnOn').checked}));}
+ catch(err){$('learnOn').checked=!$('learnOn').checked;alertError(err);}
+});
 handle('showActivity','click',()=>showView('activity'));
 handle('runAllRulesBtn','click',async()=>runAllRules());
 if($('sweepNow'))handle('sweepNow','click',async()=>runAllRules());
@@ -2508,6 +2664,7 @@ async function runAllRules(){
   if(r.cachedFolders)parts.push(T('runAllCached').replace('{n}',r.cachedFolders));
   if(r.skippedFolders)parts.push(T('runAllSkipped').replace('{n}',r.skippedFolders));
   if(state.config.dryRun)parts.push(T('runAllTestMode'));
+  if(r.trialRules?.length)parts.push(T('runAllTrial').replace('{n}',r.trialRules.length));
   if(r.waited)parts.push(T('runAllWaited'));
   toast(parts.join(' '));
  }catch(err){alertError(err);}

@@ -1,7 +1,7 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,yearFolders:12,diagnose:20000,examples:5});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,yearFolders:12,diagnose:20000,examples:5,trialKeys:500,trialDays:7,learnDays:7,learnCount:3,learnEntries:40});
 /* Vilka fält och jämförelser som är tillåtna. Textfälten jämförs som text,
    storlek i kB och datum som dagar eller årtal. */
 const FIELD_OPS=Object.freeze({
@@ -36,9 +36,13 @@ function validateRule(raw){
  const scope=raw.scope===undefined?'folder':raw.scope;if(!['folder','account'].includes(scope))fail('bad_rule');
  const readFilter=raw.readFilter===undefined?'default':raw.readFilter;if(!['default','read','unread','both'].includes(readFilter))fail('bad_rule');
  const unreadAction=raw.unreadAction===undefined?'default':raw.unreadAction;if(!['default','keep','window','read'].includes(unreadAction))fail('bad_rule');
+ /* Provkörning: en regel kan gå i testläge till ett datum. 0 betyder ingen
+    provkörning. Fältet saknas i regler från tidigare versioner och blir då 0. */
+ const trialUntil=raw.trialUntil===undefined||raw.trialUntil===null?0:raw.trialUntil;
+ if(typeof trialUntil!=='number'||!Number.isFinite(trialUntil)||trialUntil<0)fail('bad_rule');
  const r={id:text(raw.id,80,'bad_id'),name:text(raw.name,100,'bad_name'),enabled:raw.enabled===true,
   source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(raw.sourceAccount,2048,'choose_source'):'',scope,
-  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction,yearFolders:raw.yearFolders===true};
+  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction,trialUntil:Math.floor(trialUntil),yearFolders:raw.yearFolders===true};
  if(!/^[a-zA-Z0-9_-]+$/.test(r.id))fail('bad_id');
  if(r.scope==='folder'&&r.source===r.target)fail('same_folder');
  if(!['all','any'].includes(r.match))fail('bad_match');
@@ -93,6 +97,17 @@ function seasonOf(value=new Date()){
  if(month>=5&&month<=7)return 'summer';
  if(month>=8&&month<=10)return 'autumn';
  return 'winter';
+}
+/* Provkörning: dagar kvar av regelns testperiod. 0 = ingen provkörning eller
+   perioden är slut. Används av både motorn (flytta inte) och gränssnittet. */
+function trialActive(rule,now=Date.now()){
+ const until=Number(rule?.trialUntil)||0;
+ return until>0&&until>now;
+}
+function trialDaysLeft(rule,now=Date.now()){
+ const until=Number(rule?.trialUntil)||0;
+ if(until<=now)return 0;
+ return Math.max(1,Math.ceil((until-now)/86400000));
 }
 /* Popup-skydd: nya fönster öppnas aldrig under ett pågående mass-svep. */
 function shouldOpenWindow(options={}){
@@ -515,7 +530,7 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
 whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

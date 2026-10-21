@@ -439,6 +439,60 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  el('pause').click();
  await until(()=>/Starta|Pausa/.test(pausedNow()),'demo tillbaka i normalläge');
 
+ /* ── Provkörning per regel ─────────────────────────────────────────────── */
+ const trialCfg={...originalConfig,rules:originalConfig.rules.map((r,i)=>i===0?{...r,trialUntil:Date.now()+3*86400000}:r)};
+ w.LasDemo.setState({config:trialCfg,trials:[{ruleId:originalConfig.rules[0].id,name:originalConfig.rules[0].name,left:3,until:Date.now()+3*86400000,active:true,count:5,target:originalConfig.rules[0].target}],learn:{off:false,suggestions:[]}});
+ el('pause').click();
+ await until(()=>doc.querySelectorAll('.trial-tag').length>0,'provkörningen märks i regellistan');
+ check(/TEST/.test(doc.querySelector('.trial-tag')?.textContent||''),'märket säger TEST');
+ check(/3 dagar kvar/.test(doc.querySelector('.trial-tag')?.textContent||''),'och hur många dagar som är kvar');
+ check(el('trialBar').hidden===true,'en pågående provkörning ger ingen rad');
+
+ w.LasDemo.setState({config:originalConfig,trials:[{ruleId:'demo-1',name:'Fortnox fakturor',left:0,until:Date.now()-1000,active:false,count:34,target:'demo-fin'}]});
+ el('pause').click();
+ await until(()=>el('trialBar').hidden===false,'en utgången provkörning visas');
+ check(/34/.test(txt('trialBar')),'antalet mejl som skulle ha flyttats syns');
+ check(!/undefined|\{n\}/.test(txt('trialBar')),'inga ofyllda platshållare');
+ const trialBtns=[...el('trialBar').querySelectorAll('button')];
+ check(trialBtns.length===3,'tre val: aktivera, förläng eller stäng av');
+ check(/Aktivera/.test(trialBtns[0].textContent),'första knappen aktiverar regeln');
+ check(/Förläng/.test(trialBtns[1].textContent),'andra förlänger provkörningen');
+ trialBtns[2].click();
+ await until(()=>el('trialBar').hidden===true,'svaret tar bort raden');
+ check(el('trialBar').hidden===true,'ingen provkörning kvar efter svaret');
+
+ /* ── Lär av din flytt ──────────────────────────────────────────────────── */
+ w.LasDemo.setState({trials:[],learn:{off:false,suggestions:[{key:'klarna.se|demo-fin',domain:'klarna.se',source:'demo-in',target:'demo-fin',count:3,first:Date.now(),last:Date.now()}]}});
+ el('pause').click();
+ await until(()=>el('learnBar').hidden===false,'ett inlärt förslag visas');
+ check(/klarna\.se/.test(txt('learnBar')),'domänen syns');
+ check(/Fakturor/.test(txt('learnBar')),'mappens namn syns i stället för id:t');
+ check(!/demo-fin/.test(txt('learnBar')),'inget mapp-id läcker ut');
+ check(!/undefined|\{n\}|\{domain\}/.test(txt('learnBar')),'inga ofyllda platshållare');
+ const rulesBefore=rows();
+ const learnBtns=[...el('learnBar').querySelectorAll('button')];
+ check(learnBtns.some(b=>/Skapa regel/.test(b.textContent)),'förslaget kan bli en regel');
+ check(learnBtns.some(b=>/Sluta föreslå/.test(b.textContent)),'och funktionen kan stängas av');
+ learnBtns.find(b=>/Skapa regel/.test(b.textContent)).click();
+ await until(()=>rows()===rulesBefore+1,'regeln skapas av förslaget');
+ check(el('learnBar').hidden===true,'förslaget försvinner när regeln finns');
+
+ /* ── Fönstervalet vid regelskapning ────────────────────────────────────── */
+ w.LasDemo.setState({config:originalConfig,learn:{off:false,suggestions:[]}});
+ el('pause').click();
+ el('newRule').click();
+ await sleep(80);
+ check(el('ruleTrial')!==null,'provkörning kan väljas när regeln skapas');
+ check(el('ruleMoveUnread').checked===false,'ny regel väntar på lästa mejl som standard');
+ check(el('ruleOpenWindow').disabled===true,'fönstervalet är dött när olästa mejl inte flyttas');
+ check(el('unreadChoiceNote').classList.contains('muted-out'),'och förklaringen tonas ned');
+ el('ruleMoveUnread').checked=true;
+ fire(el('ruleMoveUnread'),'change');
+ await sleep(50);
+ check(el('ruleOpenWindow').disabled===false,'fönstervalet går att göra när olästa flyttas');
+ check(!el('unreadChoiceNote').classList.contains('muted-out'),'och förklaringen syns igen');
+ check(/efter flytten/i.test(doc.querySelector('[data-i18n="ruleOpenWindowLabel"]')?.textContent||''),'rutan säger att fönstret kommer efter flytten');
+
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
     kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */
  await sleep(400);

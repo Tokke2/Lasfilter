@@ -198,6 +198,10 @@
               <span>⌕</span>
               <input id="ruleSearch" type="search" placeholder="Sök bland dina regler…" aria-label="Sök regler">
             </label>
+            <!-- Inlärda förslag: bara domän, mapp och antal – inget skapas utan ett klick. -->
+            <div id="learnBar" class="learn-bar" hidden role="status" aria-live="polite"></div>
+            <!-- Provkörda regler som har gått ut: aktivera, förläng eller stäng av. -->
+            <div id="trialBar" class="trial-bar" hidden role="status" aria-live="polite"></div>
             <div id="ruleList" class="rule-list"></div>
             <div class="card-foot">
               <button id="export" type="button" class="button small secondary" data-i18n="exportBtn">↓ Exportera regler (.json)</button>
@@ -286,16 +290,26 @@
                 </div>
 
                 <div class="unread-toggles">
+                  <strong class="unread-toggles-title" data-i18n="unreadChoiceTitle">Olästa mejl – välj vad som ska hända</strong>
                   <label class="toggle-label">
                     <input id="ruleMoveUnread" type="checkbox">
                     <span data-i18n="ruleMoveUnreadLabel">Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)</span>
                   </label>
                   <label class="toggle-label">
                     <input id="ruleOpenWindow" type="checkbox" checked>
-                    <span data-i18n="ruleOpenWindowLabel">Öppna flyttade olästa mejl i nytt fönster</span>
+                    <span data-i18n="ruleOpenWindowLabel">Öppna olästa mejl i ett nytt fönster efter flytten</span>
                   </label>
                 </div>
                 <p class="simple-help" data-i18n="unreadMoveNote">Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.</p>
+                <p class="simple-help" id="unreadChoiceNote" data-i18n="unreadChoiceNote">Fönstervalet gäller bara när olästa mejl flyttas direkt. Då öppnas mejlet först när det ligger i målmappen – aldrig som en tom ruta.</p>
+
+                <div class="trial-box">
+                  <label class="toggle-label">
+                    <input id="ruleTrial" type="checkbox">
+                    <span data-i18n="ruleTrialLabel">Provkör i 7 dagar innan regeln flyttar något</span>
+                  </label>
+                  <p class="muted"><strong id="trialLeft" class="trial-left" hidden></strong> <span data-i18n="trialNote">Under provkörningen räknar regeln bara hur många mejl den skulle flytta. Ingenting flyttas, och regeln påverkar inte de andra reglerna. Efter sju dagar frågar SortBro om du vill aktivera den.</span></p>
+                </div>
 
                 <details class="advanced-box">
                   <summary data-i18n="branchSummary">Avancerat: läsläge & olika mål beroende på ämne</summary>
@@ -454,6 +468,11 @@
               <input id="autoBackup" type="checkbox" checked>
               <span data-i18n="autoBackupLabel">Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/Regelbackuper/</span>
             </label>
+            <label class="toggle-label">
+              <input id="learnOn" type="checkbox" checked>
+              <span data-i18n="learnOnLabel">Lär av mina egna flyttar och föreslå regler</span>
+            </label>
+            <p class="muted" data-i18n="learnOnNote">Flyttar du själv tre mejl från samma avsändare till samma mapp föreslår SortBro en regel. Bara domän, mapp och antal sparas, i högst sju dagar – aldrig ämne, namn eller mejltext.</p>
             <p class="muted" data-i18n="autoBackupNote">Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad veckokopia sparas automatiskt en gång i veckan – de senaste 12 veckorna behålls. Knappen nedan skriver båda direkt, när du vill. Under Regler importerar du filen och får tillbaka reglerna.</p>
             <label class="toggle-label">
               <input id="brake" type="checkbox" checked>

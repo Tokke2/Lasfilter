@@ -241,6 +241,11 @@ test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  assert.match(text,/tags:/,'ska köras när en tagg flyttas');
  assert.match(text,/contents:\s*write/,'behöver skrivrättighet till releasen');
  assert.match(text,/tools\/verify_release\.py/,'ska kontrollera version och hash före uppladdning');
+ /* En flyttad tagg gör att GitHub lägger releasen som utkast och flyttar
+    "latest" till en äldre release – då slutar uppdateringarna komma. */
+ assert.match(text,/draft=false/,'måste publicera releasen igen efter en flyttad tagg');
+ assert.match(text,/make_latest=true/,'måste peka releases\/latest på den nya versionen');
+ assert.match(text,/if: github\.ref_name != env\.BRIDGE_TAG/,'bryggan v1.0.0 ska inte flyttas till latest');
 });
 
 test('updates.json beskriver samma tillägg som manifestet',()=>{

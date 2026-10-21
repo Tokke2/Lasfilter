@@ -56,3 +56,19 @@ jobs:
             gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
               --jq '.assets[] | "\(.name) \(.size) \(.digest)"'
           done
+
+      # En tagg som flyttats (samma version, ny commit) gör att GitHub lägger
+      # releasen som utkast, och då slutar releases/latest att följa den nya
+      # versionen. Publicera den igen och peka "latest" hit. Två anrop: GitHub
+      # struntar i make_latest om samma anrop också ändrar draft.
+      - name: Publicera releasen och gör den till senaste
+        if: github.ref_name != env.BRIDGE_TAG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            -f draft=false >/dev/null
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            -f make_latest=true --jq '.tag_name + " ar publicerad och senaste"'
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name'

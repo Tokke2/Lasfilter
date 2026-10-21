@@ -155,6 +155,35 @@ test('manifestet pekar på en HTTPS-adress för uppdateringar',()=>{
  assert.match(g.update_url,/\/updates\.json$/,'adressen ska peka på uppdateringsfilen');
 });
 
+test('uppdateringen hämtas från en release – aldrig från main eller en rå fil',()=>{
+ const g=gecko();
+ assert.match(g.update_url,/^https:\/\/github\.com\/Tokke2\/Lasfilter\/releases\/download\/v[0-9.]+\/updates\.json$/,'uppdateringsadressen ska vara en release-tillgång');
+ assert.doesNotMatch(g.update_url,/\/main\/|raw\.githubusercontent/,'main får aldrig vara uppdateringskanal');
+ const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
+ for(const item of u.addons[g.id].updates){
+  assert.match(item.update_link,/^https:\/\/github\.com\/Tokke2\/Lasfilter\/releases\/download\//,'XPI-filen ska ligga som release-tillgång');
+  assert.doesNotMatch(item.update_link,/\/main\/|raw\.githubusercontent/,'aldrig main eller rå fil');
+ }
+});
+
+test('release-taggen är densamma i manifestet och i updates.json',()=>{
+ const g=gecko();
+ const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
+ const item=u.addons[g.id].updates[0];
+ const tagOf=url=>String(url).match(/\/releases\/(?:download|tag)\/(v[0-9.]+)(?:\/|$)/)?.[1]||'';
+ const manifestTag=tagOf(g.update_url);
+ assert.ok(manifestTag,'manifestets adress saknar en versionstagg');
+ assert.equal(tagOf(item.update_link),manifestTag,'nedladdningslänken pekar på en annan release');
+ assert.equal(tagOf(item.update_info_url),manifestTag,'informationslänken pekar på en annan release');
+});
+
+test('uppdateringsfilen är en tillgång i releasen, inte en fil på en gren',()=>{
+ const g=gecko();
+ const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
+ assert.equal(u.addons[g.id].updates.length,1,'en post per release räcker – äldre versioner behövs inte');
+ assert.equal(u.addons[g.id].updates[0].version,manifest.version);
+});
+
 test('updates.json beskriver samma tillägg som manifestet',()=>{
  const g=gecko();
  const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));

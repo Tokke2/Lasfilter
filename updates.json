@@ -4,9 +4,9 @@
       "updates": [
         {
           "version": "1.0.0",
-          "update_link": "https://raw.githubusercontent.com/Tokke2/Lasfilter/v1.0.0/SortBro-Thunderbird.xpi",
-          "update_hash": "sha256:649b50b07978fddee2943f20850711ec7d8cc8c83a7a423ddfb6303bd400bfaf",
-          "update_info_url": "https://github.com/Tokke2/Lasfilter/blob/v1.0.0/LAS-MIG.md"
+          "update_link": "https://github.com/Tokke2/Lasfilter/releases/download/v1.0.0/SortBro-Thunderbird.xpi",
+          "update_hash": "sha256:973ecfb9c4b84cd0dacea99f3d3c4d70a4d243b08f7309683005c0d0f06b0316",
+          "update_info_url": "https://github.com/Tokke2/Lasfilter/releases/tag/v1.0.0"
         }
       ]
     }

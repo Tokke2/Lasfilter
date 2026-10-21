@@ -289,9 +289,11 @@ Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen o
 
 ### En gång, för hand
 
-Hämta `SortBro-Thunderbird.xpi` här:
+Hämta `SortBro-Thunderbird.xpi` från **Releases** — inte från grenen eller filistan:
 
-`https://github.com/Tokke2/Lasfilter/blob/v1.0.0/SortBro-Thunderbird.xpi`
+`https://github.com/Tokke2/Lasfilter/releases/latest`
+
+Filen ligger som en bifogad fil (asset) på releasen `v1.0.0`. Det är samma fil som automatiken nedan hämtar, alltså den yta som faktiskt är avsedd för nedladdning.
 
 1. Thunderbird → **Verktyg → Tillägg och teman** (Ctrl+Skift+A)
 2. **Kugghjulet** uppe till höger → **Installera tillägg från fil…**
@@ -306,10 +308,14 @@ Kontrollsumman för filen ligger i `SortBro-Thunderbird.xpi.sha256` om du vill k
 Manifestet innehåller en uppdateringsadress:
 
 ```
-https://raw.githubusercontent.com/Tokke2/Lasfilter/v1.0.0/updates.json
+https://github.com/Tokke2/Lasfilter/releases/download/v1.0.0/updates.json
 ```
 
-Filen `updates.json` i repot talar om vilken version som är nyast, var XPI-filen ligger och vilken SHA-256 den har. Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart. Inget mer klickande.
+Den pekar på en **release-tillgång**, inte på en gren och inte på `main`. `updates.json` talar om vilken version som är nyast, var XPI-filen ligger och vilken SHA-256 den har — och även XPI-länken är en release-tillgång:
+
+```
+https://github.com/Tokke2/Lasfilter/releases/download/v1.0.0/SortBro-Thunderbird.xpi
+``` Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart. Inget mer klickande.
 
 Tre saker måste stämma vid varje släpp, annars uteblir uppdateringen **tyst**:
 
@@ -319,7 +325,9 @@ Tre saker måste stämma vid varje släpp, annars uteblir uppdateringen **tyst**
 
 Alla tre kontrolleras av tester i `tester/safety.test.cjs` vid varje bygge, tillsammans med en kontroll att versionsnumret i gränssnittets sidfot är samma som i manifestet.
 
-**Varför adressen pekar på taggen `v1.0.0`:** varje släpp flyttar taggen till den nya commiten, så samma adress ger alltid senaste `updates.json` och senaste XPI. En gren hade också fungerat, men taggen är den stabila punkten i det här repot. GitHub kan cacha innehållet i några minuter, så en alldeles färsk uppdatering kan dröja en stund innan Thunderbird ser den.
+**Varför release och inte `main`:** en gren är ett arbetsdokument som ändras varje gång något sparas, medan en release är en fryst version med filer som hör ihop. SortBro uppdaterar bara från `/releases/download/v1.0.0/`, så ett pågående arbete i repot kan aldrig bli en uppdatering av misstag. Samma release-tagg används varje släpp och filerna byts ut på plats, så adressen är stabil.
+
+Ett test i `tester/safety.test.cjs` avvisar bygget om adressen skulle peka på `main`, på en rå fil (`raw.githubusercontent.com`) eller på olika taggar i manifestet och `updates.json`. GitHub kan cacha release-filer i några minuter, så en alldeles färsk uppdatering kan dröja en stund innan Thunderbird ser den.
 
 **Signering:** Thunderbird kräver i dag inte signerade tillägg (till skillnad från Firefox), så det här fungerar med vår osignerade fil — det är samma förutsättning som gjorde att du kunde installera den för hand. Skulle Mozilla börja kräva signatur måste XPI:n signeras hos AMO som *unlisted*, och då måste `update_url` samtidigt tas bort: AMO avvisar paket som pekar på en egen uppdateringsfil.
 

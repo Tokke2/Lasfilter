@@ -1149,3 +1149,28 @@ test('skapa regel av en inlärd flytt',async()=>{
  assert.equal(out.rule.enabled,true);
  assert.equal(app.learned.entries.length,0,'förslaget försvinner när regeln finns');
 });
+
+/* Sidan som var öppen när tillägget uppdaterades kör kvar sin gamla kod och visar
+   därför den gamla versionen i sidfoten. Utan behörigheten "tabs" kan bakgrunden
+   inte läsa tabbarnas adresser, så den känner igen sidan på versionsmarkeringen
+   som varje ärende bär med sig – och laddar om den en gång. */
+test('en öppen sida som kör en annan version laddas om',async()=>{
+ const api=stubApi();
+ let listener=null;
+ const reloads=[];
+ api.runtime.id='lasfilter@lokala-verktyg.invalid';
+ api.runtime.getManifest=()=>({version:'1.0.1'});
+ api.runtime.onMessage.addListener=fn=>{listener=fn;};
+ api.tabs.reload=async id=>{reloads.push(id);};
+ const {app,tick}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ const sender=tabId=>({id:'lasfilter@lokala-verktyg.invalid',tab:{id:tabId}});
+ await tick.settle(listener({type:'status',uiBuild:'1.0.1'},sender(7)));
+ assert.deepEqual(reloads,[],'en sida med rätt version rörs inte');
+ await tick.settle(listener({type:'status',uiBuild:'1.0.0'},sender(7)));
+ assert.deepEqual(reloads,[7],'en sida med äldre version laddas om');
+ await tick.settle(listener({type:'status',uiBuild:'1.0.0'},sender(7)));
+ assert.deepEqual(reloads,[7],'samma flik laddas bara om en gång');
+ await tick.settle(listener({type:'status'},sender(8)));
+ assert.deepEqual(reloads,[7,8],'utan versionsmarkering räknas sidan som gammal');
+});

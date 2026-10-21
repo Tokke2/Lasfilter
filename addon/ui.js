@@ -1327,7 +1327,7 @@ function toast(text,error=false){const n=$('toast');n.textContent=text;n.style.b
 function alertError(err){toast(Terr(err.code||err.message),true);}
 async function rpc(type,data={}){
  if(!live&&!DEMO)throw new C.RuleError('not_installed');
- const reply=DEMO?await LasDemo.request({type,...data}):await browser.runtime.sendMessage({type,...data});
+ const reply=DEMO?await LasDemo.request({type,...data}):await browser.runtime.sendMessage({type,...data,uiBuild:UI_BUILD});
  if(!reply?.success)throw new C.RuleError(reply?.error||'internal_error');return reply.data;
 }
 function handle(id,event,fn){const n=$(id);if(n)n.addEventListener(event,async e=>{try{await fn(e);}catch(err){alertError(err);}});}
@@ -1361,14 +1361,22 @@ function updateReadPolicy(){
 /* Versionen i sidfoten läses ur manifestet, aldrig ur en textsträng. Då kan den
    inte säga en annan version än den som faktiskt är installerad. Saknas manifestet
    (förhandsvisningen) står den statiska texten kvar som reserv. */
-function versionText(){
- const text=T('versionText');
+function manifestVersion(){
  try{
   const v=globalThis.browser?.runtime?.getManifest?.()?.version;
-  if(typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v))return text.replace(/v\d+\.\d+\.\d+/,('v'+v));
+  if(typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v))return v;
  }catch{}
- return text;
+ return '';
 }
+function versionText(){
+ const text=T('versionText');
+ const v=manifestVersion();
+ return v?text.replace(/v\d+\.\d+\.\d+/,('v'+v)):text;
+}
+/* Samma version följer med varje ärende till bakgrunden. Bakgrunden jämför den
+   med sin egen och laddar om sidor som kör en äldre version – en sida som var
+   öppen när tillägget uppdaterades visar annars den gamla versionen för alltid. */
+const UI_BUILD=manifestVersion();
 function applyLanguage(lang){
  currentLang=lang==='en'?'en':'sv';
  document.documentElement.lang=currentLang;

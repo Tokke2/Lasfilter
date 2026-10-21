@@ -317,6 +317,8 @@ https://github.com/Tokke2/Lasfilter/releases/latest/download/SortBro-Thunderbird
 
 Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart.
 
+En sidfot kan ändå visa fel version en stund: en **flik eller ett fönster som redan var öppet** när uppdateringen kom fortsätter att köra den gamla versionens kod. Sidan laddas om automatiskt nästa gång den hör av sig till bakgrunden — varje ärende bär med sig vilken version sidans kod har, och bakgrunden laddar om fliken om den inte stämmer med den installerade. Fram till dess, eller om sidan kör en version före den här rättningen, räcker det att stänga fönstret och öppna det igen (eller trycka **Ctrl+R**): då läses den nya filen in och sidfoten visar rätt version.
+
 **Adressen är inbakad i den installerade kopian** och kan inte ändras i efterhand. Därför följer den `releases/latest` i stället för en fast tagg: en installation gjord i dag hittar även versionen som släpps om ett år, utan att du installerar om något.
 
 ### Kontrollera versionen med ett Windows-skript

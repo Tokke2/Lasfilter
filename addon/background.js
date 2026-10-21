@@ -1020,17 +1020,11 @@ App.ready=(async()=>{
  App.log('debug',0,App.startDetail());
  /* En färsk kopia direkt vid start: den senaste kända uppsättningen regler. */
  App.scheduleAutoBackup();App.changed();
- try{
-  const uiUrl=B.runtime.getURL('ui.html');
-  const tabs=await B.tabs.query({});
-  const uiTabs=(tabs||[]).filter(t=>typeof t.url==='string'&&t.url.startsWith(uiUrl));
-  if(uiTabs.length){
-   const keep=uiTabs.find(t=>t.active)||uiTabs[0];
-   App.uiTab=keep.id;
-   for(const t of uiTabs)if(t.id!==keep.id)B.tabs.remove(t.id).catch(()=>{});
-   B.tabs.reload(keep.id).catch(()=>{});
-  }
- }catch{}
+/* Sidor som var öppna när tillägget uppdaterades kör kvar sin gamla kod och visar
+   därför den gamla versionen tills de laddas om. Här gick det inte att leta upp dem:
+   tabbarnas adresser är dolda utan behörigheten "tabs", och den lägger vi inte till.
+   I stället bär varje ärende från en sida med sig sin version (uiBuild), och
+   App.reloadStaleUi laddar om den som inte matchar den här versionen. */
  App.timer=setInterval(()=>{
   const now=Date.now(),gap=App.lastTickAt?now-App.lastTickAt:0;
   App.lastTickAt=now;
@@ -1052,9 +1046,26 @@ App.ready=(async()=>{
  if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});
  App.engine.stop('storage_error');
 });
+/* En sida som skickar ett ärende hit talar om vilken version dess kod har. Stämmer
+   den inte med den installerade versionen laddas fliken om en gång – efter det kör
+   den nya koden och hör av sig med rätt version. Utan det här fortsätter en flik
+   som var öppen under uppdateringen att visa den gamla versionen i sidfoten. */
+const UI_BUILD=B.runtime.getManifest().version;
+App.staleUi=new Set();
+App.reloadStaleUi=(sender,msg)=>{
+ const tabId=sender?.tab?.id;
+ if(typeof tabId!=='number')return;
+ if(typeof UI_BUILD!=='string'||!UI_BUILD)return;
+ if(msg?.uiBuild===UI_BUILD)return;
+ if(App.staleUi.has(tabId))return;
+ App.staleUi.add(tabId);
+ B.tabs.reload(tabId).catch(()=>App.staleUi.delete(tabId));
+ App.log('debug',0,'sida med annan version omladdad ('+(msg?.uiBuild||'utan versionsmarkering')+' mot '+UI_BUILD+')');
+};
 B.browserAction.onClicked.addListener(tab=>App.open(tab).catch(()=>App.log('error')));
 B.runtime.onMessage.addListener((msg,sender)=>{
  if(sender.id!==B.runtime.id||msg?.event)return undefined;
+ if(msg?.uiBuild!==UI_BUILD)App.reloadStaleUi(sender,msg);
  return App.handle(msg).then(data=>({success:true,data})).catch(err=>{
   const code=err instanceof C.RuleError?err.code:'internal_error';
   if(code==='storage_error'||!(err instanceof C.RuleError))App.engine?.stop(code);

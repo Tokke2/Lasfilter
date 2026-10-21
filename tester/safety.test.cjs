@@ -210,7 +210,7 @@ test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  }
  assert.match(text,/tags:/,'ska köras när en tagg flyttas');
  assert.match(text,/contents:\s*write/,'behöver skrivrättighet till releasen');
- assert.match(text,/sha256sum/,'ska kontrollera hashen före uppladdning');
+ assert.match(text,/tools\/verify_release\.py/,'ska kontrollera version och hash före uppladdning');
 });
 
 test('updates.json beskriver samma tillägg som manifestet',()=>{

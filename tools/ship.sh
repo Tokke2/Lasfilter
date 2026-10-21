@@ -86,19 +86,8 @@ say "5/7 · kör testerna"
 node --test tester/*.test.cjs
 (cd tester && node dom_check.cjs | tail -1)
 
-say "6/7 · kontrollerar att versionen syns i alla filer"
-python3 - "$NEW" <<'PY'
-import json, sys
-v = sys.argv[1]
-m = json.load(open('addon/manifest.json'))
-d = json.load(open('updates.json'))
-u = d['addons']['lasfilter@lokala-verktyg.invalid']['updates'][0]
-assert m['version'] == v, m['version']
-assert u['version'] == v, u['version']
-ui = open('addon/ui.js', encoding='utf-8').read()
-assert f'v{v}' in ui
-print('version', v, 'ok i manifest, updates.json och ui.js')
-PY
+say "6/7 · kontrollerar att version, hash och adresser hör ihop"
+python3 tools/verify_release.py
 
 if [ "$CHECK_ONLY" = "1" ]; then
  say "klart (endast kontroll) – version $NEW är byggd men inte publicerad"

@@ -61,7 +61,7 @@ const I18N={
   supFaq3A:'Nej – alla funktioner i SortBro är 100 % gratis för alla, alltid. En gåva är helt frivillig och ett varmt tack som gör det möjligt att fortsätta utveckla och underhålla tillägget.',
   sidebarNoteTitle:'Du läser i lugn och ro.',
   sidebarNoteBody:'Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.',
-  versionText:'Lokal behandling · v1.0.0 · Inga molntjänster',
+  versionText:'Lokal behandling · v1.0.1 · Inga molntjänster',
   topbarTitle:'THUNDERBIRD / SORTBRO',
   themeQuickTitle:'Växla ljust/mörkt tema',
   introEyebrow:'ENKEL AUTOMATISK SORTERING',
@@ -716,7 +716,7 @@ const I18N={
   supFaq3A:'No – all features in SortBro are 100% free for everyone, always. Donating is completely voluntary and helps keep development going.',
   sidebarNoteTitle:'Read at your own pace.',
   sidebarNoteBody:'Read messages stay put while open in any mail tab or message window.',
-  versionText:'Local processing · v1.0.0 · No cloud services',
+  versionText:'Local processing · v1.0.1 · No cloud services',
   topbarTitle:'THUNDERBIRD / SORTBRO',
   themeQuickTitle:'Toggle light/dark theme',
   introEyebrow:'AUTOMATIC EMAIL SORTING',
@@ -1358,13 +1358,24 @@ function updateReadPolicy(){
  if($('readPolicyBody'))$('readPolicyBody').textContent=T(map[1]);
 }
 
+/* Versionen i sidfoten läses ur manifestet, aldrig ur en textsträng. Då kan den
+   inte säga en annan version än den som faktiskt är installerad. Saknas manifestet
+   (förhandsvisningen) står den statiska texten kvar som reserv. */
+function versionText(){
+ const text=T('versionText');
+ try{
+  const v=globalThis.browser?.runtime?.getManifest?.()?.version;
+  if(typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v))return text.replace(/v\d+\.\d+\.\d+/,('v'+v));
+ }catch{}
+ return text;
+}
 function applyLanguage(lang){
  currentLang=lang==='en'?'en':'sv';
  document.documentElement.lang=currentLang;
  document.title=T('pageTitle');
  for(const node of document.querySelectorAll('[data-i18n]')){
   const key=node.dataset.i18n;
-  if(key)node.textContent=T(key);
+  if(key)node.textContent=key==='versionText'?versionText():T(key);
  }
  if($('langSv'))$('langSv').classList.toggle('active',currentLang==='sv');
  if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');

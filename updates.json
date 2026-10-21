@@ -3,10 +3,10 @@
     "lasfilter@lokala-verktyg.invalid": {
       "updates": [
         {
-          "version": "1.0.0",
-          "update_link": "https://github.com/Tokke2/Lasfilter/releases/download/v1.0.0/SortBro-Thunderbird.xpi",
-          "update_hash": "sha256:973ecfb9c4b84cd0dacea99f3d3c4d70a4d243b08f7309683005c0d0f06b0316",
-          "update_info_url": "https://github.com/Tokke2/Lasfilter/releases/tag/v1.0.0"
+          "version": "1.0.1",
+          "update_link": "https://github.com/Tokke2/Lasfilter/releases/latest/download/SortBro-Thunderbird.xpi",
+          "update_hash": "sha256:242383b4cb9fdb26723ce3d39462aa5746e4da5822ac37e5d00a7bbb3d77ecc7",
+          "update_info_url": "https://github.com/Tokke2/Lasfilter/releases/latest"
         }
       ]
     }

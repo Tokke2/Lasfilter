@@ -155,33 +155,50 @@ test('manifestet pekar på en HTTPS-adress för uppdateringar',()=>{
  assert.match(g.update_url,/\/updates\.json$/,'adressen ska peka på uppdateringsfilen');
 });
 
-test('uppdateringen hämtas från en release – aldrig från main eller en rå fil',()=>{
+test('uppdateringen hämtas från senaste release – aldrig från main eller en rå fil',()=>{
  const g=gecko();
- assert.match(g.update_url,/^https:\/\/github\.com\/Tokke2\/Lasfilter\/releases\/download\/v[0-9.]+\/updates\.json$/,'uppdateringsadressen ska vara en release-tillgång');
+ assert.match(g.update_url,/^https:\/\/github\.com\/Tokke2\/Lasfilter\/releases\/latest\/download\/updates\.json$/,'uppdateringsadressen ska följa senaste release');
  assert.doesNotMatch(g.update_url,/\/main\/|raw\.githubusercontent/,'main får aldrig vara uppdateringskanal');
  const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
  for(const item of u.addons[g.id].updates){
-  assert.match(item.update_link,/^https:\/\/github\.com\/Tokke2\/Lasfilter\/releases\/download\//,'XPI-filen ska ligga som release-tillgång');
+  assert.match(item.update_link,/^https:\/\/github\.com\/Tokke2\/Lasfilter\/releases\/latest\/download\//,'XPI-filen ska ligga på senaste release');
   assert.doesNotMatch(item.update_link,/\/main\/|raw\.githubusercontent/,'aldrig main eller rå fil');
  }
 });
 
-test('release-taggen är densamma i manifestet och i updates.json',()=>{
+/* Adressen är inbakad i den installerade kopian och kan inte ändras i efterhand.
+   Därför måste den följa "senaste release" i stället för en fast tagg – annars
+   slutar en gammal installation leta nya versioner så snart taggen byts. */
+test('uppdateringsadressen följer senaste release så att en installerad kopia aldrig blir kvar',()=>{
  const g=gecko();
+ assert.match(g.update_url,/\/releases\/latest\/download\//,'en fast tagg skulle låsa gamla installationer');
  const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
- const item=u.addons[g.id].updates[0];
- const tagOf=url=>String(url).match(/\/releases\/(?:download|tag)\/(v[0-9.]+)(?:\/|$)/)?.[1]||'';
- const manifestTag=tagOf(g.update_url);
- assert.ok(manifestTag,'manifestets adress saknar en versionstagg');
- assert.equal(tagOf(item.update_link),manifestTag,'nedladdningslänken pekar på en annan release');
- assert.equal(tagOf(item.update_info_url),manifestTag,'informationslänken pekar på en annan release');
+ assert.match(u.addons[g.id].updates[0].update_link,/\/releases\/latest\/download\//);
+ assert.match(u.addons[g.id].updates[0].update_info_url,/\/releases\/latest$/);
 });
 
-test('uppdateringsfilen är en tillgång i releasen, inte en fil på en gren',()=>{
+/* Bryggan: kopior installerade som 1.0.0 läser fortfarande release v1.0.0.
+   Den releasen måste därför få samma filer vid varje släpp. */
+test('arbetsflödet uppdaterar även bryggreleasen v1.0.0',()=>{
+ const text=fs.readFileSync(path.join(ROOT,'.github','workflows','release-assets.yml'),'utf8');
+ assert.match(text,/BRIDGE_TAG:\s*v1\.0\.0/,'bryggreleasen ska vara v1.0.0');
+ assert.match(text,/upload "\$BRIDGE_TAG"/,'filerna ska laddas upp även dit');
+});
+
+test('versionen höjs när filerna ändras – annars uppdaterar Thunderbird aldrig',()=>{
+ /* Thunderbird jämför versionsnummer, inte filinnehåll. Ett versionssteg i
+     patchnivå är det som gör en ny fil till en uppdatering. */
+ const parts=manifest.version.split('.').map(Number);
+ assert.equal(parts.length,3,'versionen ska ha tre delar');
+ assert.ok(parts.every(Number.isInteger),'varje del ska vara ett heltal');
+ assert.ok(Number.isInteger(parts[2]),'patchdelen styr uppdateringen');
+});
+
+test('uppdateringsfilen är en tillgång på releasen, inte en fil på en gren',()=>{
  const g=gecko();
  const u=JSON.parse(fs.readFileSync(path.join(ROOT,'updates.json'),'utf8'));
  assert.equal(u.addons[g.id].updates.length,1,'en post per release räcker – äldre versioner behövs inte');
- assert.equal(u.addons[g.id].updates[0].version,manifest.version);
+ assert.equal(u.addons[g.id].updates[0].version,manifest.version,'updates.json måste säga samma version som manifestet');
 });
 
 test('releasen får sina filer automatiskt när taggen flyttas',()=>{
@@ -223,7 +240,14 @@ test('updates.json är i takt med den XPI som ligger i repot',()=>{
  assert.equal(sidecar.split(/\s+/)[0],hash,'kontrollsumman bredvid filen ska vara samma');
 });
 
-test('versionsnumret i gränssnittet är manifestets version',()=>{
+test('sidfoten läser versionen ur manifestet i stället för ur en textsträng',()=>{
+ const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
+ assert.match(ui,/function versionText\(\)/,'det ska finnas en funktion som räknar ut versionstexten');
+ assert.match(ui,/getManifest\?\.\(\)\?\.version/,'den ska läsa runtime.getManifest().version');
+ assert.match(ui,/key==='versionText'\?versionText\(\):T\(key\)/,'den ska användas när sidfoten skrivs');
+});
+
+test('versionsnumret i gränssnittet är manifestets version (reservtexten)',()=>{
  const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
  const found=[...ui.matchAll(/· v(\d+\.\d+\.\d+) ·/g)].map(m=>m[1]);
  assert.ok(found.length>=2,'både svensk och engelsk text ska visa versionen');

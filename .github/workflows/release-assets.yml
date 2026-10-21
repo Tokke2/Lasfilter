@@ -1,8 +1,13 @@
 name: Release assets
 
-# Lägger XPI-filen, kontrollsumman och updates.json som bilagor på releasen,
-# så att Thunderbird kan uppdatera från /releases/download/... och ingen
-# behöver ladda upp något för hand. Körs när en versionstagg flyttas.
+# Lägger XPI-filen, kontrollsumman och updates.json som bilagor på releasen, så
+# att Thunderbird kan uppdatera från /releases/latest/download/... utan att någon
+# laddar upp något för hand.
+#
+# Två releaser får filerna:
+#   1. releasen för den tagg som just pushades (v1.0.1, v1.0.2 …),
+#   2. bryggan v1.0.0 – den release som redan installerade kopior pekar på.
+#      Utan den skulle en installation av 1.0.0 aldrig se en nyare version.
 on:
   push:
     tags:
@@ -10,6 +15,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  BRIDGE_TAG: v1.0.0
 
 jobs:
   upload:
@@ -24,7 +32,7 @@ jobs:
           test -f SortBro-Thunderbird.xpi.sha256
           test -f updates.json
 
-      - name: Kontrollera att hashen stämmer
+      - name: Kontrollera att hashen stämmer med XPI-filen
         run: |
           set -e
           expected=$(cut -d' ' -f1 < SortBro-Thunderbird.xpi.sha256)
@@ -33,19 +41,44 @@ jobs:
           echo "faktisk:   $actual"
           test "$expected" = "$actual"
 
+      - name: Kontrollera att updates.json beskriver samma version och hash
+        run: |
+          set -e
+          version=$(python3 -c "import json;print(json.load(open('addon/manifest.json'))['version'])")
+          python3 - "$version" <<'PY'
+import json, sys, hashlib
+version = sys.argv[1]
+d = json.load(open('updates.json'))
+item = d['addons']['lasfilter@lokala-verktyg.invalid']['updates'][0]
+assert item['version'] == version, f"updates.json säger {item['version']}, manifestet {version}"
+h = hashlib.sha256(open('SortBro-Thunderbird.xpi','rb').read()).hexdigest()
+assert item['update_hash'] == 'sha256:' + h, 'update_hash stämmer inte med XPI-filen'
+print('version', version, 'ok')
+PY
+
       - name: Lägg filerna på releasen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
           set -e
-          # Releasen skapas om den inte finns, så en ny tagg alltid får en sida.
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "SortBro $TAG" --notes "Se LAS-MIG.md i repot."
-          fi
-          gh release upload "$TAG" \
-            SortBro-Thunderbird.xpi \
-            SortBro-Thunderbird.xpi.sha256 \
-            updates.json \
-            --clobber --repo "$GITHUB_REPOSITORY"
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
+          upload() {
+            tag="$1"
+            if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+                --title "SortBro $tag" --notes "Se LAS-MIG.md i repot."
+            fi
+            gh release upload "$tag" \
+              SortBro-Thunderbird.xpi \
+              SortBro-Thunderbird.xpi.sha256 \
+              updates.json \
+              --clobber --repo "$GITHUB_REPOSITORY"
+          }
+          upload "$TAG"
+          # Bryggan: samma filer på den release som installerade 1.0.0-kopior läser.
+          if [ "$TAG" != "$BRIDGE_TAG" ]; then upload "$BRIDGE_TAG"; fi
+          for tag in "$TAG" "$BRIDGE_TAG"; do
+            echo "== $tag =="
+            gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[] | "\(.name) \(.size) \(.digest)"'
+          done

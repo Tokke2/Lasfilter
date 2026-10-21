@@ -201,11 +201,41 @@ test('uppdateringsfilen är en tillgång på releasen, inte en fil på en gren',
  assert.equal(u.addons[g.id].updates[0].version,manifest.version,'updates.json måste säga samma version som manifestet');
 });
 
+/* Windows-skriptet som bara kontrollerar versionen. Det får aldrig kunna
+   installera något, och det måste vara tekniskt körbart: ren ASCII, bara CRLF,
+   inga utropstecken (de äts upp av delayed expansion) och alla etiketter utsatta. */
+test('kontrollskriptet för Windows finns och är körbart',()=>{
+ const file=path.join(ROOT,'Kolla-SortBro-version.bat');
+ assert.ok(fs.existsSync(file),'Kolla-SortBro-version.bat saknas');
+ const raw=fs.readFileSync(file);
+ const text=raw.toString('latin1');
+ assert.equal(/[\x80-\xff]/.test(text),false,'bara ASCII – annars blir svenska tecken skräp i cmd');
+ assert.equal(text.replace(/\r\n/g,'').includes('\n'),false,'bara CRLF – annars kan cmd tappa en etikett');
+ assert.equal(text.includes('!'),false,'inga utropstecken – delayed expansion äter dem');
+ assert.ok(text.includes('Thunderbird')&&text.includes('Profiles'),'ska leta i Thunderbird-profilerna');
+ assert.ok(text.includes('lasfilter@lokala-verktyg.invalid'),'ska känna igen tilläggets id');
+ assert.ok(text.includes('%ADDON_ID%'+'.xpi'),'ska läsa den installerade XPI-filen i profilen');
+
+ assert.match(text,/releases\/latest\/download\/updates\.json/,'ska fråga senaste release');
+ assert.match(text,/System\.IO\.Compression\.FileSystem/,'ska kunna läsa manifest.json ur en XPI');
+ assert.match(text,/choice \/c JN/,'ska fråga innan något öppnas');
+ /* Bara läsa – aldrig skriva in i profilen. */
+ assert.equal(/xcopy|robocopy|copy .*extensions|move .*extensions/i.test(text),false,'får inte kopiera in något i profilen');
+});
+
+test('alla etiketter som skriptet hoppar till finns',()=>{
+ const text=fs.readFileSync(path.join(ROOT,'Kolla-SortBro-version.bat'),'latin1');
+ const defined=new Set([...text.matchAll(/^:([a-z]+)\s*$/gim)].map(m=>m[1].toLowerCase()));
+ const used=[...text.matchAll(/\bgoto\s+:?([a-z]+)/gi)].map(m=>m[1].toLowerCase()).filter(n=>n!=='eof');
+ for(const label of used)assert.ok(defined.has(label),'etikett saknas: '+label);
+ for(const [,label] of text.matchAll(/\bcall\s+:([a-z]+)/gi))assert.ok(defined.has(label.toLowerCase()),'underprogram saknas: '+label);
+});
+
 test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  const wf=path.join(ROOT,'.github','workflows','release-assets.yml');
  assert.ok(fs.existsSync(wf),'arbetsflödet som lägger filerna på releasen saknas');
  const text=fs.readFileSync(wf,'utf8');
- for(const file of ['SortBro-Thunderbird.xpi','SortBro-Thunderbird.xpi.sha256','updates.json']){
+ for(const file of ['SortBro-Thunderbird.xpi','SortBro-Thunderbird.xpi.sha256','updates.json','Kolla-SortBro-version.bat']){
   assert.ok(text.includes(file),'arbetsflödet måste ladda upp '+file);
  }
  assert.match(text,/tags:/,'ska köras när en tagg flyttas');

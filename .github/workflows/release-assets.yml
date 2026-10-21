@@ -1,8 +1,10 @@
 name: Release assets
 
-# Lägger XPI-filen, kontrollsumman och updates.json som bilagor på releasen, så
+# Lägger XPI-filen, kontrollsumman, updates.json och Windows-skriptet som
+# bilagor på releasen, så
 # att Thunderbird kan uppdatera från /releases/latest/download/... utan att någon
-# laddar upp något för hand.
+# laddar upp något för hand. Kolla-SortBro-version.bat bara läser – den kan inte
+# installera något, den finns med så att den går att hämta från release-sidan.
 #
 # Två releaser får filerna:
 #   1. releasen för den tagg som just pushades (v1.0.1, v1.0.2 …),
@@ -44,6 +46,7 @@ jobs:
               SortBro-Thunderbird.xpi \
               SortBro-Thunderbird.xpi.sha256 \
               updates.json \
+              Kolla-SortBro-version.bat \
               --clobber --repo "$GITHUB_REPOSITORY"
           }
           upload "$TAG"

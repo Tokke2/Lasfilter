@@ -1,4 +1,4 @@
-# SortBro – smart mejlsortering för Thunderbird (version 1.0.0)
+# SortBro – smart mejlsortering för Thunderbird (version 1.0.1)
 
 > Tilläggets id är `lasfilter@lokala-verktyg.invalid` och installationsfilen heter `SortBro-Thunderbird.xpi` (samma innehåll finns även som `Lasfilter-Thunderbird.xpi`).
 
@@ -319,6 +319,23 @@ Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du välj
 
 **Adressen är inbakad i den installerade kopian** och kan inte ändras i efterhand. Därför följer den `releases/latest` i stället för en fast tagg: en installation gjord i dag hittar även versionen som släpps om ett år, utan att du installerar om något.
 
+### Kontrollera versionen med ett Windows-skript
+
+Vill du veta om det finns något nyare utan att öppna Thunderbird finns `Kolla-SortBro-version.bat` i repot — och som bilaga på release-sidan. Dubbelklicka på den.
+
+Skriptet letar upp den installerade filen i Thunderbirds profil (`%APPDATA%\Thunderbird\Profiles\*\extensions\lasfilter@lokala-verktyg.invalid.xpi`), läser `version` ur dess manifest och hämtar `updates.json` från senaste release. Sedan skriver det ut:
+
+```
+  Installerad:  1.0.1
+  Senaste:      1.0.1
+
+  Du har senaste versionen.
+```
+
+Är den senaste högre berättar skriptet också om din kopia har automatisk uppdatering, och frågar om nedladdningssidan ska öppnas. Det **laddar aldrig ner och installerar aldrig något** — det läser bara två filer och jämför tre siffror. Installationen gör du själv med *Installera tillägg från fil…*.
+
+Två saker att veta: skriptet är bara för Windows, och det tittar bara i den vanliga profilplatsen. Har du flyttat profilen, eller kör en bärbar Thunderbird, säger det att det inte hittar någon installation — det betyder inte att tillägget saknas. Relaterade tester ligger i `tester/safety.test.cjs`: de kräver att filen är ren ASCII med CRLF, att varje `goto` har en etikett och att skriptet inte innehåller något som kan kopiera in en fil i profilen.
+
 ### Varje släpp höjer versionen
 
 Thunderbird jämför **versionsnummer**, inte filinnehåll. En ny fil med samma nummer räknas inte som en uppdatering, hur mycket som än ändrats inuti. Därför höjs patchsiffran vid varje släpp — 1.0.1, 1.0.2, 1.0.3 — och det är hela skillnaden mellan "filen ligger på GitHub" och "tillägget uppdateras".
@@ -337,7 +354,7 @@ Sidfoten i gränssnittet läser versionen ur `runtime.getManifest().version`, s�
 
 ### Filerna läggs på releasen automatiskt
 
-Inget laddas upp för hand. När en versionstagg pushas körs `.github/workflows/release-assets.yml`, som kontrollerar att hashen stämmer med filen och att `updates.json` säger samma version, och sedan lägger **XPI:n, kontrollsumman och `updates.json`** som bilagor — på två ställen:
+Inget laddas upp för hand. När en versionstagg pushas körs `.github/workflows/release-assets.yml`, som kontrollerar att hashen stämmer med filen och att `updates.json` säger samma version, och sedan lägger **XPI:n, kontrollsumman, `updates.json` och Windows-skriptet** som bilagor — på två ställen:
 
 - **releasen för den nya taggen** (`v1.0.1`, `v1.0.2` …), som är den `releases/latest` pekar på,
 - **bryggan `v1.0.0`**, alltså den release som kopior installerade före den här ändringen fortfarande läser. Utan den skulle de aldrig se en nyare version. Bryggan får samma filer varje gång och behöver aldrig röras för hand.

@@ -462,7 +462,8 @@ class Engine {
        matched++;
        /* Redan i målmappen eller i sin årsmapp: räkna som klar utan att ens slå upp målet. */
        if(this.sameTarget(rule,m)){inTarget++;continue;}
-       const target=await this.resolveTarget(rule,m);
+       /* Provkörning får inte skapa årsmappar: ett test ska inte lämna spår. */
+       const target=trial?(await this.resolveTarget(rule,m,{create:false}))||C.targetFor(rule,m):await this.resolveTarget(rule,m);
        if(!target)continue;
        if(target===m.folder.id){inTarget++;continue;}
        /* Provkörning: räkna mejlet och gå vidare. Inget köas, inget flyttas,

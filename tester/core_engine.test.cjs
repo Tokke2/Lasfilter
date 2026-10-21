@@ -1366,3 +1366,12 @@ test('provkörningens räkning följer med i minnet och kan tömmas',()=>{
  other.clearTrial(rule.id);
  assert.equal(other.trialCount(rule.id),0);
 });
+
+test('provkörning skapar inga årsmappar',async()=>{
+ const f=fixture({yearFolders:true});
+ f.e.config.rules=[C.validateRule({...base(),target:'archive',yearFolders:true,trialUntil:Date.UTC(2026,9,20)})];
+ const r=await f.e.sweepRule(f.e.config.rules[0],{force:true});
+ assert.equal(r.trial,true);
+ assert.equal(f.api.created.length,0,'ett test lämnar inga spår i mappträdet');
+ assert.equal(f.api.calls.length,0);
+});

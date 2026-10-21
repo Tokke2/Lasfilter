@@ -22,6 +22,9 @@ const dom=new JSDOM(fs.readFileSync(path.join(ADDON,'ui.html'),'utf8'),{
  beforeParse(w){
   w.matchMedia=q=>({matches:false,media:q,addEventListener(){},removeEventListener(){}});
   w.LAS_DEMO=true;
+  /* Låtsas att sidan är installerad i Thunderbird: bara getManifest, inget runtime.id,
+     så demon körs som vanligt men sidfoten kan visa manifestets version. */
+  w.browser={runtime:{getManifest:()=>({version:'9.9.9'})}};
   w.structuredClone=structuredClone;
   w.confirm=()=>true;
   w.Element.prototype.scrollIntoView=function(){};
@@ -61,6 +64,11 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
 (async()=>{
  await until(()=>rows()>0,'gränssnittet laddas med demon');
  check(true,'gränssnittet laddas utan skriptfel');
+
+ /* --- Sidfoten: versionen ska komma från manifestet, inte från ui.html --- */
+ await until(()=>/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version');
+ check(/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version, inte texten i ui.html');
+ check(!/v1\.0\./.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'ingen gammal version kvar i sidfoten');
 
  /* --- 🔍 Varför ligger det här mejlet här? --- */
  check(el('whyBtn')!==null,'det finns en knapp för uppslaget');

@@ -317,7 +317,9 @@ https://github.com/Tokke2/Lasfilter/releases/latest/download/SortBro-Thunderbird
 
 Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart.
 
-En sidfot kan ändå visa fel version en stund: en **flik eller ett fönster som redan var öppet** när uppdateringen kom fortsätter att köra den gamla versionens kod. Sidan laddas om automatiskt nästa gång den hör av sig till bakgrunden — varje ärende bär med sig vilken version sidans kod har, och bakgrunden laddar om fliken om den inte stämmer med den installerade. Fram till dess, eller om sidan kör en version före den här rättningen, räcker det att stänga fönstret och öppna det igen (eller trycka **Ctrl+R**): då läses den nya filen in och sidfoten visar rätt version.
+**Sidfoten kan ändå visa fel version — det var en riktig bugg i 1.0.1.** Texten står nämligen som reserv i `ui.html`, och den skrevs bara om när språket byttes. Kör man svenska (som är standard) byts språket aldrig, så sidfoten behöll den version som råkade stå i HTML-filen — `v1.0.0` — även om 1.0.1 var installerad. Från 1.0.2 skrivs sidfoten om direkt vid start, och `ui.html`-reserven höjs av `tools/ship.sh` tillsammans med de andra versionstalen.
+
+En **flik eller ett fönster som redan var öppet** när uppdateringen kom fortsätter dessutom att köra den gamla versionens kod, och då visas den gamla versionen tills sidan laddats om. Sidan laddas om automatiskt nästa gång den hör av sig till bakgrunden — varje ärende bär med sig vilken version sidans kod har, och bakgrunden laddar om fliken om den inte stämmer med den installerade. Fram till dess räcker det att stänga fönstret och öppna det igen (eller trycka **Ctrl+R**).
 
 **Adressen är inbakad i den installerade kopian** och kan inte ändras i efterhand. Därför följer den `releases/latest` i stället för en fast tagg: en installation gjord i dag hittar även versionen som släpps om ett år, utan att du installerar om något.
 
@@ -400,6 +402,11 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.2
+
+- **Sidfoten visar alltid rätt version.** Den skrevs bara om när språket byttes, så en svensk installation visade kvar versionen som stod i `ui.html`. Nu skrivs den om direkt vid start, och reservtexten i `ui.html` höjs automatiskt vid varje släpp.
+- **Öppna fönster upptäcker uppdateringen.** En flik som var öppen när tillägget uppdaterades kör kvar sin gamla kod och visar därför den gamla versionen. Den laddas nu om automatiskt första gången den hör av sig till bakgrunden — utan behörigheten `tabs`, som aldrig läggs till.
 
 ## Nyheter i 1.0.1
 

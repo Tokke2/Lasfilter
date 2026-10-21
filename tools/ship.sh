@@ -51,6 +51,13 @@ s = open(p, encoding='utf-8').read()
 s = s.replace(f'v{old}', f'v{new}')
 open(p, 'w', encoding='utf-8').write(s)
 
+# Samma reservtext finns i ui.html: sidfoten skrivs om av koden, men faller
+# tillbaka på den här raden om skriptet inte hunnit köra.
+p = 'addon/ui.html'
+s = open(p, encoding='utf-8').read()
+s = s.replace(f'v{old}', f'v{new}')
+open(p, 'w', encoding='utf-8').write(s)
+
 p = 'updates.json'
 d = json.load(open(p, encoding='utf-8'))
 d['addons']['lasfilter@lokala-verktyg.invalid']['updates'][0]['version'] = new

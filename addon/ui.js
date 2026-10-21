@@ -1373,6 +1373,13 @@ function versionText(){
  const v=manifestVersion();
  return v?text.replace(/v\d+\.\d+\.\d+/,('v'+v)):text;
 }
+/* Sidfoten är statisk text i ui.html, och den skrevs bara om när språket byttes.
+   För en svensk installation byts språket aldrig – därför kunde sidfoten stå kvar
+   på den version som råkade stå i HTML-filen. Nu skrivs den alltid om vid start. */
+function applyVersionLabel(){
+ const node=document.querySelector('[data-i18n="versionText"]');
+ if(node)node.textContent=versionText();
+}
 /* Samma version följer med varje ärende till bakgrunden. Bakgrunden jämför den
    med sin egen och laddar om sidor som kör en äldre version – en sida som var
    öppen när tillägget uppdaterades visar annars den gamla versionen för alltid. */
@@ -2987,6 +2994,7 @@ if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
  if(msg?.event==='ruleFromMessage')applyPrefill().catch(()=>{});
 });
 (async()=>{
+ applyVersionLabel();
  if($('installWarnHide'))handle('installWarnHide','click',()=>{installWarnDismissed=true;if($('installWarn'))$('installWarn').hidden=true;});
 try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');await applyPrefill();}
  catch(e){$('statusPill').textContent=T('pillDisconnected');$('notice').hidden=false;$('notice').textContent=Terr(e.code);$('notice').className='notice error';}

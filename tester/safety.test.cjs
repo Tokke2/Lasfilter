@@ -291,4 +291,17 @@ test('versionsnumret i gränssnittet är manifestets version (reservtexten)',()=
  const found=[...ui.matchAll(/· v(\d+\.\d+\.\d+) ·/g)].map(m=>m[1]);
  assert.ok(found.length>=2,'både svensk och engelsk text ska visa versionen');
  assert.deepEqual([...new Set(found)],[manifest.version],'sidfoten får inte säga en annan version än manifestet');
+ /* ui.html har samma text som reserv. Den stod kvar på 1.0.0 i 1.0.1 och syntes
+    för alla som körde svenska, eftersom sidfoten bara skrevs om vid språkbyte. */
+ const html=fs.readFileSync(path.join(ADDON,'ui.html'),'utf8');
+ const fallback=[...html.matchAll(/· v(\d+\.\d+\.\d+) ·/g)].map(m=>m[1]);
+ assert.deepEqual([...new Set(fallback)],[manifest.version],'reservtexten i ui.html måste vara manifestets version');
+});
+
+test('sidfoten skrivs om vid start, inte bara när språket byts',()=>{
+ const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
+ assert.match(ui,/function applyVersionLabel\(\)\{/,'det ska finnas en funktion som skriver sidfoten');
+ assert.match(ui,/applyVersionLabel\(\);\n if\(\$\('installWarnHide'\)\)/,'den ska anropas först av allt vid start');
+ const boot=ui.slice(ui.lastIndexOf('(async()=>{'));
+ assert.ok(boot.indexOf('applyVersionLabel()')<boot.indexOf('await rpc('),'den ska köra innan något hämtas från bakgrunden');
 });

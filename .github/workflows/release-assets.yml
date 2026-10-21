@@ -1,0 +1,51 @@
+name: Release assets
+
+# Lägger XPI-filen, kontrollsumman och updates.json som bilagor på releasen,
+# så att Thunderbird kan uppdatera från /releases/download/... och ingen
+# behöver ladda upp något för hand. Körs när en versionstagg flyttas.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kontrollera att filerna finns
+        run: |
+          set -e
+          test -f SortBro-Thunderbird.xpi
+          test -f SortBro-Thunderbird.xpi.sha256
+          test -f updates.json
+
+      - name: Kontrollera att hashen stämmer
+        run: |
+          set -e
+          expected=$(cut -d' ' -f1 < SortBro-Thunderbird.xpi.sha256)
+          actual=$(sha256sum SortBro-Thunderbird.xpi | cut -d' ' -f1)
+          echo "förväntad: $expected"
+          echo "faktisk:   $actual"
+          test "$expected" = "$actual"
+
+      - name: Lägg filerna på releasen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          # Releasen skapas om den inte finns, så en ny tagg alltid får en sida.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "SortBro $TAG" --notes "Se LAS-MIG.md i repot."
+          fi
+          gh release upload "$TAG" \
+            SortBro-Thunderbird.xpi \
+            SortBro-Thunderbird.xpi.sha256 \
+            updates.json \
+            --clobber --repo "$GITHUB_REPOSITORY"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'

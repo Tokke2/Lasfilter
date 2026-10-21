@@ -246,6 +246,10 @@ test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  assert.match(text,/draft=false/,'måste publicera releasen igen efter en flyttad tagg');
  assert.match(text,/make_latest=true/,'måste peka releases\/latest på den nya versionen');
  assert.match(text,/if: github\.ref_name != env\.BRIDGE_TAG/,'bryggan v1.0.0 ska inte flyttas till latest');
+ /* /releases/tags/<tagg> svarar bara på GET – PATCH måste gå mot release-id:t. */
+ assert.match(text,/releases\/tags\/\$GITHUB_REF_NAME" --jq \.id/,'måste hämta release-id:t först');
+ assert.match(text,/releases\/\$id" -f make_latest=true/,'måste peka latest via release-id:t');
+ assert.match(text,/test "\$latest" = "\$GITHUB_REF_NAME"/,'ska avbryta om latest inte blev rätt version');
 });
 
 test('updates.json beskriver samma tillägg som manifestet',()=>{

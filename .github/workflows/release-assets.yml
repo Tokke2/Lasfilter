@@ -67,8 +67,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
-            -f draft=false >/dev/null
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
-            -f make_latest=true --jq '.tag_name + " ar publicerad och senaste"'
-          gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name'
+          repo="$GITHUB_REPOSITORY"
+          # PATCH går bara mot release-id, inte mot /releases/tags/<tagg> (404).
+          id=$(gh api "repos/$repo/releases/tags/$GITHUB_REF_NAME" --jq .id)
+          gh api -X PATCH "repos/$repo/releases/$id" -f draft=false >/dev/null
+          gh api -X PATCH "repos/$repo/releases/$id" -f make_latest=true \
+            --jq '.tag_name + " ar publicerad och senaste"'
+          latest=$(gh api "repos/$repo/releases/latest" --jq .tag_name)
+          echo "releases/latest pekar pa $latest"
+          test "$latest" = "$GITHUB_REF_NAME"

@@ -345,13 +345,22 @@ Vill du veta om det finns något nyare utan att öppna Thunderbird finns `Kolla-
 Skriptet letar upp den installerade filen i Thunderbirds profil (`%APPDATA%\Thunderbird\Profiles\*\extensions\lasfilter@lokala-verktyg.invalid.xpi`), läser `version` ur dess manifest och hämtar `updates.json` från senaste release. Sedan skriver det ut:
 
 ```
-  Installerad:  1.0.1
-  Senaste:      1.0.1
+  Installerad:  1.0.2
+  Senaste:      1.0.4
+  Senaste kontrollen:  2026-10-25 19:14  /  15 tim sedan  /  nasta om ca 9 tim
 
-  Du har senaste versionen.
+  Det finns en nyare version.
+
+  Din installation uppdaterar sig sjalv - ingenting att gora.
+  Thunderbird letar vid start och sedan en gang i dygnet, och
+  SortBro startar om sig sjalv nar filen val ar hamtad.
 ```
 
-Är den senaste högre berättar skriptet också om din kopia har automatisk uppdatering, och frågar om nedladdningssidan ska öppnas. Det **laddar aldrig ner och installerar aldrig något** — det läser bara två filer och jämför tre siffror. Installationen gör du själv med *Installera tillägg från fil…*.
+Raden **Senaste kontrollen** läses ur `app.update.lastUpdateTime.addon-background-update-timer` i profilens `prefs.js`. Den svarar på frågan "varför har den inte uppdaterat sig än?": Thunderbird letar vid start och sedan **en gång i dygnet** (`extensions.update.interval`, 86400 sekunder) — den frågar inte av sig själv i samma stund som en release publiceras. Står det `aldrig` har kontrollen inte hunnit köras sedan profilen skapades.
+
+Är den automatiska hämtningen avstängd i Thunderbird (`extensions.autoUpdate` satt till `false`) skriver skriptet ut det också, för då laddas ingen ny version ner förrän du själv söker. Vill du inte vänta på dygnskontrollen: *Tillägg och teman* (`Ctrl+Skift+A`) → kugghjulet uppe till höger → *Sök efter uppdateringar*. Det är ingen ominstallation — regler och inställningar ligger kvar.
+
+Skriptet **laddar aldrig ner och installerar aldrig något** och skriver inte heller i profilen: det läser bara tre filer och jämför tre siffror. Installationen gör du själv med *Installera tillägg från fil…*.
 
 Två saker att veta: skriptet är bara för Windows, och det tittar bara i den vanliga profilplatsen. Har du flyttat profilen, eller kör en bärbar Thunderbird, säger det att det inte hittar någon installation — det betyder inte att tillägget saknas. Relaterade tester ligger i `tester/safety.test.cjs`: de kräver att filen är ren ASCII med CRLF, att varje `goto` har en etikett och att skriptet inte innehåller något som kan kopiera in en fil i profilen.
 

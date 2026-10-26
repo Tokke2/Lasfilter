@@ -11,6 +11,8 @@ set "LATEST_JSON=https://github.com/Tokke2/Lasfilter/releases/latest/download/up
 set "PAGE=https://github.com/Tokke2/Lasfilter/releases/latest"
 set "TMP1=%TEMP%\sortbro-installed.txt"
 set "TMP2=%TEMP%\sortbro-latest.txt"
+set "TMP3=%TEMP%\sortbro-profile.txt"
+set "TMP4=%TEMP%\sortbro-lastcheck.txt"
 
 echo.
 echo  SortBro - finns det en nyare version?
@@ -20,11 +22,14 @@ echo.
 if not defined APPDATA goto noappdata
 
 del "%TMP1%" >nul 2>nul
+del "%TMP3%" >nul 2>nul
 for /d %%P in ("%APPDATA%\Thunderbird\Profiles\*") do (
   if not exist "%TMP1%" (
     if exist "%%~fP\extensions\%ADDON_ID%.xpi" (
+      > "%TMP3%" echo %%~fP
       powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; $z=[System.IO.Compression.ZipFile]::OpenRead('%%~fP\extensions\%ADDON_ID%.xpi'); $e=$z.GetEntry('manifest.json'); $t=(New-Object System.IO.StreamReader($e.Open())).ReadToEnd(); $o=ConvertFrom-Json -InputObject $t; $a='nej'; if($o.browser_specific_settings.gecko.update_url -or $o.applications.gecko.update_url){$a='ja'}; Write-Output ($o.version + '|' + $a); $z.Dispose()" > "%TMP1%" 2>nul
     ) else if exist "%%~fP\extensions\%ADDON_ID%\manifest.json" (
+      > "%TMP3%" echo %%~fP
       powershell -NoProfile -ExecutionPolicy Bypass -Command "$o=ConvertFrom-Json -InputObject (Get-Content '%%~fP\extensions\%ADDON_ID%\manifest.json' -Raw); $a='nej'; if($o.browser_specific_settings.gecko.update_url -or $o.applications.gecko.update_url){$a='ja'}; Write-Output ($o.version + '|' + $a)" > "%TMP1%" 2>nul
     )
   )
@@ -36,6 +41,19 @@ for /f "usebackq tokens=1,2 delims=|" %%a in ("%TMP1%") do (
   set "AUTOUPD=%%b"
 )
 if not defined INSTALLED goto notinstalled
+
+rem  Nar letade Thunderbird senast efter en ny version, och ar den
+rem  automatiska hamtningen pa? Det star i profilens prefs.js.
+set "PROFILE="
+set "DIAG="
+set "AUTO="
+if exist "%TMP3%" for /f "usebackq delims=" %%p in ("%TMP3%") do set "PROFILE=%%p"
+del "%TMP4%" >nul 2>nul
+if defined PROFILE if exist "%PROFILE%\prefs.js" (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$f='%PROFILE%\prefs.js'; $dt='aldrig'; $m=Select-String -Path $f -Pattern 'lastUpdateTime\.addon-background-update-timer[\x22],\s*(\d+)' -ErrorAction SilentlyContinue | Select-Object -First 1; if($m){$t=[int64]$m.Matches[0].Groups[1].Value; $w=(Get-Date '1970-01-01T00:00:00Z').ToLocalTime().AddSeconds($t); $ago=[int](((Get-Date)-$w).TotalMinutes); if($ago -lt 0){$ago=0}; $rest=1440-$ago; if($rest -lt 0){$rest=0}; $dt=$w.ToString('yyyy-MM-dd HH:mm')+'  /  '+[int]($ago/60)+' tim sedan  /  nasta om ca '+[int]($rest/60)+' tim'}; $au='ja'; if(Select-String -Path $f -Pattern 'extensions.autoUpdate[\x22],\s*false' -Quiet -ErrorAction SilentlyContinue){$au='NEJ'}; Write-Output ('  Senaste kontrollen:  '+$dt); Write-Output $au" > "%TMP4%" 2>nul
+  if exist "%TMP4%" for /f "usebackq delims=" %%a in ("%TMP4%") do if not defined DIAG set "DIAG=%%a"
+  if exist "%TMP4%" for /f "usebackq skip=1 delims=" %%a in ("%TMP4%") do if not defined AUTO set "AUTO=%%a"
+)
 
 echo  Kontrollerar GitHub ...
 del "%TMP2%" >nul 2>nul
@@ -53,6 +71,8 @@ if not defined LNUM goto nonetwork
 echo.
 echo  Installerad:  %INSTALLED%
 echo  Senaste:      %LATESTV%
+if defined DIAG echo %DIAG%
+if "%AUTO%"=="NEJ" echo  Automatisk hamtning:  AV i Thunderbird
 echo.
 
 if %LNUM% GTR %INUM% goto newer
@@ -65,12 +85,21 @@ goto end
 echo  Det finns en nyare version.
 echo.
 if "%AUTOUPD%"=="ja" (
-  echo  Din installation har automatisk uppdatering. Thunderbird
-  echo  kontrollerar varje dygn och uppdaterar automatiskt.
+  echo  Din installation uppdaterar sig sjalv - ingenting att gora.
+  echo  Thunderbird letar vid start och sedan en gang i dygnet, och
+  echo  SortBro startar om sig sjalv nar filen val ar hamtad.
 ) else (
   echo  Din installation har ingen automatisk uppdatering. Ladda ner
   echo  filen och installera den som vanligt - utan att avinstallera.
 )
+if "%AUTO%"=="NEJ" (
+  echo.
+  echo  OBS: automatisk hamtning av tillaggsuppdateringar ar AV i Thunderbird,
+  echo  sa ingen ny version laddas ner forran du sjalv soker.
+)
+echo.
+echo  Vill du ha den med en gang: Tillagg och teman, Ctrl+Skift+A,
+echo  kugghjulet uppe till hoger, Sok efter uppdateringar.
 echo.
 echo  Ladda ner: %PAGE%
 echo.
@@ -109,8 +138,11 @@ set "N2=0"
 set "N3=0"
 for /f "tokens=1,2,3 delims=." %%a in ("%~1") do (
   set "N1=%%a"
-  if not "%%b"=="" set "N2=%%b"
-  if not "%%c"=="" set "N3=%%c"
+  set "N2=%%b"
+  set "N3=%%c"
 )
+if not defined N1 set "N1=0"
+if not defined N2 set "N2=0"
+if not defined N3 set "N3=0"
 set /a %~2=1000000*N1+1000*N2+N3
 goto :eof

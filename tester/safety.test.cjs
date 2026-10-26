@@ -219,6 +219,11 @@ test('kontrollskriptet för Windows finns och är körbart',()=>{
  assert.match(text,/releases\/latest\/download\/updates\.json/,'ska fråga senaste release');
  assert.match(text,/System\.IO\.Compression\.FileSystem/,'ska kunna läsa manifest.json ur en XPI');
  assert.match(text,/choice \/c JN/,'ska fråga innan något öppnas');
+ /* Frågan "varför uppdateras den inte själv?" ska skriptet kunna svara på:
+    när Thunderbird senast letade, och om den automatiska hämtningen är på. */
+ assert.match(text,/lastUpdateTime\\\.addon-background-update-timer/,'ska läsa när Thunderbird senast letade efter en ny version');
+ assert.match(text,/extensions\.autoUpdate/,'ska tala om ifall automatisk hämtning är avstängd');
+ assert.equal(/SortBro-Thunderbird\.xpi[^)]*\s(?:Copy-Item|Move-Item|Invoke-WebRequest|Expand-Archive)/.test(text),false,'får aldrig hämta eller lägga in en XPI');
  /* Bara läsa – aldrig skriva in i profilen. */
  assert.equal(/xcopy|robocopy|copy .*extensions|move .*extensions/i.test(text),false,'får inte kopiera in något i profilen');
 });

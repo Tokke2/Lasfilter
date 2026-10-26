@@ -1,6 +1,6 @@
-# SortBro – smart mejlsortering för Thunderbird (version 1.0.1)
+# SortBro – smart mejlsortering för Thunderbird
 
-> Tilläggets id är `lasfilter@lokala-verktyg.invalid` och installationsfilen heter `SortBro-Thunderbird.xpi` (samma innehåll finns även som `Lasfilter-Thunderbird.xpi`).
+> Tilläggets id är `lasfilter@lokala-verktyg.invalid` och installationsfilen heter `SortBro-Thunderbird.xpi`. Versionen står i `addon/manifest.json`.
 
 Ett Thunderbird-tillägg med ett eget svenskt och engelskt gränssnitt (MV2, Thunderbird 140+). Det flyttar ett mejl som matchar dina regler först när Thunderbird har markerat det som läst **och** det inte längre visas i någon mejlflik eller något meddelandefönster. Tillägget börjar alltid i **testläge utan flyttar**.
 
@@ -147,7 +147,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
 - **Ljust och mörkt läge** samt **årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
-- **Stöd SortBro** finns både i gränssnittet och i `stod.html`: 100 % lokalt genererad Swish-QR (ISO/IEC 18004-verifierad, `C0721817177;…` samt kameravy med `swish://`), PayPal och Ko-fi. Inget låses upp av en gåva.
+- **Stöd SortBro** finns i gränssnittet: 100 % lokalt genererad Swish-QR (ISO/IEC 18004-verifierad, `C0721817177;…` samt kameravy med `swish://`), PayPal och Ko-fi. Inget låses upp av en gåva.
 
 ## Säkerhetsbromsen – när en regel plötsligt matchar för mycket
 
@@ -451,6 +451,13 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.6
+
+Ett städpass som hittade en bugg.
+
+- **Säsongsikonen i verktygsfältet fungerar nu.** Koden byggde sökvägen `season-spring-16.png`, men filerna hette `season-var-16.png`, `season-sommar-…`, `season-host-…` och `season-vinter-…`. `setIcon` letade alltså efter sexton filer som inte fanns, felet slukades av en tom `catch`, och ikonen stod stilla hela året. Filerna har fått de engelska namnen som `SEASONS` använder, och ett test ser till att varje årstid och storlek finns på riktigt.
+- **Bara det aktiva finns kvar.** Tjugo säsongsikoner blev sexton (128-pixlarna anropades aldrig), dubbletten `Lasfilter-Thunderbird.xpi` är borta, liksom de döda testskripten `ui_smoke.py`, `build_native_fixture.py`, `native-driver.js` och `native-ui.js` samt den fristående `stod.html` — stödvyn finns i gränssnittet. Källkodsarkivet för releasen innehåller nu bara det som används.
 
 ## Nyheter i 1.0.5
 

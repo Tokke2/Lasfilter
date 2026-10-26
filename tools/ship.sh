@@ -69,7 +69,6 @@ say "3/7 · bygger XPI:n"
 rm -f /tmp/sortbro-build.xpi
 (cd addon && zip -r -X -q /tmp/sortbro-build.xpi . -x '.*' -x '*/.*')
 cp /tmp/sortbro-build.xpi SortBro-Thunderbird.xpi
-cp /tmp/sortbro-build.xpi Lasfilter-Thunderbird.xpi
 HASH=$(sha256sum SortBro-Thunderbird.xpi | cut -d' ' -f1)
 echo "$HASH  SortBro-Thunderbird.xpi" > SortBro-Thunderbird.xpi.sha256
 python3 - "$HASH" <<'PY'

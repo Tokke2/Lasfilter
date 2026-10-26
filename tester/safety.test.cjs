@@ -246,6 +246,28 @@ test('uppdateringen väger tyngre än att bara byta en fil',()=>{
  assert.equal(/taskkill\s+\/f/i.test(text),false,'får inte tvinga igenom en stängning');
 });
 
+/* Säsongsikonen i verktygsfältet byggs som season-<årstid>-<storlek>.png.
+   Filerna hette en gång season-var/sommar/host/vinter, så setIcon pekade på
+   filer som inte fanns och felet slukades av en tom catch – ikonen byttes
+   aldrig. Namnen ska följa SEASONS, inte svenskan. */
+test('säsongsikonerna heter det koden letar efter',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ assert.match(bg,/season-'\+s\+'-/,'sökvägen ska byggas av årstidsnamnet');
+ const core=fs.readFileSync(path.join(ADDON,'core.js'),'utf8');
+ const m=core.match(/SEASONS=Object\.freeze\(\[([^\]]*)\]\)/);
+ assert.ok(m,'SEASONS saknas i core.js');
+ const seasons=m[1].split(',').map(s=>s.trim().replace(/'/g,''));
+ assert.deepEqual(seasons,['spring','summer','autumn','winter'],'årstiderna är engelska nycklar');
+ for(const s of seasons){
+   for(const z of ['16','32','48','64']){
+     assert.ok(fs.existsSync(path.join(ADDON,`season-${s}-${z}.png`)),`season-${s}-${z}.png saknas`);
+   }
+ }
+ for(const f of fs.readdirSync(ADDON).filter(n=>n.startsWith('season-'))){
+   assert.match(f,/^season-(spring|summer|autumn|winter)-(16|32|48|64)\.png$/,'okänt säsongsnamn i filnamnet: '+f);
+ }
+});
+
 /* Tyst omstart: en nedladdad version ska tas i bruk utan fråga, men aldrig mitt
    i en flytt. Det får inte heller kräva något som Thunderbird inte har. */
 test('en ny version startas tyst och bara när inget pågår',()=>{

@@ -201,39 +201,49 @@ test('uppdateringsfilen är en tillgång på releasen, inte en fil på en gren',
  assert.equal(u.addons[g.id].updates[0].version,manifest.version,'updates.json måste säga samma version som manifestet');
 });
 
-/* Windows-skriptet som bara kontrollerar versionen. Det får aldrig kunna
-   installera något, och det måste vara tekniskt körbart: ren ASCII, bara CRLF,
-   inga utropstecken (de äts upp av delayed expansion) och alla etiketter utsatta. */
-test('kontrollskriptet för Windows finns och är körbart',()=>{
- const file=path.join(ROOT,'Kolla-SortBro-version.bat');
- assert.ok(fs.existsSync(file),'Kolla-SortBro-version.bat saknas');
+/* Windows-skriptet som uppdaterar. Det får bara göra fyra saker: jämföra
+   versioner, ladda ner, kontrollsumma och byta ut XPI-filen i profilen. Det
+   får aldrig skriva i Thunderbirds databas – den ska Thunderbird äga. Och det
+   måste vara tekniskt körbart: ren ASCII, bara CRLF, inga utropstecken (de äts
+   upp av delayed expansion) och alla etiketter utsatta. */
+test('uppdateringsskriptet för Windows finns och är körbart',()=>{
+ const file=path.join(ROOT,'Uppdatera-SortBro.bat');
+ assert.ok(fs.existsSync(file),'Uppdatera-SortBro.bat saknas');
  const raw=fs.readFileSync(file);
  const text=raw.toString('latin1');
  assert.equal(/[\x80-\xff]/.test(text),false,'bara ASCII – annars blir svenska tecken skräp i cmd');
  assert.equal(text.replace(/\r\n/g,'').includes('\n'),false,'bara CRLF – annars kan cmd tappa en etikett');
  assert.equal(text.includes('!'),false,'inga utropstecken – delayed expansion äter dem');
- assert.ok(text.includes('Thunderbird')&&text.includes('Profiles'),'ska leta i Thunderbird-profilerna');
  assert.ok(text.includes('lasfilter@lokala-verktyg.invalid'),'ska känna igen tilläggets id');
- assert.ok(text.includes('%ADDON_ID%'+'.xpi'),'ska läsa den installerade XPI-filen i profilen');
-
+ assert.match(text,/Thunderbird\\Profiles/,'ska leta i Thunderbird-profilerna');
  assert.match(text,/releases\/latest\/download\/updates\.json/,'ska fråga senaste release');
- assert.match(text,/System\.IO\.Compression\.FileSystem/,'ska kunna läsa manifest.json ur en XPI');
- assert.match(text,/choice \/c JN/,'ska fråga innan något öppnas');
- /* Frågan "varför uppdateras den inte själv?" ska skriptet kunna svara på:
-    när Thunderbird senast letade, och om den automatiska hämtningen är på. */
- assert.match(text,/lastUpdateTime\\\.addon-background-update-timer/,'ska läsa när Thunderbird senast letade efter en ny version');
- assert.match(text,/extensions\.autoUpdate/,'ska tala om ifall automatisk hämtning är avstängd');
- assert.equal(/SortBro-Thunderbird\.xpi[^)]*\s(?:Copy-Item|Move-Item|Invoke-WebRequest|Expand-Archive)/.test(text),false,'får aldrig hämta eller lägga in en XPI');
- /* Bara läsa – aldrig skriva in i profilen. */
- assert.equal(/xcopy|robocopy|copy .*extensions|move .*extensions/i.test(text),false,'får inte kopiera in något i profilen');
+ /* Ett tappat citattecken skickar halva raden till PowerShell i stället för
+    hela, och då gör skriptet något annat än det ser ut att göra. */
+ for(const line of text.split(/\r?\n/)){
+   if(!/^\s*powershell\s/.test(line))continue;
+   assert.equal((line.match(/"/g)||[]).length%2,0,'udda antal citattecken: '+line.trim().slice(0,70));
+   assert.match(line.trim(),/2>(?:nul|&1)$/,'PowerShell-raden ska sluta med 2>nul eller 2>&1');
+ }
 });
 
-test('alla etiketter som skriptet hoppar till finns',()=>{
- const text=fs.readFileSync(path.join(ROOT,'Kolla-SortBro-version.bat'),'latin1');
- const defined=new Set([...text.matchAll(/^:([a-z]+)\s*$/gim)].map(m=>m[1].toLowerCase()));
- const used=[...text.matchAll(/\bgoto\s+:?([a-z]+)/gi)].map(m=>m[1].toLowerCase()).filter(n=>n!=='eof');
- for(const label of used)assert.ok(defined.has(label),'etikett saknas: '+label);
- for(const [,label] of text.matchAll(/\bcall\s+:([a-z]+)/gi))assert.ok(defined.has(label.toLowerCase()),'underprogram saknas: '+label);
+test('uppdateringen väger tyngre än att bara byta en fil',()=>{
+ const text=fs.readFileSync(path.join(ROOT,'Uppdatera-SortBro.bat'),'latin1');
+ /* Ordningen är hela säkerheten: kontrollsumman ska stämma innan något rörs,
+    originalet ska ligga i en kopia, och resultatet ska läsas tillbaka ur
+    Thunderbirds egen databas i stället för att antas. */
+ assert.match(text,/Get-FileHash[^\n]*SHA256/i,'ska räkna kontrollsumma på det nedladdade');
+ assert.ok(text.indexOf('update_hash')>-1,'ska jämföra mot den hash som releasen anger');
+ assert.ok(text.indexOf('%HASHEX%')<text.indexOf("Copy-Item -LiteralPath '%NEW%'"),'hashkontrollen måste ske före bytet');
+ assert.match(text,/Lasfilter\\Backup/,'den gamla XPI-filen ska sparas undan först');
+ assert.match(text,/Join-Path '%PROFILE%' 'extensions\.json'/,'resultatet ska läsas ur Thunderbirds databas');
+ assert.match(text,/CloseMainWindow/,'Thunderbird ska stängas snällt, inte dödas');
+ assert.match(text,/\/tyst/,'ska kunna köras utan frågor, till exempel av en schemalagd uppgift');
+
+ /* Databasen är Thunderbirds. Ett skript som skriver i den kan förstöra
+    hela tilläggslistan, och en uppdatering behöver aldrig göra det. */
+ assert.equal(/Set-Content[^\n]*extensions\.json|Out-File[^\n]*extensions\.json|Add-Content[^\n]*extensions\.json/i.test(text),false,'får aldrig skriva i extensions.json');
+ assert.equal(/Remove-Item[^\n]*extensions\.json/i.test(text),false,'får aldrig radera extensions.json');
+ assert.equal(/taskkill\s+\/f/i.test(text),false,'får inte tvinga igenom en stängning');
 });
 
 /* Tyst omstart: en nedladdad version ska tas i bruk utan fråga, men aldrig mitt
@@ -300,7 +310,7 @@ test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  const wf=path.join(ROOT,'.github','workflows','release-assets.yml');
  assert.ok(fs.existsSync(wf),'arbetsflödet som lägger filerna på releasen saknas');
  const text=fs.readFileSync(wf,'utf8');
- for(const file of ['SortBro-Thunderbird.xpi','SortBro-Thunderbird.xpi.sha256','updates.json','Kolla-SortBro-version.bat']){
+ for(const file of ['SortBro-Thunderbird.xpi','SortBro-Thunderbird.xpi.sha256','updates.json','Uppdatera-SortBro.bat']){
   assert.ok(text.includes(file),'arbetsflödet måste ladda upp '+file);
  }
  assert.match(text,/tags:/,'ska köras när en tagg flyttas');

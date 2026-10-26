@@ -338,31 +338,56 @@ En **flik eller ett fönster som redan var öppet** när uppdateringen kom forts
 
 **Adressen är inbakad i den installerade kopian** och kan inte ändras i efterhand. Därför följer den `releases/latest` i stället för en fast tagg: en installation gjord i dag hittar även versionen som släpps om ett år, utan att du installerar om något.
 
-### Kontrollera versionen med ett Windows-skript
+### Uppdatera med ett dubbelklick
 
-Vill du veta om det finns något nyare utan att öppna Thunderbird finns `Kolla-SortBro-version.bat` i repot — och som bilaga på release-sidan. Dubbelklicka på den.
+Thunderbird sköter uppdateringen själv — men den letar **vid start och sedan en gång i dygnet**, så en ny version kan ligga osedd i upp till ett dygn. Vill du inte vänta finns `Uppdatera-SortBro.bat` i repot och som bilaga på release-sidan. Dubbelklicka på den.
 
-Skriptet letar upp den installerade filen i Thunderbirds profil (`%APPDATA%\Thunderbird\Profiles\*\extensions\lasfilter@lokala-verktyg.invalid.xpi`), läser `version` ur dess manifest och hämtar `updates.json` från senaste release. Sedan skriver det ut:
+Skriptet gör hela jobbet själv:
+
+1. letar upp profilen och läser vilken version Thunderbird **faktiskt använder** ur dess egen databas (`extensions.json`), inte bara ur filen,
+2. hämtar `updates.json` från senaste release och jämför siffrorna,
+3. laddar ner XPI-filen och **räknar kontrollsumma innan något rörs** — stämmer den inte avbryts allt och din installation lämnas orörd,
+4. stänger Thunderbird snällt (aldrig `taskkill /f`),
+5. sparar undan den gamla XPI-filen i `Lasfilter/Backup` i profilen — de fem senaste behålls,
+6. lägger in den nya filen och kontrollsummar den igen på plats,
+7. startar Thunderbird och läser tillbaka versionen ur `extensions.json`.
+
+Sedan skriver den ut antingen `Klart. 1.0.5 ar aktiv i Thunderbird.` eller, om Thunderbird inte tog filen, en förklaring och vad du gör i stället.
 
 ```
   Installerad:  1.0.2
-  Senaste:      1.0.4
-  Senaste kontrollen:  2026-10-25 19:14  /  15 tim sedan  /  nasta om ca 9 tim
+  Senaste:      1.0.5
 
-  Det finns en nyare version.
+  Uppdaterar 1.0.2 till 1.0.5 ...
+  Nedladdning:   OK 203 kB
+  Thunderbird:   stangt
+  Filen:         utbytt, kopia sparad
+  Thunderbird:   startat
 
-  Din installation uppdaterar sig sjalv - ingenting att gora.
-  Thunderbird letar vid start och sedan en gang i dygnet, och
-  SortBro startar om sig sjalv nar filen val ar hamtad.
+  Klart. 1.0.5 ar aktiv i Thunderbird.
+  Dina regler och installningar ligger kvar.
 ```
 
-Raden **Senaste kontrollen** läses ur `app.update.lastUpdateTime.addon-background-update-timer` i profilens `prefs.js`. Den svarar på frågan "varför har den inte uppdaterat sig än?": Thunderbird letar vid start och sedan **en gång i dygnet** (`extensions.update.interval`, 86400 sekunder) — den frågar inte av sig själv i samma stund som en release publiceras. Står det `aldrig` har kontrollen inte hunnit köras sedan profilen skapades.
+**Vad skriptet aldrig gör:** det skriver inte i `extensions.json`, Thunderbirds databas över installerade tillägg — den äger Thunderbird. Det ändrar ingen inställning i Thunderbird och rör inga mejl eller regler. Det byter ut en fil och startar om programmet, precis som en manuell installation hade gjort.
 
-Är den automatiska hämtningen avstängd i Thunderbird (`extensions.autoUpdate` satt till `false`) skriver skriptet ut det också, för då laddas ingen ny version ner förrän du själv söker. Vill du inte vänta på dygnskontrollen: *Tillägg och teman* (`Ctrl+Skift+A`) → kugghjulet uppe till höger → *Sök efter uppdateringar*. Det är ingen ominstallation — regler och inställningar ligger kvar.
+Två växlar: `/kolla` jämför bara och ändrar ingenting, `/tyst` ställer inga frågor och skriver en rad till loggen — den går att lägga i Windows Schemalagda uppgifter om du vill ha det helt utan handpåläggning:
 
-Skriptet **laddar aldrig ner och installerar aldrig något** och skriver inte heller i profilen: det läser bara tre filer och jämför tre siffror. Installationen gör du själv med *Installera tillägg från fil…*.
+```
+Uppdatera-SortBro.bat /tyst
+```
 
-Två saker att veta: skriptet är bara för Windows, och det tittar bara i den vanliga profilplatsen. Har du flyttat profilen, eller kör en bärbar Thunderbird, säger det att det inte hittar någon installation — det betyder inte att tillägget saknas. Relaterade tester ligger i `tester/safety.test.cjs`: de kräver att filen är ren ASCII med CRLF, att varje `goto` har en etikett och att skriptet inte innehåller något som kan kopiera in en fil i profilen.
+Två saker att veta: skriptet är bara för Windows, och det tittar bara i den vanliga profilplatsen. Har du flyttat profilen, eller kör en bärbar Thunderbird, säger det att det inte hittar någon installation — det betyder inte att tillägget saknas. Är installationen uppackad till en mapp i stället för en XPI-fil byter skriptet ingenting, utan hänvisar till *Installera tillägg från fil…*. Relaterade tester ligger i `tester/safety.test.cjs`: ren ASCII med CRLF, en etikett till varje `goto`, kontrollsumman före bytet, kopian före bytet, och förbud mot att skriva i `extensions.json` eller tvinga igenom en stängning.
+
+### Varför inte från tilläggets egen sida?
+
+Kort svar: det går inte, och det är Thunderbird som sätter gränsen — inte en inställning vi kan ändra.
+
+- Ett tillägg har **inget API för att installera ett tillägg**, inte ens sig självt. `management`-behörigheten kan slå av och på andra tillägg, men aldrig lägga in ett nytt — och den behörigheten har SortBro aldrig haft.
+- `runtime.requestUpdateCheck()` finns inte i Thunderbird; anropet svarar `unsupported`. Tillägget kan alltså inte ens be Thunderbird om att leta.
+- `runtime.reload()` laddar om den version som redan ligger på plats. Det är den som gör den tysta omstarten i 1.0.3 — men den hämtar ingenting.
+- SortBros egen säkerhetsmodell stänger dessutom dörren: `connect-src 'none'` betyder att gränssnittet inte får göra ett enda nätanrop. Att hämta en fil därifrån är inte möjligt utan att först riva spärren, och den spärren är poängen med hela tillägget.
+
+Det som *är* automatiskt är därför fördelat: Thunderbird hämtar och installerar, SortBro startar om sig själv tyst när filen är hämtad, och `Uppdatera-SortBro.bat` är genvägen för den som inte vill vänta på dygnskontrollen. Texten under *Hjälp* i gränssnittet säger samma sak, så frågan besvarar sig själv nästa gång.
 
 ### Varje släpp höjer versionen
 
@@ -426,6 +451,11 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.5
+
+- **Uppdateringen kan göras med ett dubbelklick.** `Uppdatera-SortBro.bat` ersätter det gamla skript som bara kontrollerade: den jämför versioner, laddar ner, kontrollsummar, sparar undan den gamla filen, lägger in den nya, startar Thunderbird och läser tillbaka vilken version som blev aktiv. `/kolla` kontrollerar bara, `/tyst` går att schemalägga.
+- **Hjälpen svarar på uppdateringsfrågan.** Under *Hjälp* står det nu varför en ny version kan dröja upp till ett dygn och varför ett tillägg inte kan installera sig självt — samma förklaring som står här ovan, fast där frågan uppstår.
 
 ## Nyheter i 1.0.4
 

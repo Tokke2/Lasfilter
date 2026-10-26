@@ -1192,10 +1192,10 @@ test('en nedladdad version byts tyst när inget pågår',async()=>{
  assert.deepEqual(reloads,[],'mitt i en flytt väntar vi');
  assert.equal(app.pendingUpdate,'1.0.4','versionen sparas till dess');
  engine.pending.clear();
- assert.equal(app.applyPendingUpdate(),true);
+ assert.equal(await app.applyPendingUpdate(),true);
  assert.deepEqual(reloads,[1],'när kön är tom byts koden');
  assert.equal(app.pendingUpdate,'','det ska bara hända en gång');
- assert.equal(app.applyPendingUpdate(),false);
+ assert.equal(await app.applyPendingUpdate(),false);
  assert.deepEqual(reloads,[1],'inget mer händer utan ny version');
 });
 
@@ -1213,7 +1213,7 @@ test('en uppdatering som väntar för länge tvingas igenom',async()=>{
  assert.deepEqual(reloads,[],'ett svep pågår');
  /* Klockan i sandlådan står still, så "för länge sedan" skrivs som ett förflutet tal. */
  app.updateDeadline=1;
- assert.equal(app.applyPendingUpdate(),true,'efter trettio minuter byter vi ändå');
+ assert.equal(await app.applyPendingUpdate(),true,'efter trettio minuter byter vi ändå');
  assert.deepEqual(reloads,[1]);
 });
 
@@ -1236,4 +1236,43 @@ test('uppdateringskontrollen är tyst och tål att anropet saknas',async()=>{
  api2.runtime.requestUpdateCheck=async()=>({status:'no_update'});
  assert.equal(await second.app.requestUpdateCheck(),'no_update');
  assert.deepEqual(reloads,[1],'ingen ny version – ingenting händer');
+});
+
+/* Loggraden skrivs med 500 ms fördröjning. En omstart som sker direkt efter
+   loggningen får inte slänga bort raden som förklarar omstarten. */
+test('loggen hinner sparas innan den tysta omstarten',async()=>{
+ const api=stubApi();
+ let onUpdate=null;
+ const order=[];
+ api.runtime.id='lasfilter@lokala-verktyg.invalid';
+ api.runtime.onUpdateAvailable.addListener=fn=>{onUpdate=fn;};
+ api.runtime.reload=()=>{order.push('reload');};
+ const store=api.storage.local;
+ api.storage.local={...store,set:async obj=>{if(obj&&obj.logs)order.push('logg:'+obj.logs.length);return store.set?store.set(obj):undefined;}};
+ const {app}=await loadBackground(api);
+ const engine=fakeEngineWithRules(app);
+ app.logs=[];
+ engine.pending.set('m1',{}); /* en flytt pågår: uppdateringen får vänta */
+ onUpdate({version:'2.0.0'});
+ engine.pending.clear();
+ assert.equal(await app.applyPendingUpdate(),true);
+ assert.deepEqual(order,[ 'logg:1','reload' ],'loggen ska vara skriven före omstarten');
+ assert.equal(app.logs.length,1,'och raden finns kvar');
+ assert.match(app.logs[0].data.detail,/byter till version 2\.0\.0/);
+});
+
+/* Snabbmenyn skapades en gång med fast svensk text. Den ska följa språkvalet. */
+test('snabbmenyns titel följer språkvalet',async()=>{
+ const api=stubApi();
+ api.runtime.id='lasfilter@lokala-verktyg.invalid';
+ const updates=[];
+ api.menus.create=async opts=>{updates.push(['create',opts.title]);};
+ api.menus.update=async(id,opts)=>{updates.push([id,opts.title]);};
+ const {app,tick}=await loadBackground(api);
+ await tick.settle(Promise.resolve());
+ assert.match(updates[0][1],/^SortBro: Skapa filter/,'svensk titel när inget annat valts');
+ await tick.settle(app.handle({type:'prefs',prefs:{lang:'en'}}));
+ assert.match(app.menuTitle(),/^SortBro: Create a filter/,'engelsk titel efter språkbytet');
+ assert.equal(updates.at(-1)[0],'sortbro-rule-from-message','menyn uppdateras, inte en ny rad');
+ assert.match(updates.at(-1)[1],/Create a filter/);
 });

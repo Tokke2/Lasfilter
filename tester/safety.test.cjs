@@ -253,6 +253,44 @@ test('dokumentationen säger hur man får två kontroller per dygn',()=>{
  assert.match(doc,/43200/,'och värdet för tolv timmar');
 });
 
+/* Listorna i gränssnittet får inte byggas om i onödan: statusen kommer högst var
+   hundrade millisekund under ett svep, och att rita om 5 000 loggrader varje gång
+   kostade mer än svepet. */
+test('listorna ritas bara om när deras indata ändrats',()=>{
+ const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
+ assert.match(ui,/function unchanged\(key,signature\)/,'det ska finnas en jämförelse per lista');
+ for(const fn of ['renderRules','renderActivity','renderTrialBar','renderLearnBar','renderBackups','renderQuickExisting','renderTbAccounts']){
+  const body=ui.slice(ui.indexOf('function '+fn+'('));
+  const head=body.slice(0,600);
+  assert.match(head,/unchanged\(|logShown/,'listan '+fn+' måste hoppa över oförändrat läge');
+  assert.match(head,/return;|insertBefore|every\(/,'och faktiskt hoppa över');
+ }
+ assert.match(ui,/body\.insertBefore\(frag,first\|\|null\)/,'nya loggrader läggs till i stället för att tabellen byggs om');
+ assert.match(ui,/function repaint\(\)\{painted\.clear\(\);logShown\.length=0;\}/,'språkbyte och mappbyte ska tvinga en omritning');
+});
+
+/* Den tysta omstarten får inte slänga bort loggraden som förklarar den. */
+test('skrivningarna spolas ut innan tillägget startas om',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ const fn=bg.slice(bg.indexOf('App.flushWrites='),bg.indexOf('App.applyPendingUpdate='));
+ assert.match(fn,/clearTimeout\(App\.logTimer\)/,'den väntande loggskrivningen ska avbrytas');
+ assert.match(fn,/clearTimeout\(App\.fileLogTimer\)/,'och den väntande loggfilen');
+ assert.match(fn,/await App\.write\(/,'allt ska skrivas');
+ const apply=bg.slice(bg.indexOf('App.applyPendingUpdate='));
+ assert.match(apply.slice(0,600),/await App\.flushWrites\(\)[\s\S]{0,40}runtime\.reload\(\)/,'spolningen ska ske före reload');
+});
+
+/* Snabbmenyn var den enda platsen där språkvalet inte följde med. */
+test('snabbmenyns titel finns på båda språken',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ assert.match(bg,/App\.menuTitle=\(\)=>/, 'titeln ska räknas ut, inte skrivas fast');
+ assert.match(bg,/menus\.update\(MENU_ID/,'menyn ska uppdateras när språket byts');
+ assert.match(bg,/App\.syncMenu\(\);return next;/,'språkbytet ska synka menyn');
+ const line=bg.match(/App\.menuTitle=\(\)=>[^\n]+/)[0];
+ assert.match(line,/SortBro: Skapa filter/);
+ assert.match(line,/SortBro: Create a filter/,'engelsk titel saknas');
+});
+
 test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  const wf=path.join(ROOT,'.github','workflows','release-assets.yml');
  assert.ok(fs.existsSync(wf),'arbetsflödet som lägger filerna på releasen saknas');

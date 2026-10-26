@@ -917,7 +917,7 @@ App.handle=async msg=>{
     for(const [k,v] of Object.entries(p.filterUris).slice(0,10))if(typeof k==='string'&&k.length>=1&&k.length<=64&&typeof v==='string'&&v.length<=240)clean[k]=v;
     next.filterUris=clean;
    }
-   await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;App.applySeasonIcon();return next;
+   await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;App.applySeasonIcon();App.syncMenu();return next;
   }
   /* Provkörning är slut: aktivera, förläng en vecka eller stäng av regeln. */
   case 'trialResolve':return App.mutate(async()=>{
@@ -1033,7 +1033,7 @@ App.ready=(async()=>{
   if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
   App.engine.tick().catch(()=>App.fail('internal_error'));
   /* En nedladdad version som väntar på att inget ska pågå. */
-  App.applyPendingUpdate();
+  App.applyPendingUpdate().catch(()=>{});
  },2000);App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
  App.lastTickAt=Date.now();App.startedAt=Date.now();
@@ -1077,13 +1077,22 @@ App.engineBusy=()=>{
  if(!e)return false;
  return !!((e.pending&&e.pending.size)||(e.inflight&&e.inflight.size)||e.sweeping||e.hold);
 };
-App.applyPendingUpdate=()=>{
+/* Loggraden skrivs med 500 ms fördröjning och loggfilen med 1 200 ms. En omstart
+   som sker direkt efter loggningen skulle alltså slänga bort exakt den rad som
+   förklarar omstarten. Här spolas allt ut först. */
+App.flushWrites=async()=>{
+ clearTimeout(App.logTimer);clearTimeout(App.fileLogTimer);
+ try{await App.write(()=>B.storage.local.set({logs:App.logs,work:App.engine?.recordList?.()||[]}));}catch{}
+ try{await App.writeChain;}catch{}
+};
+App.applyPendingUpdate=async()=>{
  if(!App.pendingUpdate)return false;
  const overdue=!!App.updateDeadline&&Date.now()>App.updateDeadline;
  if(App.engineBusy()&&!overdue)return false;
  const version=App.pendingUpdate;
  App.pendingUpdate='';
  App.log('debug',0,'byter till version '+version+(overdue?' (inget blev ledigt pa 30 min)':' nar inget pagick'));
+ await App.flushWrites();
  try{B.runtime.reload();}catch{App.pendingUpdate=version;return false;}
  return true;
 };
@@ -1091,7 +1100,7 @@ try{
  B.runtime.onUpdateAvailable.addListener(details=>{
   App.pendingUpdate=String(details?.version||'okand');
   App.updateDeadline=Date.now()+30*60*1000;
-  App.applyPendingUpdate();
+  App.applyPendingUpdate().catch(()=>{});
  });
 }catch{}
 
@@ -1111,7 +1120,7 @@ App.requestUpdateCheck=async()=>{
   if(r&&r.status==='update_available'){
    App.pendingUpdate=String(r.version||'okand');
    App.updateDeadline=Date.now()+30*60*1000;
-   App.applyPendingUpdate();
+   await App.applyPendingUpdate();
   }
   return (r&&r.status)||'unknown';
  }catch{return 'failed';}
@@ -1196,9 +1205,21 @@ App.ruleFromMessage=async info=>{
  setTimeout(()=>B.runtime.sendMessage({event:'ruleFromMessage'}).catch(()=>{}),150);
  return true;
 };
+/* Snabbmenyn skapas en gång, men titeln ska följa språkvalet som allt annat.
+   Den skapas innan inställningarna är inlästa, så titeln synkas om så snart de
+   finns – och varje gång språket byts. */
+const MENU_ID='sortbro-rule-from-message';
+App.menuTitle=()=>App.prefs?.lang==='en'?'SortBro: Create a filter from this message…':'SortBro: Skapa filter från detta mejl…';
+App.syncMenu=()=>{
+ try{
+  if(!B.menus?.update)return;
+  Promise.resolve(B.menus.update(MENU_ID,{title:App.menuTitle()})).catch(()=>{});
+ }catch{}
+};
 try{
- if(B.menus?.create)Promise.resolve(B.menus.create({id:'sortbro-rule-from-message',title:'SortBro: Skapa filter från detta mejl…',contexts:['message_list']})).catch(()=>{});
+ if(B.menus?.create)Promise.resolve(B.menus.create({id:MENU_ID,title:App.menuTitle(),contexts:['message_list']})).catch(()=>{});
 }catch{}
+App.ready.then(()=>App.syncMenu()).catch(()=>{});
 if(B.menus?.onClicked)B.menus.onClicked.addListener((info,tab)=>{
  if(info?.menuItemId!=='sortbro-rule-from-message')return;
  App.ruleFromMessage(info).catch(()=>App.log('error',0,'hogerklicksmeny_misslyckades'));

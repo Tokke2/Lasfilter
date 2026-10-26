@@ -418,6 +418,17 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.4
+
+Ett kvalitetspass utan nya funktioner – samma gränssnitt, samma knappar, men mindre arbete bakom varje bild.
+
+- **Listorna ritas bara om när deras innehåll ändrats.** Under ett svep skickar bakgrunden status högst var hundrade millisekund, och förr byggdes hela gränssnittet om varje gång: upp till 5 000 loggrader och 200 regelrader slängdes och återskapades för att en siffra i sidhuvudet ändrats. Nu jämförs en signatur per lista, och bara den lista som faktiskt ändrats ritas om. Loggen lägger dessutom till nya rader i stället för att bygga om tabellen, så raderna behåller sin plats och scrollen hoppar inte.
+- **Högst en statusförfrågan i taget.** Kom det tio ändringar i sekunden skickades tio förfrågningar iväg, och svaren kunde komma ikapp varandra så att en äldre status ritades över en nyare. Nu ligger en i luften och högst en på kö.
+- **Loggraden för omstarten finns kvar.** Den tysta omstarten loggade "byter till version …" och startade om direkt – men loggen skrivs med en halv sekunds fördröjning, så just den raden försvann. Nu spolas loggen och arbetskön ut innan tillägget laddas om.
+- **Snabbmenyn följer språkvalet.** Högerklicksmenyn *Skapa filter från detta mejl* var den enda texten i tillägget som alltid stod på svenska. Nu byts titeln när språket byts, i båda riktningarna.
+
+Testerna är nu 353 stycken plus 188 DOM-kontroller, och de nya vaktar just det här: att en oförändrad lista inte ritas om, att de gamla loggraderna behålls när nya kommer, att loggen är skriven före omstarten och att menyn har en titel på båda språken.
+
 ## Nyheter i 1.0.3
 
 - **Tyst omstart när en ny version har hämtats.** SortBro lyssnar på att en uppdatering finns, väntar tills ingen flytt eller inget svep pågår och laddar då om sig själv. Inget fönster, ingen fråga, ingen omstart av Thunderbird. Har något hängt i trettio minuter byts versionen ändå — kön ligger i lagringsutrymmet och plockas upp igen.

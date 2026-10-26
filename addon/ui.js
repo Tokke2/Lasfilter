@@ -1332,6 +1332,16 @@ async function rpc(type,data={}){
 }
 function handle(id,event,fn){const n=$(id);if(n)n.addEventListener(event,async e=>{try{await fn(e);}catch(err){alertError(err);}});}
 const label=id=>folders.find(f=>f.id===id)?.label||T('missingFolder');
+/* Listorna ritas bara om när deras indata faktiskt ändrats. Under ett svep kommer
+   statusen högst var hundrade millisekund (App.changed), och att bygga om upp till
+   5 000 loggrader och 200 regelrader varje gång kostade mer än svepet självt.
+   Signaturen är en billig sträng av precis det listan läser; allt annat hoppas över. */
+const painted=new Map(),logShown=[];
+function unchanged(key,signature){
+ if(painted.get(key)===signature)return true;
+ painted.set(key,signature);return false;
+}
+function repaint(){painted.clear();logShown.length=0;}
 /* Sökvägarna kommer från bakgrunden i statusen (state.paths), så att gränssnittet och
    filskrivningen aldrig kan visa olika saker. Reservvärdet gäller bara innan statusen
    hunnit in. Allt SortBro skapar ligger i undermappar till appmappen i Hämtade filer. */
@@ -1418,6 +1428,7 @@ function applyLanguage(lang){
  updateReadPolicy();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
  if(state)applySeason(state.prefs);
+ repaint();
 }
 
 function applyTheme(prefs){
@@ -1725,7 +1736,7 @@ async function createFolderFromModal(){
  const name=$('folderName')?.value||'';
  const parentId=$('folderParent')?.value||'';
  const created=await rpc('createFolder',{parentId,name});
- folders=await rpc('folders');
+ folders=await rpc('folders');repaint();
  const src=$('source')?.value||'',target=$('target')?.value||'';
  accountOptions(src);targetOptions(created?.id||target);
  if($('quickTarget')&&created?.id){$('quickTarget').value=created.id;rememberQuickTarget(created.id);}
@@ -1873,6 +1884,7 @@ function setTrialFields(rule){
 /* Provkörda regler vars tid har gått ut: en rad med tre tydliga val. */
 function renderTrialBar(){
  const bar=$('trialBar');if(!bar)return;
+ if(unchanged('trial',JSON.stringify([state.trials||[],currentLang])))return;
  const expired=(state.trials||[]).filter(t=>!t.active);
  bar.replaceChildren();bar.hidden=!expired.length;
  for(const t of expired){
@@ -1900,6 +1912,7 @@ function renderTrialBar(){
 /* Inlärda förslag: domän + mapp + antal. Bara ett förslag – inget skapas utan klick. */
 function renderLearnBar(){
  const bar=$('learnBar');if(!bar)return;
+ if(unchanged('learn',JSON.stringify([state.learn||null,currentLang,folders.length])))return;
  const list=(state.learn&&!state.learn.off)?state.learn.suggestions||[]:[];
  bar.replaceChildren();bar.hidden=!list.length;
  if(!list.length)return;
@@ -1937,6 +1950,13 @@ function renderLearnBar(){
  }
 }
 function renderRules(){
+ /* Allt listan läser: reglerna, sökordet, markeringen, språket och mapplistan
+    (den behövs för konfliktvarningen och för att visa mappnamn). */
+ const sig=JSON.stringify([state.config.rules,selectedId,$('ruleSearch')?.value||'',currentLang,folders.length]);
+ if(unchanged('rules',sig))return;
+ paintRules();
+}
+function paintRules(){
  const list=$('ruleList');list.replaceChildren();const search=C.norm($('ruleSearch').value);
  /* Konfliktkartan: vilka regler som kan träffa samma mejl och skicka det olika väg.
     Mappens konto slås upp i den inlästa mapplistan, så mapp- och kontoregler kan jämföras. */
@@ -2139,13 +2159,38 @@ function loadRule(id='',presetAccount=''){
  dirty=false;editRevision=state.config.revision;editToken=currentToken();renderRules();
  rpc('prefs',{prefs:{lastRule:selectedId}}).catch(()=>{});
 }
+const logKey=log=>log.time+'|'+log.event+'|'+(log.data?.count||0)+'|'+(log.data?.detail||'');
+function logRow(log){
+ const tr=el('tr');
+ for(const text of [new Date(log.time).toLocaleString(locale()),Tevent(log.event)+(log.data.detail?' – '+log.data.detail:''),log.level,log.data.count])tr.append(el('td','',text));
+ return tr;
+}
 function renderActivity(){
- $('logRows').replaceChildren();for(const log of [...state.logs].reverse()){
-  const tr=el('tr');for(const text of [new Date(log.time).toLocaleString(locale()),Tevent(log.event)+(log.data.detail?' – '+log.data.detail:''),log.level,log.data.count])tr.append(el('td','',text));$('logRows').append(tr);
+ const body=$('logRows');if(!body)return;
+ const logs=state.logs||[];
+ const keys=logs.map(logKey).reverse();
+ /* Kommer det bara nya rader i toppen? Då läggs de till i stället för att hela
+    tabellen byggs om: raderna behåller sin plats och scrollen hoppar inte. */
+ const added=keys.length-logShown.length;
+ if(logShown.length&&added>0&&keys.slice(added).every((k,i)=>k===logShown[i])){
+  const height=body.scrollHeight;
+  const first=body.firstChild;
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<added;i++)frag.append(logRow(logs[logs.length-1-i]));
+  body.insertBefore(frag,first||null);
+  logShown.push(...keys.slice(0,added));
+  if(body.scrollTop>0)body.scrollTop+=body.scrollHeight-height;
+  return;
  }
- if(!state.logs.length){const tr=el('tr'),td=el('td','',T('noLogsYet'));td.colSpan=4;tr.append(td);$('logRows').append(tr);}
+ body.replaceChildren();
+ const frag=document.createDocumentFragment();
+ for(let i=logs.length-1;i>=0;i--)frag.append(logRow(logs[i]));
+ if(!logs.length){const tr=el('tr'),td=el('td','',T('noLogsYet'));td.colSpan=4;tr.append(td);frag.append(tr);}
+ body.append(frag);
+ logShown.length=0;logShown.push(...keys);
 }
 function renderBackups(){
+ if(unchanged('backups',JSON.stringify([state.backups,state.blocked,state.inflight,currentLang])))return;
  $('backupList').replaceChildren();for(const b of state.backups){const row=el('div','backup');row.append(el('span','',new Date(b.time).toLocaleString(locale())+' · '+b.count+T('rulesCountSuffix')));const btn=el('button','text-button',T('restoreBtn'));btn.addEventListener('click',async()=>{if(!confirm(T('confirmRestore')))return;try{const s=await rpc('restoreBackup',{index:b.index,revision:state.config.revision});dirty=false;renderStatus(s);loadRule();toast(T('toastRestored'));}catch(e){alertError(e);}});row.append(btn);$('backupList').append(row);}
  if(!state.backups.length)$('backupList').append(el('p','muted',T('backupHint')));
  $('blockedInfo').textContent=state.blocked?state.blocked+T('blockedSome'):T('blockedNone');
@@ -2562,6 +2607,7 @@ function scheduleQuickPreview(){clearTimeout(quickPreviewTimer);quickPreviewTime
 
 function renderQuickExisting(){
  const sel=$('quickExisting');if(!sel)return;
+ if(unchanged('quickExisting',JSON.stringify([state.config.rules.map(r=>[r.id,r.name,r.enabled]),sel.value,currentLang])))return;
  const keep=sel.value;
  const list=[{id:'',name:T('quickExistingNew')}].concat(state.config.rules.map(r=>({id:r.id,name:(r.enabled?'':'⏸ ')+r.name})));
  sel.replaceChildren(...list.map(r=>{const o=el('option','',r.name);o.value=r.id;return o;}));
@@ -2913,6 +2959,7 @@ if($('tbExportBtn'))handle('tbExportBtn','click',exportTbFilters);
 if($('tbUriPrefix'))$('tbUriPrefix').addEventListener('change',()=>{if(tbImport)tbImport.uriPrefix=$('tbUriPrefix').value.trim();});
 function renderTbAccounts(){
  const sel=$('tbAccount');if(!sel)return;
+ if(unchanged('tbAccounts',JSON.stringify([accounts().map(a=>a.id),currentLang])))return;
  const keep=sel.value;
  selectOptions(sel,accounts(),T('chooseAccount'),keep);
 }
@@ -2969,7 +3016,7 @@ handle('backupNow','click',async()=>{
  if(r?.written){if(info)info.textContent=r.filename;toast(T('backupNowDone').replace('{n}',r.count).replace('{name}',r.filename));}
  else{toast(r?.reason==='unchanged'?T('backupNowUnchanged'):T('backupNowFailed'),r?.reason!=='unchanged');}
 });
-handle('refreshFolders','click',async()=>{folders=await rpc('folders');const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();renderSuggestions();toast(T('toastFoldersRefreshed'));});
+handle('refreshFolders','click',async()=>{folders=await rpc('folders');repaint();const src=$('source').value,target=$('target').value;accountOptions(src);targetOptions(target);renderRules();renderSuggestions();toast(T('toastFoldersRefreshed'));});
 
 /* ===== Nya funktioner: mallar, förslag, ny mapp, årstid ===== */
 for(const btn of document.querySelectorAll('#templateBar .template-btn'))btn.addEventListener('click',()=>applyTemplate(btn.dataset.template));
@@ -2988,7 +3035,18 @@ async function setSeasonPref(value){
 for(const id of ['season','seasonQuick'])if($(id))handle(id,'change',()=>setSeasonPref($(id).value));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(state)applyTheme(state.prefs);});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-async function refresh(){try{renderStatus(await rpc('status'));}catch(e){alertError(e);}}
+/* Statusen kan komma tiotal gånger i sekunden under ett svep. Här ligger högst
+   en förfrågan i luften åt gången, och högst en till på kö – annars kunde svaren
+   komma ikapp varandra och rita en äldre status över en nyare. */
+let refreshing=false,refreshQueued=false;
+async function refresh(){
+ if(refreshing){refreshQueued=true;return;}
+ refreshing=true;
+ try{
+  do{refreshQueued=false;renderStatus(await rpc('status'));}while(refreshQueued);
+ }catch(e){alertError(e);}
+ finally{refreshing=false;refreshQueued=false;}
+}
 if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
  if(msg?.event==='statusChanged')refresh();
  if(msg?.event==='ruleFromMessage')applyPrefill().catch(()=>{});

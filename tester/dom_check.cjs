@@ -70,6 +70,32 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version, inte texten i ui.html');
  check(!/v1\.0\./.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'ingen gammal version kvar i sidfoten');
 
+ /* --- Ritningen: bara det som ändrats ska ritas om --- */
+ /* Statusen kommer högst var hundrade millisekund under ett svep. Byggdes listorna
+    om varje gång kostade det mer än svepet – och scrollen hoppade. */
+ const firstRow=()=>doc.querySelector('#ruleList .rule-row');
+ const rowBefore=firstRow();
+ check(rowBefore!==null,'regellistan har rader att jämföra');
+ w.eval('renderStatus(state)');
+ check(firstRow()===rowBefore,'regellistan ritas inte om när inget har ändrats');
+ const logFirst=doc.querySelector('#logRows tr');
+ const logCount=doc.querySelectorAll('#logRows tr').length;
+ w.eval("state.logs=[...state.logs,{time:new Date().toISOString(),event:'moved',level:'info',data:{count:1,detail:'rittestet'}}];renderStatus(state);");
+ check(doc.querySelectorAll('#logRows tr').length===logCount+1,'den nya loggraden läggs till');
+ check(doc.querySelector('#logRows tr')!==logFirst,'den nya raden hamnar överst');
+ check(logFirst.parentNode!==null,'de gamla raderna behålls i stället för att byggas om');
+ check(/rittestet/.test(doc.querySelector('#logRows tr').textContent),'den nya raden syns');
+
+ /* Statusen får inte skickas iväg tiotal gånger i sekunden: högst en i taget. */
+ let calls=0;
+ const demo=w.LasDemo;
+ const realRequest=demo.request.bind(demo);
+ w.LasDemo.request=async msg=>{if(msg&&msg.type==='status')calls++;return realRequest(msg);};
+ await Promise.all([w.refresh(),w.refresh(),w.refresh(),w.refresh()]);
+ w.LasDemo.request=realRequest;
+ check(calls<=2,'flera statusändringar ger högst en förfrågan i taget (blev '+calls+')');
+ check(calls>=1,'men minst en förfrågan görs');
+
  /* --- 🔍 Varför ligger det här mejlet här? --- */
  check(el('whyBtn')!==null,'det finns en knapp för uppslaget');
  check(el('whyPanel')!==null&&el('whyPanel').hidden===true,'panelen är tyst innan man frågar');

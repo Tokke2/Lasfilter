@@ -231,6 +231,28 @@ test('alla etiketter som skriptet hoppar till finns',()=>{
  for(const [,label] of text.matchAll(/\bcall\s+:([a-z]+)/gi))assert.ok(defined.has(label.toLowerCase()),'underprogram saknas: '+label);
 });
 
+/* Tyst omstart: en nedladdad version ska tas i bruk utan fråga, men aldrig mitt
+   i en flytt. Det får inte heller kräva något som Thunderbird inte har. */
+test('en ny version startas tyst och bara när inget pågår',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ assert.match(bg,/runtime\.onUpdateAvailable\.addListener/,'bakgrunden ska lyssna på nya versioner');
+ assert.match(bg,/runtime\.reload\(\)/,'den ska ladda om tillägget själv i stället för att vänta på Thunderbird');
+ assert.match(bg,/App\.engineBusy\(\)&&!overdue/,'den ska vänta tills ingen flytt eller inget svep pågår');
+ assert.match(bg,/30\*60\*1000/,'men inte vänta i evighet');
+ /* Ingen fråga, ingen omstart av Thunderbird – bara tillägget laddas om. */
+ assert.equal(/confirm\(|alert\(/.test(bg),false,'ingen fråga till användaren');
+ /* Uppdateringskontrollen får bara användas om anropet finns: i Thunderbird är
+    runtime.requestUpdateCheck deklarerat men märkt "unsupported" i schemat. */
+ assert.match(bg,/if\(typeof call!=='function'\)return 'unsupported'/,'anropet måste kollas innan det används');
+ assert.match(bg,/App\.updateCheckEveryMs=12\*60\*60\*1000/,'en kontroll var tolfte timme');
+});
+
+test('dokumentationen säger hur man får två kontroller per dygn',()=>{
+ const doc=fs.readFileSync(path.join(ROOT,'LAS-MIG.md'),'utf8');
+ assert.match(doc,/extensions\.update\.interval/,'dygnsintervallet ska nämnas vid namn');
+ assert.match(doc,/43200/,'och värdet för tolv timmar');
+});
+
 test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  const wf=path.join(ROOT,'.github','workflows','release-assets.yml');
  assert.ok(fs.existsSync(wf),'arbetsflödet som lägger filerna på releasen saknas');

@@ -1032,6 +1032,8 @@ App.ready=(async()=>{
      Har svepet hunnit bli försenat tar vi igen det direkt i stället för att vänta på timern. */
   if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
   App.engine.tick().catch(()=>App.fail('internal_error'));
+  /* En nedladdad version som väntar på att inget ska pågå. */
+  App.applyPendingUpdate();
  },2000);App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
  App.lastTickAt=Date.now();App.startedAt=Date.now();
@@ -1062,6 +1064,67 @@ App.reloadStaleUi=(sender,msg)=>{
  B.tabs.reload(tabId).catch(()=>App.staleUi.delete(tabId));
  App.log('debug',0,'sida med annan version omladdad ('+(msg?.uiBuild||'utan versionsmarkering')+' mot '+UI_BUILD+')');
 };
+/* Tyst omstart när en ny version har laddats ner. Så länge tillägget lyssnar på
+   onUpdateAvailable skjuter Thunderbird upp bytet – annars hade koden bytts ut mitt
+   i en flytt – och vi laddar om själva när inget pågår. Det är hela "omstarten":
+   inget fönster, ingen fråga, ingen omstart av Thunderbird.
+   Går det inte att vänta längre (något har hängt i trettio minuter) byter vi ändå;
+   kön och reglerna ligger i storage och plockas upp igen av restore(). */
+App.pendingUpdate='';
+App.updateDeadline=0;
+App.engineBusy=()=>{
+ const e=App.engine;
+ if(!e)return false;
+ return !!((e.pending&&e.pending.size)||(e.inflight&&e.inflight.size)||e.sweeping||e.hold);
+};
+App.applyPendingUpdate=()=>{
+ if(!App.pendingUpdate)return false;
+ const overdue=!!App.updateDeadline&&Date.now()>App.updateDeadline;
+ if(App.engineBusy()&&!overdue)return false;
+ const version=App.pendingUpdate;
+ App.pendingUpdate='';
+ App.log('debug',0,'byter till version '+version+(overdue?' (inget blev ledigt pa 30 min)':' nar inget pagick'));
+ try{B.runtime.reload();}catch{App.pendingUpdate=version;return false;}
+ return true;
+};
+try{
+ B.runtime.onUpdateAvailable.addListener(details=>{
+  App.pendingUpdate=String(details?.version||'okand');
+  App.updateDeadline=Date.now()+30*60*1000;
+  App.applyPendingUpdate();
+ });
+}catch{}
+
+/* Hur ofta det letas efter en ny version bestäms av Thunderbird, inte av oss:
+   en kontroll vid start och sedan enligt extensions.update.interval (86400 s).
+   Webbläsar-API:t för att be om en extra kontroll, runtime.requestUpdateCheck,
+   finns bara som deklaration i Thunderbird – det är märkt "unsupported" i
+   toolkit/components/extensions/schemas/runtime.json – så det går inte att
+   tvinga fram en kontroll härifrån. Finns anropet i en framtid används det,
+   tyst, var tolfte timme; annars står vi still. */
+App.updateCheckEveryMs=12*60*60*1000;
+App.requestUpdateCheck=async()=>{
+ const call=B.runtime?.requestUpdateCheck;
+ if(typeof call!=='function')return 'unsupported';
+ try{
+  const r=await call.call(B.runtime);
+  if(r&&r.status==='update_available'){
+   App.pendingUpdate=String(r.version||'okand');
+   App.updateDeadline=Date.now()+30*60*1000;
+   App.applyPendingUpdate();
+  }
+  return (r&&r.status)||'unknown';
+ }catch{return 'failed';}
+};
+App.startUpdateWatch=()=>{
+ App.requestUpdateCheck().then(status=>{
+  if(status==='unsupported')App.log('debug',0,'uppdateringskontroll: Thunderbird har inget sadant anrop - dess egen timer skoter kontrollen');
+  else if(status!=='no_update')App.log('debug',0,'uppdateringskontroll: '+status);
+ }).catch(()=>{});
+ App.updateTimer=setInterval(()=>{App.requestUpdateCheck();},App.updateCheckEveryMs);
+};
+App.startUpdateWatch();
+
 B.browserAction.onClicked.addListener(tab=>App.open(tab).catch(()=>App.log('error')));
 B.runtime.onMessage.addListener((msg,sender)=>{
  if(sender.id!==B.runtime.id||msg?.event)return undefined;

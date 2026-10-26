@@ -317,6 +317,21 @@ https://github.com/Tokke2/Lasfilter/releases/latest/download/SortBro-Thunderbird
 
 Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart.
 
+### Tyst omstart – och två kontroller per dygn
+
+När Thunderbird har hämtat en ny version tar SortBro den i bruk själv. Tillägget väntar tills ingen flytt och inget svep pågår, laddar sedan om sig självt och fortsätter med den nya koden. **Inget fönster, ingen fråga, ingen omstart av Thunderbird** — kön och reglerna ligger i lagringsutrymmet och plockas upp igen. Ett SortBro-fönster som står öppet laddar om sig självt i samma stund, så sidfoten visar den version som faktiskt körs.
+
+Hur ofta det letas efter en ny version bestämmer **Thunderbird**, inte tillägget: en kontroll vid start och sedan enligt inställningen `extensions.update.interval`, som är `86400` sekunder — ett dygn. Tillägget kan inte be om en extra kontroll. Anropet `runtime.requestUpdateCheck` finns nämligen bara som en deklaration i Thunderbird; det är märkt `"unsupported": true` i `toolkit/components/extensions/schemas/runtime.json` och har ingen implementation. SortBro använder det om det någon gång dyker upp, men i dag står det still.
+
+Vill du att det ska letas **två gånger per dygn** räcker det med en inställning i Thunderbird, en gång:
+
+1. **Inställningar → Allmänt** och rulla längst ner.
+2. **Config-editor** (avancerade inställningar).
+3. Sök upp `extensions.update.interval` och ändra `86400` till **`43200`** (tolv timmar i sekunder).
+4. Starta om Thunderbird.
+
+Inställningen gäller alla tillägg, kräver ingen behörighet och överlever både uppdateringar och nya versioner av SortBro. SortBro själv rör den aldrig.
+
 **Sidfoten kan ändå visa fel version — det var en riktig bugg i 1.0.1.** Texten står nämligen som reserv i `ui.html`, och den skrevs bara om när språket byttes. Kör man svenska (som är standard) byts språket aldrig, så sidfoten behöll den version som råkade stå i HTML-filen — `v1.0.0` — även om 1.0.1 var installerad. Från 1.0.2 skrivs sidfoten om direkt vid start, och `ui.html`-reserven höjs av `tools/ship.sh` tillsammans med de andra versionstalen.
 
 En **flik eller ett fönster som redan var öppet** när uppdateringen kom fortsätter dessutom att köra den gamla versionens kod, och då visas den gamla versionen tills sidan laddats om. Sidan laddas om automatiskt nästa gång den hör av sig till bakgrunden — varje ärende bär med sig vilken version sidans kod har, och bakgrunden laddar om fliken om den inte stämmer med den installerade. Fram till dess räcker det att stänga fönstret och öppna det igen (eller trycka **Ctrl+R**).
@@ -402,6 +417,11 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.3
+
+- **Tyst omstart när en ny version har hämtats.** SortBro lyssnar på att en uppdatering finns, väntar tills ingen flytt eller inget svep pågår och laddar då om sig själv. Inget fönster, ingen fråga, ingen omstart av Thunderbird. Har något hängt i trettio minuter byts versionen ändå — kön ligger i lagringsutrymmet och plockas upp igen.
+- **Kontrollen sker när Thunderbird själv kontrollerar.** Tillägget kan inte tvinga fram en extra kontroll (anropet finns inte i Thunderbird), men det använder det om det någon gång införs. Avsnittet ovan visar hur du får två kontroller per dygn med en enda inställning.
 
 ## Nyheter i 1.0.2
 

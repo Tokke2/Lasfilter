@@ -1174,3 +1174,66 @@ test('en öppen sida som kör en annan version laddas om',async()=>{
  await tick.settle(listener({type:'status'},sender(8)));
  assert.deepEqual(reloads,[7,8],'utan versionsmarkering räknas sidan som gammal');
 });
+
+/* Tyst omstart: en nedladdad version ska bytas när inget pågår, aldrig mitt i en
+   flytt – och aldrig med en fråga till användaren. */
+test('en nedladdad version byts tyst när inget pågår',async()=>{
+ const api=stubApi();
+ let onUpdate=null;
+ const reloads=[];
+ api.runtime.id='lasfilter@lokala-verktyg.invalid';
+ api.runtime.onUpdateAvailable.addListener=fn=>{onUpdate=fn;};
+ api.runtime.reload=()=>{reloads.push(1);};
+ const {app}=await loadBackground(api);
+ const engine=fakeEngineWithRules(app);
+ assert.equal(typeof onUpdate,'function','bakgrunden ska lyssna på nya versioner');
+ engine.pending.set('m1',{});
+ onUpdate({version:'1.0.4'});
+ assert.deepEqual(reloads,[],'mitt i en flytt väntar vi');
+ assert.equal(app.pendingUpdate,'1.0.4','versionen sparas till dess');
+ engine.pending.clear();
+ assert.equal(app.applyPendingUpdate(),true);
+ assert.deepEqual(reloads,[1],'när kön är tom byts koden');
+ assert.equal(app.pendingUpdate,'','det ska bara hända en gång');
+ assert.equal(app.applyPendingUpdate(),false);
+ assert.deepEqual(reloads,[1],'inget mer händer utan ny version');
+});
+
+test('en uppdatering som väntar för länge tvingas igenom',async()=>{
+ const api=stubApi();
+ let onUpdate=null;
+ const reloads=[];
+ api.runtime.id='lasfilter@lokala-verktyg.invalid';
+ api.runtime.onUpdateAvailable.addListener=fn=>{onUpdate=fn;};
+ api.runtime.reload=()=>{reloads.push(1);};
+ const {app}=await loadBackground(api);
+ const engine=fakeEngineWithRules(app);
+ engine.sweeping=2;
+ onUpdate({version:'1.0.4'});
+ assert.deepEqual(reloads,[],'ett svep pågår');
+ /* Klockan i sandlådan står still, så "för länge sedan" skrivs som ett förflutet tal. */
+ app.updateDeadline=1;
+ assert.equal(app.applyPendingUpdate(),true,'efter trettio minuter byter vi ändå');
+ assert.deepEqual(reloads,[1]);
+});
+
+test('uppdateringskontrollen är tyst och tål att anropet saknas',async()=>{
+ const api=stubApi();
+ api.runtime.id='lasfilter@lokala-verktyg.invalid';
+ /* Stubben svarar på allt, men i Thunderbird finns ingen sådan funktion. */
+ api.runtime.requestUpdateCheck=undefined;
+ const {app}=await loadBackground(api);
+ assert.equal(await app.requestUpdateCheck(),'unsupported','Thunderbird har inget requestUpdateCheck');
+ const api2=stubApi();
+ api2.runtime.id='lasfilter@lokala-verktyg.invalid';
+ const reloads=[];
+ api2.runtime.reload=()=>{reloads.push(1);};
+ const second=await loadBackground(api2);
+ fakeEngineWithRules(second.app);
+ api2.runtime.requestUpdateCheck=async()=>({status:'update_available',version:'9.9.9'});
+ assert.equal(await second.app.requestUpdateCheck(),'update_available');
+ assert.deepEqual(reloads,[1],'en hittad version byts direkt när inget pågår');
+ api2.runtime.requestUpdateCheck=async()=>({status:'no_update'});
+ assert.equal(await second.app.requestUpdateCheck(),'no_update');
+ assert.deepEqual(reloads,[1],'ingen ny version – ingenting händer');
+});

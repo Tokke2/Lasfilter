@@ -465,6 +465,27 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(el('brakeWarns').hidden===true,'ingen stoppad regel kvar efter svaret');
  check(!/Säkerhetsbromsen stoppade/.test(el('brakeWarns').textContent),'raden är tom efter svaret');
 
+ /* Cache-kortet: reglaget speglar konfigurationen och knappen tömmer cachen. */
+ check(el('autoClear')!==null,'det finns ett reglage för automatisk cache-rensning');
+ check(el('autoClear').checked===true,'det är på som standard');
+ check(el('clearCacheNow')!==null,'det finns en knapp för att rensa cachen nu');
+ check(typeof el('cacheStatus').textContent==='string','det finns en rad som säger när cachen senast tömdes');
+ w.LasDemo.setState({cache:{on:true,at:Date.now()-3*86400000,day:''}});
+ el('pause').click();
+ await until(()=>/3 dagar sedan/.test(el('cacheStatus').textContent),'statusraden räknar dagar sedan senaste rensning',false,6000);
+ check(/Senast rensad för 3 dagar sedan/.test(el('cacheStatus').textContent),'i klartext: "'+el('cacheStatus').textContent+'"');
+ el('clearCacheNow').click();
+ await until(()=>/i dag/.test(el('cacheStatus').textContent),'knappen rensar och raden uppdateras',false,6000);
+ check(/i dag \d{2}:\d{2}/.test(el('cacheStatus').textContent),'med klockslag: "'+el('cacheStatus').textContent+'"');
+ check(/rensad: \d+ mappar/.test(el('toast')?.textContent||''),'kvittot säger hur många mappar som läses om: "'+(el('toast')?.textContent||'')+'"');
+ el('autoClear').checked=false;fire(el('autoClear'),'change');
+ await until(()=>w.LasDemo.setState({}).config.autoClear===false,'reglaget sparas av',false,6000);
+ /* Vänta på att gränssnittet hunnit rita om – demodata ändras direkt, texten ett steg senare. */
+ await until(()=>/avstängd/.test(el('cacheStatus').textContent),'statusraden säger att automatiken är av',false,6000);
+ check(/avstängd/.test(el('cacheStatus').textContent),'i klartext: "'+el('cacheStatus').textContent+'"');
+ el('autoClear').checked=true;fire(el('autoClear'),'change');
+ await until(()=>w.LasDemo.setState({}).config.autoClear===true,'och på igen',false,6000);
+
  check(el('installWarn')!==null,'det finns en varningsrad för installationen');
  check(el('installWarn').hidden===true,'den är tyst när installationen är permanent');
  w.LasDemo.setState({installType:'development'});

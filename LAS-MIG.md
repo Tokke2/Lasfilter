@@ -255,6 +255,24 @@ Lagrade data är egna regelinställningar, fem regelkopior, köjournal och en te
 | Datorn har sovit | Klockglappet upptäcks inom två sekunder; är svepet försenat körs det direkt |
 | Kontona svarar inte ännu | Två tysta försök (10 s och 60 s) innan något skrivs i loggen |
 
+## Cachen – snabba svep utan att bli gammal
+
+För att ett svep ska gå fort behöver SortBro inte läsa om hela kontot varje gång. Därför minns den varje mapps meddelandetal: har en mapp 412 mejl och 3 olästa i dag som i går, finns det inget nytt att leta efter där, och mappen hoppas över på under en millisekund. Det är samma princip som en webbläsares cache – och samma svaghet: den kan bli inaktuell.
+
+SortBro tömmer cachen när den **vet** att något ändrats: ett mejl flyttas, ett nytt kommer in, en läsmarkering ändras, en regel sparas. Men en ändring som sker någon annanstans – en annan dator, en telefon, webbmail, eller serverns egna filter – skickar ingen sådan signal. Därför töms cachen också **en gång per dygn**, och du kan tömma den själv när du vill.
+
+**Under Inställningar → Cache:**
+
+- **Rensa cachen automatiskt en gång per dygn** – på som standard. En ny dag räknas från din lokala klocka, inte UTC. Dagen sparas, så en omstart samma dag rensar inte igen och en lång session utan omstart kommer ändå ikapp.
+- **Rensa cachen nu** – knappen fungerar även om du stängt av den automatiska rensningen. Kvittot säger hur många mappar som läses om vid nästa svep.
+- Raden bredvid säger när det senast hände: *"Senast rensad i dag 09:12"*, *"…i går 21:40"* eller *"…för 3 dagar sedan"*. Är automatiken avstängd står det också.
+
+**Vad som aldrig rensas.** Kön, journalen och minnet av redan hanterade mejl är inte cache – de är det som hindrar samma mejl från att hanteras två gånger. Inte heller provkörningens räknare eller säkerhetsbromsens historik rörs. Ett test i `tester/safety.test.cjs` avvisar ändringar som skulle tömma något av dem.
+
+**Mitt i en flytt väntar rensningen.** Skulle cachen rensas medan mejl är på väg ut ur kön kan nästa svep hoppa över en mapp som faktiskt ändrats. Därför rensas ingenting så länge kön inte är tom – den automatiska väntar till nästa minut, den manuella säger *"Vänta tills flytten är klar"*.
+
+En rensning flyttar inga mejl och ändrar inga regler. Det enda som händer är att nästa svep läser om mapparnas storlek, vilket tar några sekunder extra en gång.
+
 ## Reglerna säkras automatiskt
 
 Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil. Backuperna har sin egen undermapp (`Lasfilter/Regelbackuper/`) så att de aldrig blandas ihop med loggfilen eller annat i appmappen:
@@ -462,6 +480,12 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.9
+
+- **Cachen kan rensas – automatiskt en gång per dygn.** Den smarta mappcachen sparar varje mapps meddelandetal så att ett svep kan hoppa över mappar som inte ändrats. Den tömdes när SortBro fick en signal om en ändring, men en ändring från en annan dator eller från serverns egna filter skickar ingen sådan signal. Nu töms den också en gång i dygnet, med din lokala klocka som dagräknare, och dagen sparas så att en omstart inte rensar i onödan.
+- **Knappen "Rensa cachen nu"** under Inställningar → Cache, med en rad som säger när det senast hände. Den fungerar även om du stängt av den automatiska rensningen.
+- **Ingenting annat rörs.** Kön, journalen, minnet av hanterade mejl, provkörningens räknare och bromsens historik är inte cache. Ett test vaktar det.
 
 ## Nyheter i 1.0.8
 

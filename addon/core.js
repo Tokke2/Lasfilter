@@ -306,7 +306,7 @@ function validatePair(source,target,sourceCaps,targetCaps){
  if(source.id===target.id)fail('same_folder');
  if(sourceCaps.canDeleteMessages!==true||targetCaps.canAddMessages!==true)fail('read_only');
 }
-function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,brake:true,rules:[]};}
+function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,brake:true,rules:[]};}
 function config(raw){
  if(!raw||raw.schema!==1)fail('bad_schema');
  if(!Number.isSafeInteger(raw.revision)||raw.revision<0||!Number.isSafeInteger(raw.rulesVersion)||raw.rulesVersion<0)fail('bad_schema');
@@ -315,12 +315,15 @@ function config(raw){
  if(typeof raw.hourly!=='boolean'||typeof raw.openWindow!=='boolean'||typeof raw.verbose!=='boolean')fail('bad_schema');
  const fileLog=raw.fileLog===undefined?true:raw.fileLog;if(typeof fileLog!=='boolean')fail('bad_schema');
  const autoBackup=raw.autoBackup===undefined?true:raw.autoBackup;if(typeof autoBackup!=='boolean')fail('bad_schema');
+ /* Cache-rensningen är på som standard, som de andra automatiska rutinerna.
+    Konfigurationer från tidigare versioner saknar fältet och får true. */
+ const autoClear=raw.autoClear===undefined?true:raw.autoClear;if(typeof autoClear!=='boolean')fail('bad_schema');
  /* Säkerhetsbromsen är på som standard. Konfigurationer från tidigare versioner
     saknar fältet och får då true, precis som när det infördes. */
  const brake=raw.brake===undefined?true:raw.brake;if(typeof brake!=='boolean')fail('bad_schema');
  const sweepMinutes=raw.sweepMinutes===undefined?60:raw.sweepMinutes;if(!Number.isInteger(sweepMinutes)||sweepMinutes<15||sweepMinutes>1440||sweepMinutes%15)fail('bad_schema');
  const newInboxDirect=raw.newInboxDirect===undefined?true:raw.newInboxDirect;if(typeof newInboxDirect!=='boolean')fail('bad_schema');
- return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,autoBackup,brake,rules:validateRules(raw.rules)};
+ return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,autoBackup,autoClear,brake,rules:validateRules(raw.rules)};
 }
 
 /* ── Konfliktvarning: kan två regler matcha samma mejl? ────────────────────

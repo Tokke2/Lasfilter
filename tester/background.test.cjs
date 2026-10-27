@@ -859,6 +859,82 @@ test('bromsens svar avvisas för en regel som inte är stoppad',async()=>{
  await assert.rejects(()=>app.handle({type:'brakeDelete',ruleId:'r1'}),'inget att ta bort');
 });
 
+/* ── Cachen ───────────────────────────────────────────────────────────────
+   Mappcachen gör svepen snabba men kan bli gammal. Den töms automatiskt en gång
+   i dygnet. Det farliga vore att tömma något annat på vägen: kön, journalen
+   eller minnet av redan hanterade mejl. Då kan samma mejl hanteras två gånger. */
+function cacheEngine(app,over={}){
+ const engine=fakeEngine(app,{folderCache:new Map([['inbox',{total:10,unread:2}],['fin',{total:4,unread:0}]]),
+  yearFolderIds:new Map([['fin|2025','y2025']]),
+  invalidateFolders(){engine.folderCache.clear();},...over});
+ return engine;
+}
+
+test('cachen kan rensas för hand',async()=>{
+ const {app}=await loadBackground();
+ const engine=cacheEngine(app);
+ app.scanCache={at:Date.now(),data:{x:1},limit:0};
+ const out=await app.handle({type:'clearCache'});
+ assert.equal(out.result.ok,true,'rensningen ska lyckas');
+ assert.equal(out.result.folders,2,'antalet mappar som fanns i cachen rapporteras');
+ assert.equal(engine.folderCache.size,0,'mappcachen är tömd');
+ assert.equal(engine.yearFolderIds.size,0,'årsmapparnas id-karta är tömd');
+ assert.equal(app.scanCache.data,null,'sökningen räknas om');
+ assert.match(out.result.day,/^\d{4}-\d{2}-\d{2}$/,'dagen sparas som ÅÅÅÅ-MM-DD');
+ assert.equal(out.status.cache.on,true,'statusen säger att automatiken är på');
+ assert.equal(out.status.cache.at>0,true,'statusen vet när den senast rensades');
+});
+
+test('cache-rensningen rör aldrig kön eller minnet av hanterade mejl',async()=>{
+ const {app}=await loadBackground();
+ const engine=cacheEngine(app,{pending:new Map(),inflight:new Map()});
+ engine.pending.set('m1',{});
+ engine.records=new Map([['abc',{stage:'attempted'}]]);
+ engine.done=new Set(['abc','def']);
+ /* Kön är inte tom – då ska rensningen vägra i stället för att röja runt. */
+ const busy=await app.handle({type:'clearCache'});
+ assert.equal(busy.result.ok,false,'mitt i en flytt rensas ingenting');
+ assert.equal(busy.result.reason,'busy');
+ assert.equal(engine.folderCache.size,2,'cachen står kvar när det är upptaget');
+ assert.equal(engine.done.size,2,'minnet av hanterade mejl är orört');
+ engine.pending.clear();
+ const r=await app.handle({type:'clearCache'});
+ assert.equal(r.result.ok,true,'när kön är tom går det bra');
+ assert.equal(engine.done.has('abc'),true,'done rensas aldrig – annars kan ett mejl hanteras två gånger');
+ assert.equal(engine.done.size,2,'hela minnet finns kvar');
+ assert.equal(engine.records.size,1,'journalen är orörd');
+});
+
+test('cachen rensas automatiskt en gång per dygn, inte oftare',async()=>{
+ const {app,tick}=await loadBackground();
+ cacheEngine(app);
+ app.lastCacheDay='';
+ app.lastCacheClear=0;
+ const first=app.maybeClearCache();
+ assert.equal(first.ok,true,'första kontrollen på dygnet rensar');
+ assert.equal(app.lastCacheDay,app.cacheDayOf(),'dagens datum sparas');
+ const second=app.maybeClearCache();
+ assert.equal(second,null,'samma dygn rensas inte igen');
+ /* En ny dag (som om dygnet gått) ska rensa igen. */
+ app.lastCacheDay='2000-01-01';
+ const third=app.maybeClearCache();
+ assert.equal(third.ok,true,'en ny dag rensar igen');
+});
+
+test('avstängd automatisk rensning rör ingenting, men knappen fungerar',async()=>{
+ const {app}=await loadBackground();
+ const engine=cacheEngine(app);
+ engine.config={...engine.config,autoClear:false};
+ app.lastCacheDay='';
+ app.lastCacheClear=0;
+ assert.equal(app.maybeClearCache(),null,'avstängd automatisk rensning gör ingenting');
+ assert.equal(engine.folderCache.size,2,'cachen står kvar');
+ const manual=await app.handle({type:'clearCache'});
+ assert.equal(manual.result.ok,true,'den manuella knappen fungerar ändå');
+ assert.equal(engine.folderCache.size,0,'och tömmer cachen');
+ assert.equal(app.snapshot().cache.on,false,'statusen säger att automatiken är av');
+});
+
 test('statusen visar stoppade regler med namn och antal',async()=>{
  const {app}=await loadBackground();
  fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,

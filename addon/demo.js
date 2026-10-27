@@ -5,13 +5,13 @@ globalThis.LasDemo=(()=>{
   {id:'demo-web',accountId:'demo',label:'Exempelkonto · Webb',name:'Webb'},
   {id:'demo-buy',accountId:'demo',label:'Exempelkonto · Inköp',name:'Inköp'},
   {id:'demo-arkiv',accountId:'demo',label:'Exempelkonto · Arkiv',name:'Arkiv'}];
- let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,brake:true,rules:[
+ let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,brake:true,rules:[
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
   {id:'demo-3',name:'Arkivera äldre mejl',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',conditions:[{field:'date',op:'older',value:'90'}]}]},
   prefs:{theme:'light',fontSize:14,lastRule:'demo-1',lang:'sv'},installType:'normal',
   paths:{root:'Lasfilter/',logs:'Lasfilter/Loggar/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'},
-  brake:true,brakeHolds:[],lastBackupWeek:'2026-W42',trials:[],learn:{off:false,suggestions:[]},
+  brake:true,brakeHolds:[],lastBackupWeek:'2026-W42',cache:{on:true,at:0,day:''},trials:[],learn:{off:false,suggestions:[]},
   moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];let mockPrefill=null;
@@ -211,7 +211,12 @@ globalThis.LasDemo=(()=>{
     state.config.rules=state.config.rules.filter(r=>r.id!==m.ruleId);
     data=state;break;
    }
-   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.brake=m.brake!==false;state.config.revision++;data=state;break;
+   case 'clearCache':{
+    const day=new Date().toISOString().slice(0,10);
+    state.cache={on:state.config.autoClear!==false,at:Date.now(),day};
+    data={result:{ok:true,folders:12,day,at:Date.now()},status:state};break;
+   }
+   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.autoClear=m.autoClear!==false;state.config.brake=m.brake!==false;state.cache={...state.cache,on:state.config.autoClear!==false};state.config.revision++;data=state;break;
    case 'backupNow':data=state.config.autoBackup===false?{written:false,reason:'off'}:{written:true,filename:'Lasfilter/Regelbackuper/sortbro-regler-backup.json',dated:'',count:state.config.rules.length};break;
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};

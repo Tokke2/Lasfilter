@@ -150,6 +150,47 @@ App.autoBackup=async({force=false}={})=>{
  return {written:true,filename:App.backupFolder+name,dated:weekly?App.backupFolder+App.autoBackupNames.dated(day):'',week,count:rules.length};
 };
 App.scheduleAutoBackup=()=>{clearTimeout(App.backupTimer);App.backupTimer=setTimeout(()=>App.autoBackup().catch(()=>{}),3000);};
+/* ── Cache ───────────────────────────────────────────────────────────────
+   Den "smarta mappcachen" i motorn sparar varje mapps meddelandetal, så att ett
+   svep kan hoppa över mappar som inte ändrats (under 1 ms i stället för att
+   skanna om dem). Den gör svepen snabba, men den kan bli gammal om Thunderbird
+   ändrar något vi inte får en händelse om. Därför töms den en gång i dygnet –
+   och när du vill, med knappen i Inställningar.
+
+   Det som INTE rensas är medvetet: kön (pending), journalen (records), minnet av
+   redan hanterade mejl (done), provkörningens räknare (trialKeys) och
+   säkerhetsbromsens historik (brakeHistory). De är inte cache – de är minne som
+   skyddar mot att samma mejl hanteras två gånger. */
+App.lastCacheDay='';
+App.lastCacheClear=0;
+App.cacheDayOf=now=>{const d=new Date(Number.isFinite(now)?now:Date.now());return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+App.cacheBusy=()=>{const e=App.engine;return !e||(e.pending?.size||0)>0||(e.inflight?.size||0)>0||(e.sweeping||0)>0;};
+App.clearCaches=({manual=false}={})=>{
+ const e=App.engine;
+ if(!e)return {ok:false,reason:'starting'};
+ /* Rensas mappbilden mitt i en flytt kan nästa svep hoppa över en mapp som
+    faktiskt ändrats. Vänta tills kön är tom i stället – det tar några sekunder. */
+ if(App.cacheBusy())return {ok:false,reason:'busy'};
+ const folders=e.folderCache?.size||0;
+ e.invalidateFolders?.();
+ e.yearFolderIds?.clear();
+ App.invalidateScan();
+ const day=App.cacheDayOf();
+ App.lastCacheClear=Date.now();App.lastCacheDay=day;
+ /* Dagen sparas i lagringen, inte bara i minnet: annars skulle en omstart samma
+    dygn rensa igen, och en lång session utan omstart aldrig komma ikapp. */
+ App.write(()=>B.storage.local.set({cacheDay:day})).catch(()=>{});
+ App.log('debug',0,(manual?'cachen rensades for hand':'cachen rensades automatiskt')+': '+folders+' mappar, mapplistan och sokningen');
+ App.changed();
+ return {ok:true,folders,day,at:App.lastCacheClear};
+};
+/* En gång per dygn, om användaren inte stängt av det. Anropas från pulsen. */
+App.maybeClearCache=()=>{
+ if(App.engine?.config?.autoClear===false)return null;
+ if(App.lastCacheDay===App.cacheDayOf())return null;
+ return App.clearCaches();
+};
+
 App.log=(name,count=0,detail='')=>{
  const entry=C.event(name,count,Date.now(),detail);if(!entry)return;
  /* Samma klocka som stämplade raden avgör om den får ligga kvar – annars kan en
@@ -657,7 +698,10 @@ App.snapshot=()=>{
       kan visa dem utan ett extra anrop. */
    trials:(e.config.rules||[]).filter(r=>r.trialUntil>0).map(r=>({ruleId:r.id,name:r.name,left:C.trialDaysLeft(r),until:r.trialUntil,active:C.trialActive(r),count:e.trialCount?.(r.id)||0,target:r.target})),
    learn:{off:App.learned.off,suggestions:App.learnSuggestions()},
-   lastBackupWeek:App.lastBackupWeek||'',logs:App.logs};
+   lastBackupWeek:App.lastBackupWeek||'',logs:App.logs,
+   /* Cachen: om den rensas automatiskt, när den senast rensades och vilken dag
+      som räknas som gjord. Gränssnittet visar det under Inställningar. */
+   cache:{on:e.config.autoClear!==false,at:App.lastCacheClear||0,day:App.lastCacheDay||''}};
 };
 App.mutate=fn=>{
  const p=App.editChain.then(async()=>{
@@ -817,6 +861,12 @@ App.handle=async msg=>{
    App.invalidateScan();App.scheduleAutoBackup();
    return App.snapshot();
   });
+  /* Manuell cache-rensning. Auto-rensningen kan stängas av; den här knappen
+     fungerar ändå, det är användarens eget val. */
+  case 'clearCache':{
+   const result=App.clearCaches({manual:true});
+   return {result,status:App.snapshot()};
+  }
   case 'sweepNow':{
    const r=await App.runAllRules(true);
    App.invalidateScan();
@@ -848,11 +898,11 @@ App.handle=async msg=>{
   }
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
-   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean'||typeof msg.brake!=='boolean')throw new C.RuleError('bad_schema');
+   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean'||typeof msg.autoClear!=='boolean'||typeof msg.brake!=='boolean')throw new C.RuleError('bad_schema');
    const modeChanged=msg.moveMode!==e.config.moveMode;
    const verboseChanged=msg.verbose!==e.config.verbose;
    const backupChanged=msg.autoBackup!==e.config.autoBackup;
-   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,brake:msg.brake,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});
+   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,autoClear:msg.autoClear,brake:msg.brake,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});
    /* Stängs bromsen av släpps alla stoppade regler direkt – annars skulle de ligga kvar stoppade utan broms. */
    if(msg.brake===false)for(const h of e.heldList())e.releaseRule(h.ruleId);
    App.scheduleSweep();
@@ -983,9 +1033,10 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake','backupWeek','trial','learned']);
+ const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
+ if(typeof data.cacheDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(data.cacheDay))App.lastCacheDay=data.cacheDay;
  let cfg=C.defaults(),fault='';
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
  App.logs=C.cleanLogs(data.logs);App.backups=[];
@@ -1048,6 +1099,9 @@ App.ready=(async()=>{
      Har svepet hunnit bli försenat tar vi igen det direkt i stället för att vänta på timern. */
   if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
   App.engine.tick().catch(()=>App.fail('internal_error'));
+  /* Cache-rensningen behöver inte frågas varannan sekund – en gång i minuten
+     räcker, och då är klockan ändå billig att läsa. */
+  if(!App.cacheTickAt||now-App.cacheTickAt>60000){App.cacheTickAt=now;App.maybeClearCache();}
   /* En nedladdad version som väntar på att inget ska pågå. */
   App.applyPendingUpdate().catch(()=>{});
  },2000);App.scheduleSweep();

@@ -1354,6 +1354,19 @@ th {
   align-items: center;
 }
 
+/* Cache-kortet under Inställningar: knappen och raden om när den senast tömdes. */
+.cache-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.cache-actions .muted {
+  margin: 0;
+}
+
 /* Konfliktvarningen under en regel i listan. */
 .rule-conflict {
   margin: 2px 0 8px 34px;

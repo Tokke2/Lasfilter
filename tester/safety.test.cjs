@@ -268,6 +268,36 @@ test('säsongsikonerna heter det koden letar efter',()=>{
  }
 });
 
+/* Cache-rensningen får bara tömma det som är cache. Kön, journalen, minnet av
+   redan hanterade mejl, provkörningens räknare och bromsens historik är inte
+   cache – de skyddar mot att samma mejl hanteras två gånger. */
+test('cache-rensningen rör bara cache',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ const start=bg.indexOf('App.clearCaches=');
+ assert.ok(start>0,'clearCaches saknas');
+ const body=bg.slice(start,bg.indexOf('\n};',start));
+ assert.match(body,/invalidateFolders\?\.\(\)/,'mappcachen ska tömmas');
+ assert.match(body,/yearFolderIds\?\.clear\(\)/,'årsmapparnas karta ska tömmas');
+ assert.match(body,/invalidateScan\(\)/,'sökningen ska räknas om');
+ for(const skyddad of ['done.clear','records.clear','pending.clear','trialKeys.clear','brakeHistory=']){
+   assert.equal(body.includes(skyddad),false,'cache-rensningen får aldrig röra '+skyddad);
+ }
+ /* Mitt i en flytt är mappbilden på väg att ändras – då väntar vi. */
+ assert.match(body,/cacheBusy\(\)/,'ska vägra rensa medan kön inte är tom');
+ /* Dagen ska sparas, annars rensar en omstart samma dygn igen. */
+ assert.match(body,/storage\.local\.set\(\{cacheDay/,'dagen ska sparas i lagringen');
+});
+
+test('den dagliga rensningen är på som standard och drivs av pulsen',()=>{
+ const core=fs.readFileSync(path.join(ADDON,'core.js'),'utf8');
+ assert.match(core,/autoClear:true/,'cachen ska rensas automatiskt som standard');
+ assert.match(core,/const autoClear=raw\.autoClear===undefined\?true:raw\.autoClear/,'äldre konfigurationer ska få true');
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ const tick=bg.slice(bg.indexOf('App.timer=setInterval'),bg.indexOf('},2000);',bg.indexOf('App.timer=setInterval')));
+ assert.match(tick,/maybeClearCache\(\)/,'pulsen ska sköta den dagliga kontrollen');
+ assert.match(bg,/autoClear===false\)return null/,'avstängd automatisk rensning ska vara tyst');
+});
+
 /* Tyst omstart: en nedladdad version ska tas i bruk utan fråga, men aldrig mitt
    i en flytt. Det får inte heller kräva något som Thunderbird inte har. */
 test('en ny version startas tyst och bara när inget pågår',()=>{

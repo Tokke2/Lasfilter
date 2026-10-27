@@ -302,6 +302,18 @@ const I18N={
   brakeWarnDelete:'Ta bort regeln',
   brakeDeleteConfirm:'"{name}" tas bort helt. Ingenting flyttas, och regeln slutar leta efter mejl.\n\nEn kopia av reglerna sparas först, så den går att hämta tillbaka under Regelkopior & säkerhet.\n\nTa bort regeln?',
   brakeDeleted:'Regeln "{name}" togs bort. Ingenting flyttades.',
+  cacheTitle:'Cache',
+  cacheSub:'SortBro minns varje mapps meddelandetal så att ett svep kan hoppa över mappar som inte ändrats. Det gör svepen snabba. Cachen töms automatiskt en gång i dygnet, så att den aldrig kan visa en gammal bild av inkorgen.',
+  autoClearLabel:'Rensa cachen automatiskt en gång per dygn',
+  clearCacheBtn:'Rensa cachen nu',
+  cacheNote:'Att rensa cachen flyttar inga mejl och ändrar inga regler. Nästa svep läser bara om mapparnas storlek, vilket tar några sekunder extra en gång.',
+  cacheNever:'Inte rensad sedan tillägget startades.',
+  cacheToday:'Senast rensad i dag {time}.',
+  cacheYesterday:'Senast rensad i går {time}.',
+  cacheDaysAgo:'Senast rensad för {n} dagar sedan.',
+  cacheCleared:'Cachen rensad: {n} mappar läses om vid nästa svep.',
+  cacheBusy:'Vänta tills flytten är klar – då rensas cachen direkt.',
+  cacheOff:'Automatisk rensning är avstängd. Knappen fungerar ändå.',
   brakeReleased:'Regeln "{name}" släpptes och flyttar nu {n} mejl.',
   brakeStopped:'Regeln "{name}" stängdes av. Inget flyttades.',
   conflictTitle:'Kan krocka med "{name}" – båda kan matcha samma mejl ({fields}).',
@@ -961,6 +973,18 @@ const I18N={
   brakeWarnDelete:'Delete the rule',
   brakeDeleteConfirm:'"{name}" will be deleted completely. Nothing is moved, and the rule stops looking for mail.\n\nA copy of your rules is saved first, so you can bring it back under Rule copies & safety.\n\nDelete the rule?',
   brakeDeleted:'The rule "{name}" was deleted. Nothing was moved.',
+  cacheTitle:'Cache',
+  cacheSub:'SortBro remembers each folder\'s message counts so a sweep can skip folders that have not changed. That keeps sweeps fast. The cache is cleared automatically once a day, so it can never show a stale picture of your inbox.',
+  autoClearLabel:'Clear the cache automatically once a day',
+  clearCacheBtn:'Clear the cache now',
+  cacheNote:'Clearing the cache moves no email and changes no rule. The next sweep simply re-reads the folder sizes, which takes a few extra seconds once.',
+  cacheNever:'Not cleared since the add-on started.',
+  cacheToday:'Last cleared today at {time}.',
+  cacheYesterday:'Last cleared yesterday at {time}.',
+  cacheDaysAgo:'Last cleared {n} days ago.',
+  cacheCleared:'Cache cleared: {n} folders will be re-read on the next sweep.',
+  cacheBusy:'Wait until the move finishes – the cache is then cleared at once.',
+  cacheOff:'Automatic clearing is off. The button still works.',
   brakeReleased:'The rule "{name}" was released and now moves {n} emails.',
   brakeStopped:'The rule "{name}" was switched off. Nothing was moved.',
   conflictTitle:'May collide with "{name}" – both can match the same email ({fields}).',
@@ -1452,6 +1476,7 @@ function applyTheme(prefs){
  }
  if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;$('autoBackup').checked=state.config.autoBackup!==false;$('brake').checked=state.config.brake!==false;}
  /* Veckostatus: när den senaste automatiska veckokopian skrevs. */
+ renderCache(state);
  if($('backupStatus'))$('backupStatus').textContent=state.config.autoBackup===false?'':(state.lastBackupWeek?T('backupLastWeek').replace('{week}',state.lastBackupWeek):T('backupNoWeek'));
 }
 /* ===== Årstidsteman: Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter ===== */
@@ -1840,6 +1865,24 @@ function renderInstallWarning(next){
  if($('installWarnTitle'))$('installWarnTitle').textContent=T(type==='temporary'?'installWarnTempTitle':'installWarnSideTitle');
  if($('installWarnText'))$('installWarnText').textContent=T(type==='temporary'?'installWarnTempText':'installWarnSideText');
  box.hidden=false;
+}
+/* Cachen: reglaget speglar konfigurationen, raden säger när den senast tömdes.
+   Dagen räknas lokalt – "i dag" ska betyda din dag, inte UTC:s. */
+function cacheDayOf(ms){const d=new Date(ms);return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();}
+function cacheStatusText(cache){
+ const at=Number(cache?.at)||0;
+ if(!at)return T(cache?.on===false?'cacheOff':'cacheNever');
+ const time=new Date(at).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'});
+ const days=Math.round((cacheDayOf(Date.now())-cacheDayOf(at))/86400000);
+ const when=days<=0?T('cacheToday').replace('{time}',time)
+  :days===1?T('cacheYesterday').replace('{time}',time)
+  :T('cacheDaysAgo').replace('{n}',days);
+ /* Är automatiken avstängd ska det stå – annars tror man att raden ljuger. */
+ return cache?.on===false?when+' '+T('cacheOff'):when;
+}
+function renderCache(next){
+ if($('autoClear'))$('autoClear').checked=next?.cache?.on!==false;
+ if($('cacheStatus'))$('cacheStatus').textContent=cacheStatusText(next?.cache);
 }
 function renderStatus(next){
  state=next;applyTheme(state.prefs);applySeason(state.prefs);
@@ -2724,6 +2767,16 @@ handle('mode','click',async()=>{
  if(becomingLive&&!confirm(T('confirmEnableLive')))return;
  renderStatus(await rpc('setMode',{revision:state.config.revision,paused:false,dryRun:!becomingLive}));toast(becomingLive?T('toastLiveOn'):T('toastTestOn'));
 });
+handle('clearCacheNow','click',async()=>{
+ const btn=$('clearCacheNow');btn.disabled=true;
+ try{
+  const r=await rpc('clearCache');
+  renderStatus(r.status);
+  if(r.result?.ok)toast(T('cacheCleared').replace('{n}',String(r.result.folders||0)));
+  else toast(T('cacheBusy'),true);
+ }catch(err){alertError(err);}
+ finally{btn.disabled=false;}
+});
 handle('queueSelected','click',async()=>{const r=await rpc('queueSelected');toast(r.queued?T('toastQueued'):T('toastAlreadyQueued'));});
 handle('learnOn','change',async()=>{
  try{renderStatus(await rpc('learnToggle',{off:!$('learnOn').checked}));}
@@ -3018,10 +3071,10 @@ handle('lang','change',async()=>switchLanguage($('lang').value));
 function optionsPayload(){
  return {revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),
   newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked,
-  autoBackup:$('autoBackup').checked,brake:$('brake').checked};
+  autoBackup:$('autoBackup').checked,autoClear:$('autoClear').checked,brake:$('brake').checked};
 }
 handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
-for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog','autoBackup','brake'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));if(id==='autoBackup')toast($('autoBackup').checked?T('toastAutoBackupOn'):T('toastAutoBackupOff'));if(id==='brake')toast($('brake').checked?T('toastBrakeOn'):T('toastBrakeOff'));});
+for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog','autoBackup','autoClear','brake'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));if(id==='autoBackup')toast($('autoBackup').checked?T('toastAutoBackupOn'):T('toastAutoBackupOff'));if(id==='brake')toast($('brake').checked?T('toastBrakeOn'):T('toastBrakeOff'));});
 if($('brakeWarns'))$('brakeWarns').addEventListener('click',e=>{
  const move=e.target.closest('[data-brake-move]'),stop=e.target.closest('[data-brake-stop]'),del=e.target.closest('[data-brake-delete]');
  if(move)brakeAnswer(move.dataset.brakeMove,'move');

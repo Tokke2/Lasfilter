@@ -494,6 +494,20 @@
           </div>
 
           <div class="card settings-card">
+            <h2 data-i18n="cacheTitle">Cache</h2>
+            <p data-i18n="cacheSub">SortBro minns varje mapps meddelandetal så att ett svep kan hoppa över mappar som inte ändrats. Det gör svepen snabba. Cachen töms automatiskt en gång i dygnet, så att den aldrig kan visa en gammal bild av inkorgen.</p>
+            <label class="toggle-label">
+              <input id="autoClear" type="checkbox" checked>
+              <span data-i18n="autoClearLabel">Rensa cachen automatiskt en gång per dygn</span>
+            </label>
+            <div class="cache-actions">
+              <button id="clearCacheNow" type="button" class="button secondary" data-i18n="clearCacheBtn">Rensa cachen nu</button>
+              <span id="cacheStatus" class="muted"></span>
+            </div>
+            <p class="muted" data-i18n="cacheNote">Att rensa cachen flyttar inga mejl och ändrar inga regler. Nästa svep läser bara om mapparnas storlek, vilket tar några sekunder extra en gång.</p>
+          </div>
+
+          <div class="card settings-card">
             <h2 data-i18n="backupsTitle">Regelkopior & säkerhet</h2>
             <p data-i18n="jsonBackupSub">Exportera dina regler till en JSON-fil eller importera regler från en JSON-fil (ersätt alla eller lägg till).</p>
             <div class="json-backup-actions">

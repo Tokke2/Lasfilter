@@ -379,6 +379,7 @@ Sedan skriver den ut antingen `Klart. 1.0.5 ar aktiv i Thunderbird.` eller, om T
 ```
   Installerad:  1.0.2
   Senaste:      1.0.5
+  Automatik:    ja, Thunderbird letar själv med 24 timmars mellanrum
 
   Uppdaterar 1.0.2 till 1.0.5 ...
   Nedladdning:   OK 203 kB
@@ -389,6 +390,10 @@ Sedan skriver den ut antingen `Klart. 1.0.5 ar aktiv i Thunderbird.` eller, om T
   Klart. 1.0.5 ar aktiv i Thunderbird.
   Dina regler och installningar ligger kvar.
 ```
+
+Raden **Automatik:** berättar vad Thunderbird själv tänker göra, läst ur profilens egna filer — bara läsning, aldrig skrivning: `extensions.update.enabled` och `extensions.update.interval` i `prefs.js`, och tilläggets egen `applyBackgroundUpdates` i `extensions.json` (0 = av, 1 = som standard, 2 = på). Står det *ja, Thunderbird letar själv med 24 timmars mellanrum* behöver du aldrig köra filen — den finns bara för att slippa vänta. Står det *nej* säger raden under var du slår på det igen.
+
+**En gammal fil kan lura dig.** Fram till 1.0.5 fanns ett separat skript som bara *kontrollerade* versionen; det frågade *"Visa nedladdningssidan nu? [J/N]"* och öppnade i bästa fall en webbsida. Det togs bort i 1.0.6. Får du den frågan har du en gammal kopia kvar i Hämtade filer: kör `Uppdatera-SortBro.bat` i stället, så görs hela jobbet — och `/kolla` på samma fil jämför bara.
 
 **Vad skriptet aldrig gör:** det skriver inte i `extensions.json`, Thunderbirds databas över installerade tillägg — den äger Thunderbird. Det ändrar ingen inställning i Thunderbird och rör inga mejl eller regler. Det byter ut en fil och startar om programmet, precis som en manuell installation hade gjort.
 
@@ -483,6 +488,12 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.11
+
+- **Uppdateringsskriptet svarar på om Thunderbird sköter det själv.** En ny rad, *Automatik:*, läser profilens inställningar och skriver ut svaret i klartext — *ja, Thunderbird letar själv med 24 timmars mellanrum*, eller *nej, automatiken är avstängd i Thunderbird* med en rad om var den slås på. Bara läsning; skriptet skriver fortfarande aldrig i Thunderbird.
+- **Rätt rubrik.** Skriptets egen beskrivning sa att det *frågar innan det gör något* — det har det inte gjort sedan 1.0.5, och `/kolla` är sedan dess ett läge i samma fil, inte ett eget skript.
+- **Kontrolläget pekar vidare.** `/kolla` säger nu uttryckligen att samma fil laddar ner och byter ut åt dig när växeln inte är satt.
 
 ## Nyheter i 1.0.10
 

@@ -246,6 +246,19 @@ test('uppdateringen väger tyngre än att bara byta en fil',()=>{
  assert.equal(/taskkill\s+\/f/i.test(text),false,'får inte tvinga igenom en stängning');
 });
 
+/* Frågan "kan den inte uppdatera sig själv?" ska skriptet kunna svara på:
+   det läser Thunderbirds egna inställningar och skriver ut dem i klartext.
+   Läsningen får aldrig bli en skrivning – prefs.js ägs av Thunderbird. */
+test('uppdateringsskriptet säger om Thunderbird sköter det själv',()=>{
+ const text=fs.readFileSync(path.join(ROOT,'Uppdatera-SortBro.bat'),'latin1');
+ assert.ok(text.includes('extensions\\.update\\.interval'),'ska läsa kontrolltakten');
+ assert.ok(text.includes('extensions\\.update\\.enabled'),'ska läsa om automatiken är på');
+ assert.ok(text.includes('extensions\\.update\\.autoUpdateDefault'),'ska läsa den globala standarden');
+ assert.ok(text.includes('applyBackgroundUpdates'),'ska läsa tilläggets egen inställning');
+ assert.ok(text.includes('Automatik:'),'svaret ska synas för användaren');
+ assert.equal(/Set-Content[^\n]*prefs\.js|Out-File[^\n]*prefs\.js|Add-Content[^\n]*prefs\.js/i.test(text),false,'får aldrig skriva i prefs.js');
+});
+
 /* Säsongsikonen i verktygsfältet byggs som season-<årstid>-<storlek>.png.
    Filerna hette en gång season-var/sommar/host/vinter, så setIcon pekade på
    filer som inte fanns och felet slukades av en tom catch – ikonen byttes

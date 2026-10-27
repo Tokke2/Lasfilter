@@ -6,7 +6,7 @@ rem  Uppdatera-SortBro.bat
 rem  Hamtar senaste SortBro fran GitHub Releases och lagger in den i
 rem  Thunderbird-profilen. Dubbelklicka pa filen.
 rem
-rem    Uppdatera-SortBro.bat          fragar innan den gor nagot
+rem    Uppdatera-SortBro.bat          uppdaterar direkt, fragar inget
 rem    Uppdatera-SortBro.bat /tyst    inga fragor, for schemalaggning
 rem    Uppdatera-SortBro.bat /kolla   jamfor bara, andra ingenting
 rem
@@ -68,6 +68,9 @@ if not defined LNUM goto nonetwork
 if "%SILENT%"=="0" echo.
 if "%SILENT%"=="0" echo  Installerad:  %INSTALLED%
 if "%SILENT%"=="0" echo  Senaste:      %LATESTV%
+if "%SILENT%"=="0" call :las_auto
+if "%SILENT%"=="0" echo  Automatik:    %AUTOTEXT%
+if "%SILENT%"=="0" if "%AUTOSTATE%"=="off" echo  Sla pa den i Tillagg och teman - eller kor den har filen nar du vill.
 if "%SILENT%"=="0" echo.
 
 if %LNUM% GTR %INUM% goto nyare
@@ -126,7 +129,7 @@ goto inteaktiv
 :visa_bara
 echo  Det finns en nyare version: %LATESTV%
 echo.
-echo  Kor filen utan /kolla for att uppdatera.
+echo  Utan /kolla laddar samma fil ner och byter ut den at dig.
 set "RESULT=nyare"
 goto slut_ok
 
@@ -224,6 +227,35 @@ if "%SILENT%"=="1" echo SortBro fel: %RESULT%
 if "%SILENT%"=="0" echo.
 if "%SILENT%"=="0" pause
 endlocal & exit /b 1
+
+rem  ---------------------------------------------------------------
+rem  Vad tycker Thunderbird sjalv om uppdateringar? Ar automatiken pa,
+rem  och hur ofta letar den? Bara lasning - ingenting skrivs. Globala
+rem  vaxeln ar extensions.update.enabled, takten extensions.update.interval
+rem  (sekunder), och per tillagg galler applyBackgroundUpdates: 0 = av,
+rem  1 = som standard, 2 = pa. Svaret blir en rad text till anvandaren.
+:las_auto
+set "AUTOTEXT=okant"
+del "%WORK%\auto.txt" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try{ $p='%PROFILE%'; $txt=''; $f=Join-Path $p 'prefs.js'; if(Test-Path $f){ $txt=[string](Get-Content -LiteralPath $f -Raw -ErrorAction SilentlyContinue) }; $en=$true; if($txt -match 'extensions\.update\.enabled\D{0,8}false'){ $en=$false }; $de=$true; if($txt -match 'extensions\.update\.autoUpdateDefault\D{0,8}false'){ $de=$false }; $iv=86400; $m=[regex]::Match($txt,'extensions\.update\.interval\D{0,8}(\d+)'); if($m.Success){ $iv=[int]$m.Groups[1].Value }; $ab=1; $j=Join-Path $p 'extensions.json'; if(Test-Path $j){ try{ $d=ConvertFrom-Json -InputObject (Get-Content -LiteralPath $j -Raw -ErrorAction Stop); $a=$d.addons | Where-Object {$_.id -eq '%ADDON_ID%'} | Select-Object -First 1; if($a -and $null -ne $a.applyBackgroundUpdates){ $ab=[int]$a.applyBackgroundUpdates } }catch{} }; $on=$false; if($en){ if($ab -eq 2){ $on=$true } elseif($ab -eq 0){ $on=$false } else { $on=$de } }; $u='t'; $n=[int][math]::Round($iv/3600); if($iv -lt 3600){ $u='m'; $n=[int][math]::Round($iv/60) }; if($n -lt 1){ $n=1 }; $s='off'; if($on){ $s='on' }; Write-Output ('AUTO|' + $s + '|' + $n + '|' + $u) }catch{ Write-Output 'AUTO|?|0|t' }" > "%WORK%\auto.txt" 2>nul
+set "AUTOLINE="
+if exist "%WORK%\auto.txt" for /f "usebackq delims=" %%a in ("%WORK%\auto.txt") do if not defined AUTOLINE set "AUTOLINE=%%a"
+if not defined AUTOLINE exit /b 0
+for /f "tokens=1,2,3,4 delims=|" %%a in ("%AUTOLINE%") do (
+  set "AUTOSTATE=%%b"
+  set "AUTONUM=%%c"
+  set "AUTOUNIT=%%d"
+)
+if not "%AUTOSTATE%"=="on" goto las_auto_av
+set "AUTOWHEN=med %AUTONUM% timmars mellanrum"
+if "%AUTOUNIT%"=="m" set "AUTOWHEN=med %AUTONUM% minuters mellanrum"
+if "%AUTONUM%"=="1" if "%AUTOUNIT%"=="t" set "AUTOWHEN=med 1 timmes mellanrum"
+if "%AUTONUM%"=="1" if "%AUTOUNIT%"=="m" set "AUTOWHEN=med 1 minuts mellanrum"
+set "AUTOTEXT=ja, Thunderbird letar sjalv %AUTOWHEN%"
+exit /b 0
+:las_auto_av
+if "%AUTOSTATE%"=="off" set "AUTOTEXT=nej, automatiken ar avstangd i Thunderbird"
+exit /b 0
 
 rem  ---------------------------------------------------------------
 rem  Las en profil: version, plats och sokvag till XPI-filen.

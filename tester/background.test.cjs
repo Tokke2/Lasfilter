@@ -229,20 +229,28 @@ test('säkerhetskopian skriver reglerna till Hämtade filer – och de kan läsa
  assert.equal(back[0].target,'fin');
 });
 
-test('kopian skrivs när reglerna ändrats – men bara en veckokopia per vecka, och aldrig när rutan är av',async()=>{
+test('kopian skrivs en gång i veckan – inte vid varje regeländring',async()=>{
  const {api,written}=backupApi();
  const {app}=await loadBackground(api);
  fakeEngineWithRules(app,{config:backupConfig([exportRule])});
  await app.autoBackup({force:true});
  const after=written.length;
  const sameWeek=await app.autoBackup();
- assert.equal(sameWeek.written,false,'oförändrade regler samma vecka skrivs inte om');
- assert.equal(sameWeek.reason,'unchanged');
+ assert.equal(sameWeek.written,false,'samma vecka skrivs ingenting');
+ assert.equal(sameWeek.reason,'not_due');
  assert.equal(written.length,after,'ingen ny fil i onödan');
+ /* Huvudpoängen: en ändrad regel mitt i veckan väntar till veckokörningen. En
+    kopia som skrivs vid varje sparning är ett extra skrivsteg, inte en kopia. */
  app.engine.config={...app.engine.config,rules:[{...exportRule,name:'Fakturor 2'}]};
  const changed=await app.autoBackup();
- assert.equal(changed.written,true,'en ändrad regel skrivs');
- assert.equal(written.length,after+1,'bara den senaste filen skrivs om – ingen ny veckokopia');
+ assert.equal(changed.written,false,'en ändrad regel skrivs inte förrän veckan byts');
+ assert.equal(changed.reason,'not_due');
+ assert.equal(written.length,after,'inga skrivningar alls');
+ /* Ny vecka: båda filerna skrivs, med det nya innehållet. */
+ app.lastBackupWeek='2020-W01';
+ const next=await app.autoBackup();
+ assert.equal(next.written,true,'ny vecka skriver');
+ assert.equal(written.length,after+2,'senaste + veckokopia');
  app.engine.config={...app.engine.config,autoBackup:false};
  const off=await app.autoBackup();
  assert.equal(off.written,false,'avstängd ruta skriver ingenting');
@@ -1043,10 +1051,40 @@ test('veckan sparas i lagringen så en omstart inte skriver en extra kopia',asyn
  const second=await loadBackground(api);
  assert.equal(second.app.lastBackupWeek,week,'veckan läses tillbaka vid start');
  const skip=await second.app.autoBackup();
- assert.equal(skip.dated,'','ingen ny daterad veckokopia samma vecka efter omstart');
+ assert.equal(skip.written,false,'ingen ny kopia samma vecka efter omstart');
+ assert.equal(skip.reason,'not_due','veckan är redan gjord');
  assert.equal(skip.week,week,'samma vecka');
- /* Den alltid-senaste filen skrivs om – det är meningen: den ska vara aktuell. */
  await tick.flush(20);
+});
+
+test('veckokopian skrivs även om Thunderbird står öppen i veckor',async()=>{
+ const {api,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ await app.autoBackup({force:true});
+ const after=written.length;
+ /* Samma vecka: pulsen ska inte göra något. */
+ assert.equal(app.maybeWeeklyBackup(),null,'ingen kopia inom samma vecka');
+ await app.maybeWeeklyBackup();
+ /* Ny vecka utan omstart: pulsen ser det och schemalägger kopian. */
+ app.lastBackupWeek='2020-W01';
+ app.lastBackupTry=0;
+ assert.equal(app.maybeWeeklyBackup(),true,'en ny vecka upptäcks av pulsen');
+ assert.equal(app.lastBackupTry>0,true,'försöket bokförs så det inte upprepas varje minut');
+ /* Ett försök som inte hann skriva görs inte om direkt – högst en gång i timmen. */
+ app.lastBackupWeek='2019-W01';
+ assert.equal(app.maybeWeeklyBackup(),null,'inget nytt försök direkt efter ett misslyckat');
+ assert.equal(written.length,after,'ingenting skrevs av pulsen i sig');
+});
+
+test('veckokopian stängs av med rutan, men pulsen frågar aldrig när den är av',async()=>{
+ const {api}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app,{config:backupConfig([exportRule])});
+ app.engine.config={...app.engine.config,autoBackup:false};
+ app.lastBackupWeek='2019-W01';
+ app.lastBackupTry=0;
+ assert.equal(app.maybeWeeklyBackup(),null,'avstängd ruta ger ingen veckokoll');
 });
 
 test('knappen Backa upp reglerna nu skriver båda filerna direkt, även mitt i veckan',async()=>{

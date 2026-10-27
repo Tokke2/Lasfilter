@@ -277,11 +277,14 @@ En rensning flyttar inga mejl och ändrar inga regler. Det enda som händer är 
 
 Dina regler är det enda som inte går att återskapa. Därför skriver SortBro en **säkerhetskopia av reglerna** till Hämtade filer, utanför Thunderbirds profil. Backuperna har sin egen undermapp (`Lasfilter/Regelbackuper/`) så att de aldrig blandas ihop med loggfilen eller annat i appmappen:
 
-- **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-backup.json`** – alltid den senaste uppsättningen. Den skrivs om när du har sparat en regeländring, och en gång vid start.
+- **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-backup.json`** – den senaste uppsättningen.
 - **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad **veckokopia**, en per vecka (ISO-vecka, måndag–söndag). De senaste **12 veckorna** behålls; äldre veckofiler städas bort automatiskt (bara SortBros egna daterade filer i den egna undermappen – din manuella export och loggfilen rörs aldrig).
-- Veckan som senast fick en kopia sparas i Thunderbirds lagring, så en omstart mitt i veckan inte skriver en extra kopia. Har Thunderbird varit stängt över en veckogräns skrivs kopian vid nästa start.
 
-Kopieringen sker bara när något faktiskt har ändrats, så reglerna skrivs inte om i onödan. Vill du ha en färsk kopia direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Avancerat**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
+**Båda filerna skrivs en gång i veckan**, när veckan byts. Tidigare skrevs den senaste filen om vid varje regeländring; det gjorde ett skrivsteg av varje sparning utan att skydda något extra, för en kopia som skrivs tjugo gånger i timmen är ingen kopia. Vill du ha en färsk fil direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Avancerat**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
+
+Veckan som senast fick en kopia sparas i Thunderbirds lagring, så en omstart mitt i veckan inte skriver en extra kopia. **Har Thunderbird stått öppen i veckor utan omstart skrivs kopian ändå** – pulsen frågar en gång i minuten om veckan bytts. Ett misslyckat försök (full skiva, nekad skrivning) görs om, men högst en gång i timmen.
+
+**Vad veckotakten kostar:** ändrar du regler på måndagen och något går fel på tisdagen finns den nya versionen ännu inte i filen – den skrivs först när veckan byts. De fem senaste regelversionerna finns fortfarande kvar inne i tillägget (under *Regelkopior*), och knappen skriver filen direkt när du vill. Vill du hellre ha filen uppdaterad vid varje regeländring igen, säg till.
 
 **Varför utanför profilen?** Om tillägget en dag är borta ur Thunderbird – avinstallerat, avstängt av signaturkontrollen eller ersatt av en nyare version – så följer tilläggets egna ögonblicksbilder med i fallet. Filen i Hämtade filer ligger kvar på disken. Du hämtar tillbaka allt genom att importera den under **Regler** (*Importera*), precis som en vanlig export.
 
@@ -480,6 +483,12 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.10
+
+- **Säkerhetskopian skrivs en gång i veckan – inte vid varje regeländring.** Förut skrevs `sortbro-regler-backup.json` om varje gång du sparade en regel. Det blev ett extra skrivsteg i varje sparning utan att skydda något mer. Nu skrivs båda filerna när veckan byts, eller direkt med knappen *Backa upp reglerna nu*.
+- **Veckokopian skrivs även om Thunderbird aldrig startas om.** Pulsen frågar en gång i minuten om veckan bytts, så en session som står öppen i veckor inte längre kan missa sin kopia. Ett misslyckat försök görs om, högst en gång i timmen.
+- **Ett test vaktar att allt hamnar i appmappens undermappar.** Varje filskrivning måste gå genom `Lasfilter/Loggar/`, `Lasfilter/Regelbackuper/`, `Lasfilter/Regler/` eller `Lasfilter/Filterfiler/` – ingenting får hamna löst i Hämtade filer.
 
 ## Nyheter i 1.0.9
 

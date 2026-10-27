@@ -114,29 +114,31 @@ App.autoBackup=async({force=false}={})=>{
  try{payload.folders=(await App.folderList().catch(()=>[])).map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));}catch{}
  const day=new Date().toISOString().slice(0,10);
  const week=App.weekKey(new Date());
- const key=JSON.stringify(rules);
- const unchanged=key===App.lastBackupKey;
- /* En ny daterad kopia skrivs en gång per vecka – eller direkt när du trycker på knappen. */
+ /* Kopian skrivs en gång per vecka – eller direkt när du trycker på knappen.
+    Tidigare skrevs den senaste filen om vid varje regeländring, men en
+    säkerhetskopia som skrivs tjugo gånger i timmen är ingen säkerhetskopia:
+    den blir ett extra skrivsteg i varje regelsparning utan att skydda mer.
+    En gång i veckan är takten, och knappen finns för den som inte vill vänta. */
  const weekly=force||App.lastBackupWeek!==week;
+ if(!weekly)return {written:false,reason:'not_due',count:rules.length,week};
  const name=App.autoBackupNames.latest;
  const write=async filename=>{
   const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
   try{await B.downloads.download({url,filename:App.backupFolder+filename,saveAs:false,conflictAction:'overwrite'});}
   finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
  };
- if(unchanged&&!weekly)return {written:false,reason:'unchanged',count:rules.length};
  try{
   await write(name);
-  if(weekly)await write(App.autoBackupNames.dated(day));
+  await write(App.autoBackupNames.dated(day));
  }catch{
   /* Misslyckas filen är det ingen katastrof – men det ska synas i loggen. */
   App.log('debug',0,'reglerna kunde inte backas upp till Hamtade filer');
   return {written:false,reason:'failed',count:rules.length};
  }
- App.lastBackupKey=key;App.lastBackupWeek=week;
+ App.lastBackupWeek=week;
  /* Veckan sparas i lagringen, inte bara i minnet: annars skulle en omstart mitt i
     veckan skriva ännu en "veckokopia" och det skulle bli fler än en per vecka. */
- if(weekly)App.write(()=>B.storage.local.set({backupWeek:week})).catch(()=>{});
+ App.write(()=>B.storage.local.set({backupWeek:week})).catch(()=>{});
  App.log('debug',0,'reglerna backade upp: '+rules.length+' st till Hamtade filer/'+App.backupFolder);
  /* Städa gamla dagsfiler – bara våra egna, bara i vår egen mapp, och tyst om det inte går. */
  try{
@@ -150,6 +152,21 @@ App.autoBackup=async({force=false}={})=>{
  return {written:true,filename:App.backupFolder+name,dated:weekly?App.backupFolder+App.autoBackupNames.dated(day):'',week,count:rules.length};
 };
 App.scheduleAutoBackup=()=>{clearTimeout(App.backupTimer);App.backupTimer=setTimeout(()=>App.autoBackup().catch(()=>{}),3000);};
+/* Veckokopian får inte hänga på att Thunderbird startas om. Körs programmet i
+   veckor utan omstart måste den ändå skrivas när veckan byts, så pulsen frågar
+   här. Ett misslyckat försök görs om, men högst en gång i timmen – annars skulle
+   en full skiva ge sextio försök i timmen. */
+App.lastBackupTry=0;
+App.maybeWeeklyBackup=()=>{
+ const e=App.engine;
+ if(!e||e.config.autoBackup===false)return null;
+ if(App.lastBackupWeek===App.weekKey(new Date()))return null;
+ const now=Date.now();
+ if(App.lastBackupTry&&now-App.lastBackupTry<3600000)return null;
+ App.lastBackupTry=now;
+ App.scheduleAutoBackup();
+ return true;
+};
 /* ── Cache ───────────────────────────────────────────────────────────────
    Den "smarta mappcachen" i motorn sparar varje mapps meddelandetal, så att ett
    svep kan hoppa över mappar som inte ändrats (under 1 ms i stället för att
@@ -1101,7 +1118,7 @@ App.ready=(async()=>{
   App.engine.tick().catch(()=>App.fail('internal_error'));
   /* Cache-rensningen behöver inte frågas varannan sekund – en gång i minuten
      räcker, och då är klockan ändå billig att läsa. */
-  if(!App.cacheTickAt||now-App.cacheTickAt>60000){App.cacheTickAt=now;App.maybeClearCache();}
+  if(!App.cacheTickAt||now-App.cacheTickAt>60000){App.cacheTickAt=now;App.maybeClearCache();App.maybeWeeklyBackup();}
   /* En nedladdad version som väntar på att inget ska pågå. */
   App.applyPendingUpdate().catch(()=>{});
  },2000);App.scheduleSweep();

@@ -268,6 +268,50 @@ test('säsongsikonerna heter det koden letar efter',()=>{
  }
 });
 
+/* Allt SortBro skapar ska hamna i en undermapp till appmappen – aldrig löst i
+   Hämtade filer. Sökvägarna kommer från en enda källa (App.paths) och varje
+   skrivning måste gå genom den. */
+test('varje fil hamnar i en undermapp till appmappen',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ const paths=bg.match(/App\.paths=\{([^}]*)\}/);
+ assert.ok(paths,'App.paths saknas');
+ const map={};
+ for(const [,k,v] of bg.matchAll(/(\w+):'(Lasfilter\/[^']*)'/g))map[k]=v;
+ for(const key of ['root','logs','backups','rules','filters']){
+   assert.ok(map[key],'sökvägen '+key+' saknas');
+   assert.match(map[key],/^Lasfilter\//,'alla sökvägar börjar med appmappen');
+ }
+ for(const key of ['logs','backups','rules','filters']){
+   assert.match(map[key],/^Lasfilter\/[^/]+\/$/,'undermappen '+key+' ska sluta med snedstreck: '+map[key]);
+ }
+ /* Ingen skrivning får använda en sökväg som inte är en av undermapparna. */
+ for(const line of bg.split(/\r?\n/)){
+   if(!line.includes('downloads.download('))continue;
+   assert.match(line,/App\.paths\.(logs|backups|rules|filters)|App\.backupFolder|filename,/,'skrivning utan undermapp: '+line.trim().slice(0,90));
+ }
+ const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
+ /* En export får skicka en sökväg direkt från paths() eller en variabel som
+    byggts av paths() – inget annat. */
+ const fromPaths=new Set([...ui.matchAll(/const (\w+)\s*=\s*paths\(\)\.(logs|backups|rules|filters)/g)].map(m=>m[1]));
+ for(const line of ui.split(/\r?\n/)){
+   if(!/await download\(/.test(line))continue;
+   const ok=/paths\(\)\.(logs|backups|rules|filters)/.test(line)||[...fromPaths].some(v=>new RegExp('\\b'+v+'\\b').test(line));
+   assert.ok(ok,'export utan undermapp: '+line.trim().slice(0,90));
+ }
+});
+
+/* Säkerhetskopian skrivs en gång i veckan. Inte vid varje regelsparning – det
+   var den gamla takten och den gjorde ett skrivsteg av varje ändring. */
+test('säkerhetskopian skrivs en gång per vecka',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ const body=bg.slice(bg.indexOf('App.autoBackup='),bg.indexOf('App.scheduleAutoBackup='));
+ assert.match(body,/const weekly=force\|\|App\.lastBackupWeek!==week/,'takten ska vara veckan');
+ assert.match(body,/if\(!weekly\)return \{written:false,reason:'not_due'/,'utanför veckan skrivs ingenting');
+ assert.match(bg,/App\.maybeWeeklyBackup=/,'pulsen ska kunna skriva veckokopian utan omstart');
+ const tick=bg.slice(bg.indexOf('App.timer=setInterval'),bg.indexOf('},2000);',bg.indexOf('App.timer=setInterval')));
+ assert.match(tick,/maybeWeeklyBackup\(\)/,'pulsen ska fråga efter veckan');
+});
+
 /* Cache-rensningen får bara tömma det som är cache. Kön, journalen, minnet av
    redan hanterade mejl, provkörningens räknare och bromsens historik är inte
    cache – de skyddar mot att samma mejl hanteras två gånger. */

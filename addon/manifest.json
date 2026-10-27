@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "SortBro – smart mejlsortering",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Smart mejlsortering för Thunderbird: styr olästa och lästa mejl per regel eller sortera i lugn och ro efter läsning.",
   "browser_specific_settings": {
     "gecko": {

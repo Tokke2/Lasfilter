@@ -832,11 +832,31 @@ test('bromsens svar: Stäng av regeln stänger av den i stället',async()=>{
  assert.equal(status.brakeHolds.length,0,'spärren är släppt');
 });
 
+test('bromsens svar: Ta bort regeln tar bort den helt',async()=>{
+ const {app}=await loadBackground();
+ let held={ruleId:'r1',matched:51,limit:50,median:0};
+ const engine=fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
+  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,
+  rules:[{id:'r1',name:'Mejl från fortnox.se',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'fortnox.se'}]},
+         {id:'r2',name:'Nyhetsbrev',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'nytt',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'nyhetsbrev.se'}]}]},
+  heldRule:id=>held&&held.ruleId===id?held:null,
+  heldList:()=>held?[held]:[],
+  releaseRule:id=>{if(held&&held.ruleId===id)held=null;}});
+ app.brakeHistory.r1=[2,3,4];
+ const status=await app.handle({type:'brakeDelete',ruleId:'r1'});
+ assert.equal(status.config.rules.length,1,'bara den stoppade regeln försvinner');
+ assert.equal(status.config.rules[0].id,'r2','grannregeln är kvar');
+ assert.equal(engine.config.rules.length,1,'och det sparades i konfigurationen');
+ assert.equal(status.brakeHolds.length,0,'spärren är släppt');
+ assert.equal(app.brakeHistory.r1,undefined,'minnet för en borttagen regel städas');
+});
+
 test('bromsens svar avvisas för en regel som inte är stoppad',async()=>{
  const {app}=await loadBackground();
  fakeEngineWithRules(app,{heldRule:()=>null,heldList:()=>[]});
  await assert.rejects(()=>app.handle({type:'brakeRelease',ruleId:'r1'}),'inget att släppa');
  await assert.rejects(()=>app.handle({type:'brakeCancel',ruleId:'nope'}),'okänd regel');
+ await assert.rejects(()=>app.handle({type:'brakeDelete',ruleId:'r1'}),'inget att ta bort');
 });
 
 test('statusen visar stoppade regler med namn och antal',async()=>{

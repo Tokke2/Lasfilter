@@ -299,6 +299,9 @@ const I18N={
   brakeWarnNever:'inget',
   brakeWarnMove:'Flytta ändå',
   brakeWarnStop:'Stäng av regeln',
+  brakeWarnDelete:'Ta bort regeln',
+  brakeDeleteConfirm:'"{name}" tas bort helt. Ingenting flyttas, och regeln slutar leta efter mejl.\n\nEn kopia av reglerna sparas först, så den går att hämta tillbaka under Regelkopior & säkerhet.\n\nTa bort regeln?',
+  brakeDeleted:'Regeln "{name}" togs bort. Ingenting flyttades.',
   brakeReleased:'Regeln "{name}" släpptes och flyttar nu {n} mejl.',
   brakeStopped:'Regeln "{name}" stängdes av. Inget flyttades.',
   conflictTitle:'Kan krocka med "{name}" – båda kan matcha samma mejl ({fields}).',
@@ -955,6 +958,9 @@ const I18N={
   brakeWarnNever:'nothing',
   brakeWarnMove:'Move anyway',
   brakeWarnStop:'Switch the rule off',
+  brakeWarnDelete:'Delete the rule',
+  brakeDeleteConfirm:'"{name}" will be deleted completely. Nothing is moved, and the rule stops looking for mail.\n\nA copy of your rules is saved first, so you can bring it back under Rule copies & safety.\n\nDelete the rule?',
+  brakeDeleted:'The rule "{name}" was deleted. Nothing was moved.',
   brakeReleased:'The rule "{name}" was released and now moves {n} emails.',
   brakeStopped:'The rule "{name}" was switched off. Nothing was moved.',
   conflictTitle:'May collide with "{name}" – both can match the same email ({fields}).',
@@ -1794,7 +1800,8 @@ function renderBrakeWarns(){
   const actions=el('div','brake-warn-actions');
   const move=el('button','button small secondary',T('brakeWarnMove'));move.type='button';move.dataset.brakeMove=h.ruleId;
   const stop=el('button','button small secondary',T('brakeWarnStop'));stop.type='button';stop.dataset.brakeStop=h.ruleId;
-  actions.append(move,stop);
+  const del=el('button','button small secondary',T('brakeWarnDelete'));del.type='button';del.dataset.brakeDelete=h.ruleId;
+  actions.append(move,stop,del);
   row.append(body,actions);
   box.append(row);
  }
@@ -1810,6 +1817,14 @@ async function brakeAnswer(ruleId,action){
    const r=await rpc('brakeRelease',{ruleId});
    renderStatus(r.status);
    toast(T('brakeReleased').replace('{name}',name).replace('{n}',String(r.result?.queued??0)));
+  }else if(action==='delete'){
+   /* Raderingen är den enda av de tre som inte går att ångra i stunden, så den
+      frågar en gång till – med regelns namn i frågan, inte en anonym bekräftelse. */
+   const name=brakeName(ruleId);
+   if(!confirm(T('brakeDeleteConfirm').replace('{name}',name)))return;
+   const status=await rpc('brakeDelete',{ruleId});
+   renderStatus(status);
+   toast(T('brakeDeleted').replace('{name}',name));
   }else{
    const name=brakeName(ruleId);
    const status=await rpc('brakeCancel',{ruleId});
@@ -3008,9 +3023,10 @@ function optionsPayload(){
 handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
 for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog','autoBackup','brake'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));if(id==='autoBackup')toast($('autoBackup').checked?T('toastAutoBackupOn'):T('toastAutoBackupOff'));if(id==='brake')toast($('brake').checked?T('toastBrakeOn'):T('toastBrakeOff'));});
 if($('brakeWarns'))$('brakeWarns').addEventListener('click',e=>{
- const move=e.target.closest('[data-brake-move]'),stop=e.target.closest('[data-brake-stop]');
+ const move=e.target.closest('[data-brake-move]'),stop=e.target.closest('[data-brake-stop]'),del=e.target.closest('[data-brake-delete]');
  if(move)brakeAnswer(move.dataset.brakeMove,'move');
  else if(stop)brakeAnswer(stop.dataset.brakeStop,'stop');
+ else if(del)brakeAnswer(del.dataset.brakeDelete,'delete');
 });
 handle('backupNow','click',async()=>{
  const r=await rpc('backupNow');

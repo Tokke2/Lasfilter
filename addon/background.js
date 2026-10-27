@@ -801,6 +801,22 @@ App.handle=async msg=>{
    App.invalidateScan();App.scheduleAutoBackup();
    return App.snapshot();
   });
+  /* Tredje svaret på säkerhetsbromsen: regeln ska bort. Samma villkor som de
+     andra två – det måste finnas en spärr att släppa – och samma skrivning med
+     backup, så regeln går att få tillbaka under Regelkopior. */
+  case 'brakeDelete':return App.mutate(async()=>{
+   const e=App.engine;
+   const rule=e.config.rules.find(r=>r.id===msg.ruleId);
+   if(!rule||!e.heldRule(rule.id))throw new C.RuleError('bad_rule');
+   e.releaseRule(rule.id);
+   const rules=e.config.rules.filter(r=>r.id!==rule.id);
+   await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+   delete App.brakeHistory[rule.id];
+   App.saveBrakeHistory();
+   App.log('debug',0,'sakerhetsbromsen: regeln "'+(rule.name||rule.id)+'" togs bort efter ditt svar');
+   App.invalidateScan();App.scheduleAutoBackup();
+   return App.snapshot();
+  });
   case 'sweepNow':{
    const r=await App.runAllRules(true);
    App.invalidateScan();

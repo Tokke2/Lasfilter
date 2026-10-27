@@ -157,10 +157,11 @@ Ett enda stavfel i en regel kan flytta tusentals mejl. Säkerhetsbromsen finns f
 
 > ⚠ **Säkerhetsbromsen stoppade en regel**
 > Regeln "Google" ville flytta 837 mejl. Gränsen är 50 och regeln brukar flytta 5. Inget mer flyttas förrän du väljer.
-> **[Flytta ändå] [Stäng av regeln]**
+> **[Flytta ändå] [Stäng av regeln] [Ta bort regeln]**
 
 - **Flytta ändå** släpper spärren, kör regeln direkt och gör den nivån till regelns nya normalnivå – bromsen slår inte till igen för samma sak.
 - **Stäng av regeln** stänger av den i stället. Inget mer flyttas, och regeln ligger kvar med alla inställningar så att du kan rätta och slå på den igen.
+- **Ta bort regeln** tar bort den helt, för den som redan vet att regeln var fel. Den frågar en gång till och nämner regelns namn, vad som händer och att en kopia sparas först – säger du nej händer ingenting alls.
 - Den stoppade regeln **sveps inte** och tar inte heller **inkommande mejl** förrän du har svarat. Andra regler fortsätter som vanligt.
 - Nya regler har ingen historik. Deras gräns är därför 50 mejl i första svepet – det är precis då ett stavfel brukar upptäckas.
 - Antalet räknar bara mejl som **faktiskt skulle flyttas**: sådant som redan ligger i målmappen kostar ingenting.
@@ -461,6 +462,10 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.8
+
+- **Tredje svaret på säkerhetsbromsen: Ta bort regeln.** Förut fanns *Flytta ändå* och *Stäng av regeln* – ville man bli av med regeln fick man stänga av den och sedan leta upp den i listan. Nu finns knappen där varningen redan står. Den frågar en gång till, med regelns namn i frågan och en påminnelse om att en kopia sparas under *Regelkopior & säkerhet*, och säger du nej händer ingenting alls. Reglerna säkras före borttagningen, så den går att hämta tillbaka.
 
 ## Nyheter i 1.0.7
 

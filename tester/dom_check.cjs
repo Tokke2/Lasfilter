@@ -443,8 +443,23 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(/brukar flytta 5/.test(el('brakeWarns').textContent),'och vad regeln brukar göra');
  check(!/undefined|\{n\}|\{median\}/.test(el('brakeWarns').textContent),'inga ofyllda platshållare');
  const brakeBtns=[...el('brakeWarns').querySelectorAll('button')];
- check(brakeBtns.length===2,'två svar: flytta ändå eller stäng av');
+ check(brakeBtns.length===3,'tre svar: flytta ändå, stäng av eller ta bort');
  check(/Flytta ändå/.test(brakeBtns[0].textContent)&&/Stäng av regeln/.test(brakeBtns[1].textContent),'knapparna säger vad de gör');
+ check(/Ta bort regeln/.test(brakeBtns[2].textContent),'den tredje knappen tar bort regeln');
+
+ /* Ta bort frågar en gång till. Säger man nej händer ingenting alls. */
+ let asked='';
+ const realConfirm=w.confirm;
+ w.confirm=(text)=>{asked=text;return false;};
+ brakeBtns[2].click();
+ await until(()=>asked.length>0,'borttagningen frågar först',false,6000);
+ check(/Fortnox fakturor/.test(asked),'frågan nämner regeln vid namn');
+ check(/[Rr]egelkopior/.test(asked),'och var den går att få tillbaka');
+ check(/Ta bort regeln\?/.test(asked),'och vad knappen gör');
+ check(el('brakeWarns').hidden===false,'ett nej lämnar varningen kvar');
+ check(w.LasDemo.setState({}).brakeHolds.length===1,'och regeln finns kvar');
+ w.confirm=realConfirm;
+
  brakeBtns[0].click();
  await until(()=>el('brakeWarns').hidden===true,'svaret tar bort raden',false,6000);
  check(el('brakeWarns').hidden===true,'ingen stoppad regel kvar efter svaret');

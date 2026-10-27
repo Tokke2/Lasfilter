@@ -204,6 +204,13 @@ globalThis.LasDemo=(()=>{
     state.config.rules=state.config.rules.map(r=>r.id===m.ruleId?{...r,enabled:false}:r);
     data=state;break;
    }
+   case 'brakeDelete':{
+    const hold=(state.brakeHolds||[]).find(h=>h.ruleId===m.ruleId);
+    if(!hold)throw new LasCore.RuleError('bad_rule');
+    state.brakeHolds=state.brakeHolds.filter(h=>h.ruleId!==m.ruleId);
+    state.config.rules=state.config.rules.filter(r=>r.id!==m.ruleId);
+    data=state;break;
+   }
    case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.brake=m.brake!==false;state.config.revision++;data=state;break;
    case 'backupNow':data=state.config.autoBackup===false?{written:false,reason:'off'}:{written:true,filename:'Lasfilter/Regelbackuper/sortbro-regler-backup.json',dated:'',count:state.config.rules.length};break;
    default:throw new LasCore.RuleError('bad_request');

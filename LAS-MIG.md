@@ -407,7 +407,17 @@ Sidfoten i gränssnittet läser versionen ur `runtime.getManifest().version`, s�
 
 ### Filerna läggs på releasen automatiskt
 
-Inget laddas upp för hand. När en versionstagg pushas körs `.github/workflows/release-assets.yml`, som kontrollerar att hashen stämmer med filen och att `updates.json` säger samma version, och sedan lägger **XPI:n, kontrollsumman, `updates.json` och Windows-skriptet** som bilagor — på två ställen:
+Inget laddas upp för hand. När en versionstagg pushas körs `.github/workflows/release-assets.yml`, som kontrollerar att hashen stämmer med filen och att `updates.json` säger samma version, och sedan lägger **tre filer** som bilagor — på två ställen:
+
+| Fil | Varför den ligger lös |
+|---|---|
+| `updates.json` | Thunderbird hämtar den över HTTP. Adressen är dessutom inbakad i varje redan installerad kopia och kan inte ändras i efterhand. |
+| `SortBro-Thunderbird.xpi` | Samma sak — Thunderbird laddar ner filen direkt och kan inte packa upp något. |
+| `SortBro-<version>.zip` | Allt det andra: XPI:n, kontrollsumman, `updates.json`, `Uppdatera-SortBro.bat` och den här handboken. Ett paket i stället för fyra lösa filer. |
+
+De två första **måste** ligga löst; det går inte att lägga dem i zippen utan att uppdateringarna slutar fungera. Zippen byggs av `tools/package_zip.sh` vid varje släpp och versionshanteras inte. Låg det gamla lösplock kvar på en äldre release tar arbetsflödet bort det, så varje release alltid ser likadan ut.
+
+På två ställen:
 
 - **releasen för den nya taggen** (`v1.0.1`, `v1.0.2` …), som är den `releases/latest` pekar på,
 - **bryggan `v1.0.0`**, alltså den release som kopior installerade före den här ändringen fortfarande läser. Utan den skulle de aldrig se en nyare version. Bryggan får samma filer varje gång och behöver aldrig röras för hand.
@@ -451,6 +461,11 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.7
+
+- **En zip i stället för fyra lösa filer.** Release-sidan har nu tre bilagor: XPI:n, `updates.json` och `SortBro-<version>.zip` med allt övrigt — kontrollsumman, Windows-skriptet och handboken. De två första måste ligga löst eftersom Thunderbird hämtar dem över HTTP och adressen till `updates.json` redan sitter inbakad i installerade kopior; resten hade bara varit lösplock.
+- **Gamla bilagor städas automatiskt.** Låg det kvar en kontrollsumma eller ett skript från en tidigare release tar arbetsflödet bort den, så varje release ser likadan ut.
 
 ## Nyheter i 1.0.6
 

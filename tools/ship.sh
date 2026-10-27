@@ -87,6 +87,10 @@ unzip -q SortBro-Thunderbird.xpi -d /tmp/sortbro-check
 diff -r addon /tmp/sortbro-check >/dev/null || die "XPI:n stämmer inte med addon/"
 echo "zip == addon"
 
+say "4b/7 · bygger release-zippen"
+ZIP=$(tools/package_zip.sh)
+echo "$ZIP  ($(du -h "$ZIP" | cut -f1))"
+
 say "5/7 · kör testerna"
 [ -d tester/node_modules ] || (cd tester && npm install --silent)
 node --test tester/*.test.cjs
@@ -113,6 +117,11 @@ cat <<EOF
   Release:   https://github.com/Tokke2/Lasfilter/releases/tag/v$NEW
   Uppdatering: https://github.com/Tokke2/Lasfilter/releases/latest/download/updates.json
 
-  Arbetsflödet lägger XPI:n, kontrollsumman och updates.json på releasen
-  v$NEW – och på bryggan v1.0.0, som redan installerade kopior läser.
+  Arbetsflödet lägger tre filer på releasen v$NEW – och på bryggan v1.0.0,
+  som redan installerade kopior läser:
+
+    updates.json              (måste ligga löst, adressen är inbakad)
+    SortBro-Thunderbird.xpi   (måste ligga löst, Thunderbird packar inte upp)
+    SortBro-$NEW.zip          (allt: XPI, kontrollsumma, updates.json,
+                               Uppdatera-SortBro.bat och LAS-MIG.md)
 EOF

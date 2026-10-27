@@ -328,13 +328,35 @@ test('snabbmenyns titel finns på båda språken',()=>{
  assert.match(line,/SortBro: Create a filter/,'engelsk titel saknas');
 });
 
+test('zippen innehåller allt som hör till releasen',()=>{
+ const {execFileSync}=require('child_process');
+ const out=execFileSync('bash',[path.join(ROOT,'tools','package_zip.sh')],{encoding:'utf8'}).trim();
+ assert.ok(fs.existsSync(path.join(ROOT,out)),'zippen byggdes inte: '+out);
+ assert.match(path.basename(out),/^SortBro-\d+\.\d+\.\d+\.zip$/,'zipnamnet ska bära versionen');
+ const list=execFileSync('unzip',['-Z1',path.join(ROOT,out)],{encoding:'utf8'}).trim().split(/\r?\n/).sort();
+ assert.deepEqual(list,[
+  'LAS-MIG.md',
+  'SortBro-Thunderbird.xpi',
+  'SortBro-Thunderbird.xpi.sha256',
+  'Uppdatera-SortBro.bat',
+  'updates.json',
+ ].sort(),'zippen ska innehålla allt och inget annat');
+});
+
 test('releasen får sina filer automatiskt när taggen flyttas',()=>{
  const wf=path.join(ROOT,'.github','workflows','release-assets.yml');
  assert.ok(fs.existsSync(wf),'arbetsflödet som lägger filerna på releasen saknas');
  const text=fs.readFileSync(wf,'utf8');
- for(const file of ['SortBro-Thunderbird.xpi','SortBro-Thunderbird.xpi.sha256','updates.json','Uppdatera-SortBro.bat']){
-  assert.ok(text.includes(file),'arbetsflödet måste ladda upp '+file);
- }
+ /* Tre filer på release-sidan, inte fler. Två av dem måste ligga löst:
+    Thunderbird hämtar updates.json och XPI:n över HTTP och adressen till
+    updates.json sitter inbakad i installerade kopior. Resten åker med i
+    zippen. */
+ assert.ok(text.includes('SortBro-Thunderbird.xpi'),'arbetsflödet måste ladda upp XPI:n löst');
+ assert.ok(text.includes('updates.json'),'arbetsflödet måste ladda upp updates.json löst');
+ assert.match(text,/tools\/package_zip\.sh/,'arbetsflödet måste bygga zippen');
+ assert.equal(/^\s+SortBro-Thunderbird\.xpi\.sha256 \\$/m.test(text),false,'kontrollsumman ska ligga i zippen, inte lös');
+ assert.equal(/^\s+Uppdatera-SortBro\.bat \\$/m.test(text),false,'skriptet ska ligga i zippen, inte lös');
+ assert.match(text,/gh api -X DELETE/,'gamla lösplock ska städas bort från releasen');
  assert.match(text,/tags:/,'ska köras när en tagg flyttas');
  assert.match(text,/contents:\s*write/,'behöver skrivrättighet till releasen');
  assert.match(text,/tools\/verify_release\.py/,'ska kontrollera version och hash före uppladdning');

@@ -1,11 +1,12 @@
 name: Release assets
 
-# Lägger XPI-filen, kontrollsumman, updates.json och Windows-skriptet som
-# bilagor på releasen, så
-# att Thunderbird kan uppdatera från /releases/latest/download/... utan att någon
-# laddar upp något för hand. Uppdatera-SortBro.bat laddar ner, kontrollsummar
-# och byter ut XPI-filen i profilen – den finns med så att uppdateringen går att
-# göra med ett dubbelklick i stället för via Tillägg och teman.
+# Lägger filerna på releasen, så att Thunderbird kan uppdatera från
+# /releases/latest/download/... utan att någon laddar upp något för hand.
+#
+# Tre filer, inte fler: updates.json och SortBro-Thunderbird.xpi måste ligga
+# löst eftersom Thunderbird hämtar dem över HTTP och adressen till updates.json
+# redan sitter inbakad i installerade kopior. Resten – kontrollsumman,
+# Uppdatera-SortBro.bat och handboken – ligger i SortBro-<version>.zip.
 #
 # Två releaser får filerna:
 #   1. releasen för den tagg som just pushades (v1.0.1, v1.0.2 …),
@@ -37,6 +38,13 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -e
+          ZIP=$(tools/package_zip.sh | tail -1)
+          echo "zip: $ZIP"
+          # Två filer måste ligga löst på release-sidan: Thunderbird hämtar dem
+          # över HTTP och kan inte packa upp något, och adressen till
+          # updates.json är inbakad i varje redan installerad kopia. Resten åker
+          # med i zippen, så sidan har tre filer i stället för fyra lösplock.
+          KEEP="SortBro-Thunderbird.xpi updates.json $(basename "$ZIP")"
           upload() {
             tag="$1"
             if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -45,10 +53,21 @@ jobs:
             fi
             gh release upload "$tag" \
               SortBro-Thunderbird.xpi \
-              SortBro-Thunderbird.xpi.sha256 \
               updates.json \
-              Uppdatera-SortBro.bat \
+              "$ZIP" \
               --clobber --repo "$GITHUB_REPOSITORY"
+            # Det som låg löst i äldre releaser städas bort, så att varje
+            # release alltid innehåller samma tre filer.
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" \
+              --jq '.assets[] | "\(.id) \(.name)"' |
+            while read -r id name; do
+              case " $KEEP " in
+                *" $name "*) ;;
+                *) gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id" >/dev/null 2>&1 \
+                     && echo "  tog bort $name" \
+                     || echo "  kunde inte ta bort $name" ;;
+              esac
+            done
           }
           upload "$TAG"
           if [ "$TAG" != "$BRIDGE_TAG" ]; then upload "$BRIDGE_TAG"; fi

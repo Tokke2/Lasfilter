@@ -287,8 +287,8 @@ const I18N={
   sweepMinutesLabel:'Hur ofta alla regler körs (minuter, steg om 15 – 60 = en gång i timmen)',
   newInboxDirectLabel:'Flytta nya matchande mejl direkt när de kommer till Inkorgen',
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
-  fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt',
-  storageNote:'Allt SortBro skapar hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: Loggar (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.',
+  fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/logs/lasfilter-logg.txt',
+  storageNote:'Allt SortBro skapar hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.',
   fileLogNote:'Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.',
   autoBackupLabel:'Backa upp reglerna automatiskt en gång per vecka till Hämtade filer/Lasfilter/Regelbackuper/',
   brakeLabel:'Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl',
@@ -494,7 +494,7 @@ const I18N={
   toastOpenWindowOff:'Olästa flyttade mejl stannar i målmappen utan popup-fönster.',
   toastVerboseOn:'Detaljlogg på: händelser syns under Aktivitet och i exporten.',
   toastVerboseOff:'Detaljlogg av.',
-  toastFileLogOn:'Loggfil på: Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt uppdateras automatiskt.',
+  toastFileLogOn:'Loggfil på: Hämtade filer/Lasfilter/logs/lasfilter-logg.txt uppdateras automatiskt.',
   toastFileLogOff:'Automatisk loggfil av.',
   toastSweepIntervalPrefix:'Kontosvep körs var ',
   toastSweepIntervalSuffix:':e minut.',
@@ -959,8 +959,8 @@ const I18N={
   sweepMinutesLabel:'How often all rules run (minutes, steps of 15 – 60 = once an hour)',
   newInboxDirectLabel:'Move new matching emails immediately when they arrive in Inbox',
   verboseLabel:'Show detailed diagnostics in Activity Log',
-  fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/Loggar/lasfilter-logg.txt',
-  storageNote:'Everything SortBro creates lands in subfolders of the app folder Downloads/Lasfilter/: Loggar (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads.',
+  fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/logs/lasfilter-logg.txt',
+  storageNote:'Everything SortBro creates lands in subfolders of the app folder Downloads/Lasfilter/: logs (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads.',
   fileLogNote:'Also writes sortbro-fellogg.txt in the same folder: a combined error log for the last 30 days (up to 5,000 entries). No message bodies are stored. You can also save it under Activity.',
   autoBackupLabel:'Back up the rules automatically once a week to Downloads/Lasfilter/Regelbackuper/',
   brakeLabel:'Safety brake: stop a rule that suddenly matches an abnormal number of emails',
@@ -1166,7 +1166,7 @@ const I18N={
   toastOpenWindowOff:'Moved unread emails stay in target folder without a popup window.',
   toastVerboseOn:'Detailed logging enabled: diagnostics appear in Activity Log and exports.',
   toastVerboseOff:'Detailed logging disabled.',
-  toastFileLogOn:'File log enabled: Downloads/Lasfilter/Loggar/lasfilter-logg.txt updates automatically.',
+  toastFileLogOn:'File log enabled: Downloads/Lasfilter/logs/lasfilter-logg.txt updates automatically.',
   toastFileLogOff:'Automatic file log disabled.',
   toastSweepIntervalPrefix:'Account scan runs every ',
   toastSweepIntervalSuffix:' minutes.',
@@ -1385,7 +1385,7 @@ function repaint(){painted.clear();logShown.length=0;}
 /* Sökvägarna kommer från bakgrunden i statusen (state.paths), så att gränssnittet och
    filskrivningen aldrig kan visa olika saker. Reservvärdet gäller bara innan statusen
    hunnit in. Allt SortBro skapar ligger i undermappar till appmappen i Hämtade filer. */
-const FALLBACK_PATHS={root:'Lasfilter/',logs:'Lasfilter/Loggar/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'};
+const FALLBACK_PATHS={root:'Lasfilter/',logs:'Lasfilter/logs/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'};
 const paths=()=>(state&&state.paths)||FALLBACK_PATHS;
 
 function updateReadPolicy(){

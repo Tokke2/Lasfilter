@@ -10,7 +10,7 @@ const App={engine:null,logs:[],errorLogs:[],backups:[],prefs:{theme:'system',fon
    nedladdningsmappen ligger i användarens hemkatalog på alla tre. */
 App.paths={
  root:'Lasfilter/',
- logs:'Lasfilter/Loggar/',
+ logs:'Lasfilter/logs/',
  backups:'Lasfilter/Regelbackuper/',
  rules:'Lasfilter/Regler/',
  filters:'Lasfilter/Filterfiler/'

@@ -202,9 +202,9 @@ test('allt som skrivs hamnar i en undermapp till appmappen – inget löst i Hä
   assert.match(file,/^Lasfilter\/[^/]+\/.+/,'och i en undermapp till den, inte löst i appmappen: '+file);
  }
  /* deepEqual går inte över vm-gränsen: jämför JSON i stället. */
- assert.equal(JSON.stringify(app.paths),JSON.stringify({root:'Lasfilter/',logs:'Lasfilter/Loggar/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'}),'mappordningen är den utlovade');
+ assert.equal(JSON.stringify(app.paths),JSON.stringify({root:'Lasfilter/',logs:'Lasfilter/logs/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'}),'mappordningen är den utlovade');
  const snap=app.snapshot();
- assert.equal(snap.paths.logs,'Lasfilter/Loggar/','gränssnittet får samma sökvägar som filskrivningen använder');
+ assert.equal(snap.paths.logs,'Lasfilter/logs/','gränssnittet får samma sökvägar som filskrivningen använder');
  assert.equal(app.backupFolder,app.paths.backups,'kopian använder sökvägen från samma källa');
 });
 
@@ -685,7 +685,7 @@ test('startraden och loggfilen bär både tilläggets och Thunderbirds version',
  await tick.flush(20);
  await tick.settle(Promise.resolve(),20);
  const logs=[...new Set(downloaded.map(d=>d.filename))].filter(f=>/lasfilter-logg\.txt$/.test(f));
- assert.deepEqual(logs,['Lasfilter/Loggar/lasfilter-logg.txt'],'loggfilen skrivs till Loggar-mappen, inte löst i appmappen');
+ assert.deepEqual(logs,['Lasfilter/logs/lasfilter-logg.txt'],'loggfilen skrivs till logs-mappen, inte löst i appmappen');
  assert.match(logText,/Thunderbird: 140\.4\.2/,'loggfilens huvud visar Thunderbirds version');
  assert.match(logText,/sortbro /,'och startraden med båda versionerna finns i filen');
 });
@@ -1412,14 +1412,14 @@ test('snabbmenyns titel följer språkvalet',async()=>{
 });
 
 /* ── Samlad fellogg ─────────────────────────────────────────────────────── */
-test('samlad fellogg skrivs automatiskt i Loggar och innehåller inte normal aktivitet',async()=>{
+test('samlad fellogg skrivs automatiskt i logs och innehåller inte normal aktivitet',async()=>{
  const {api,files,written}=backupApi();
  const {app}=await loadBackground(api);
  fakeEngineWithRules(app);
  app.log('error',0,'motor_stoppad code=move_error');
  app.log('moved',42);
  await app.writeTextLog();
- const file='Lasfilter/Loggar/sortbro-fellogg.txt';
+ const file='Lasfilter/logs/sortbro-fellogg.txt';
  assert.match(files[file],/motor_stoppad code=move_error/);
  assert.doesNotMatch(files[file],/\tmoved\t/);
  const n=written.filter(x=>x===file).length;
@@ -1460,8 +1460,8 @@ test('fel på den vanliga loggfilen hamnar i felloggen',async()=>{
  api.downloads.download=async arg=>{if(arg.filename.endsWith('/lasfilter-logg.txt'))throw Error('disk full');return write(arg);};
  const {app}=await loadBackground(api);fakeEngineWithRules(app);
  await app.writeTextLog();
- assert.match(files['Lasfilter/Loggar/sortbro-fellogg.txt'],/teknisk_logg_skrivfel/);
- assert.doesNotMatch(files['Lasfilter/Loggar/sortbro-fellogg.txt'],/disk full/,'rå exceptiontext sparas inte');
+ assert.match(files['Lasfilter/logs/sortbro-fellogg.txt'],/teknisk_logg_skrivfel/);
+ assert.doesNotMatch(files['Lasfilter/logs/sortbro-fellogg.txt'],/disk full/,'rå exceptiontext sparas inte');
 });
 test('fel på felloggen skapar ingen oändlig skrivloop och kan hämtas manuellt',async()=>{
  const {api}=backupApi();let calls=0;
@@ -1493,5 +1493,5 @@ test('samtidiga logganrop startar nedladdningar i följd',async()=>{
  app.log('error',0,'sista');
  await Promise.all([first,app.writeTextLog()]);
  assert.equal(max,1);
- assert.match(files['Lasfilter/Loggar/sortbro-fellogg.txt'],/sista/);
+ assert.match(files['Lasfilter/logs/sortbro-fellogg.txt'],/sista/);
 });

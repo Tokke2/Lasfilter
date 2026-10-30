@@ -296,7 +296,7 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 
 | Mapp | Innehåll | Skapas av |
 | --- | --- | --- |
-| `Hämtade filer/Lasfilter/Loggar/` | `lasfilter-logg.txt` – den tekniska loggen, `sortbro-fellogg.txt` – den samlade felloggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
+| `Hämtade filer/Lasfilter/logs/` | `lasfilter-logg.txt` – den tekniska loggen, `sortbro-fellogg.txt` – den samlade felloggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
 | `Hämtade filer/Lasfilter/Regelbackuper/` | `sortbro-regler-backup.json` + en daterad veckokopia | automatisk säkerhetskopia en gång per vecka, eller *⇩ Backa upp reglerna nu* |
 | `Hämtade filer/Lasfilter/Regler/` | `sortbro-regler-ÅÅÅÅ-MM-DD.json` (alla regler) och `sortbro-regel-<namn>.json` (en regel) | *Exportera* i Regler |
 | `Hämtade filer/Lasfilter/Filterfiler/` | `msgFilterRules.dat` – filterfilen du själv kopierar in i profilen | *Skriv ut dina regler som filterfil* i Regler |
@@ -307,7 +307,7 @@ Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen o
 
 ## En enda fellogg för snabb felsökning
 
-Börja i **`Hämtade filer/Lasfilter/Loggar/sortbro-fellogg.txt`**. Filen samlar SortBros registrerade fel från sorteringsmotorn, svep och diagnos, säkerhetskopiering, filloggning och gränssnittet. Vanliga lyckade flyttar och annan normal aktivitet är bortfiltrerade. Äldre fel som skrevs som detaljrader tas också med när de känns igen.
+Börja i **`Hämtade filer/Lasfilter/logs/sortbro-fellogg.txt`**. Filen samlar SortBros registrerade fel från sorteringsmotorn, svep och diagnos, säkerhetskopiering, filloggning och gränssnittet. Vanliga lyckade flyttar och annan normal aktivitet är bortfiltrerade. Äldre fel som skrevs som detaljrader tas också med när de känns igen.
 
 - **Senaste felet först**, med UTC-tid, händelse, antal och tillgänglig detalj/felkod. Huvudet anger SortBro-version, Thunderbird-version och installationstyp för **aktuell session**, inte versionen vid varje historiskt fel.
 - **Högst 5 000 felposter från de senaste 30 dagarna**, sparade separat i tillägget och återlästa vid omstart. En livlig vanlig logg tränger därför inte undan felhistoriken. Äldre internlogg migreras första gången; redan bortgallrade händelser kan inte återskapas.
@@ -479,7 +479,7 @@ Om tillägget ändå är borta vid nästa start är det Thunderbird som har stä
 SortBro läser sin egen installationstyp vid start och säger till i klartext i stället för att du ska behöva gissa:
 
 - **En varningsrad högst upp i gränssnittet** när installationen är tillfällig eller sidoladdad, med besked om hur du gör den permanent: *Tillägg → kugghjulet ⚙ → Installera tillägg från fil…* (välj XPI-filen). Raden kan döljas och kommer tillbaka nästa gång gränssnittet öppnas.
-- **Loggfilens huvud** får raden `Installation: <typ>` (`normal`, `development`, `sideload`, `admin` eller `other`), och startraden skriver `thunderbird <version> sortbro <version> installation <typ>`. Är tillägget borta nästa gång kan du alltså läsa i `Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt` hur det var installerat – och se om en Thunderbird-uppdatering kom strax innan.
+- **Loggfilens huvud** får raden `Installation: <typ>` (`normal`, `development`, `sideload`, `admin` eller `other`), och startraden skriver `thunderbird <version> sortbro <version> installation <typ>`. Är tillägget borta nästa gång kan du alltså läsa i `Hämtade filer/Lasfilter/logs/lasfilter-logg.txt` hur det var installerat – och se om en Thunderbird-uppdatering kom strax innan.
 
 Installationstypen läses med `management.getSelf()`, som enligt Thunderbirds egen dokumentation fungerar **utan** någon ny behörighet. Behörighetslistan är oförändrad. Och även om tillägget stängs av förlorar du ingenting: reglerna ligger redan i `Hämtade filer/Lasfilter/Regelbackuper/` och importeras tillbaka under **Regler**.
 
@@ -487,7 +487,7 @@ Installationstypen läses med `management.getSelf()`, som enligt Thunderbirds eg
 
 Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 30 dagar, högst 5000 rader.
 
-Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
+Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/logs/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
 
 - **Huvudet visar båda versionerna och installationstypen** (*Version:* tilläggets, *Thunderbird:* programmets, *Installation:* hur tillägget installerades), och den första raden efter en start är `thunderbird <version> sortbro <version> installation <typ>`.
 - **Den är det sista spåret om tillägget skulle försvinna** ur Thunderbird. Filen ligger kvar på disken även om tillägget tas bort, så de sista raderna visar när det hände och i vilken Thunderbird-version det senast kördes – till exempel om en uppdatering av Thunderbird kom strax innan.
@@ -501,9 +501,14 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.13
+
+- **Loggmappen heter nu `logs`**, med små bokstäver. Den tekniska loggen, den samlade felloggen och manuella loggexporter skrivs till `Hämtade filer/Lasfilter/logs/`.
+- Äldre filer i `Lasfilter/Loggar/` ligger kvar; de flyttas eller raderas inte automatiskt. All ny loggskrivning använder `logs/`.
+
 ## Nyheter i 1.0.12
 
-- **Samlad fellogg:** `Loggar/sortbro-fellogg.txt` ger en gemensam startpunkt för felsökning, med senaste felet först och aktuella versionsuppgifter.
+- **Samlad fellogg:** `logs/sortbro-fellogg.txt` ger en gemensam startpunkt för felsökning, med senaste felet först och aktuella versionsuppgifter.
 - **Separat felhistorik:** upp till 5 000 fel från de senaste 30 dagarna behålls över omstarter, utan att normal aktivitet tränger undan dem.
 - **Spara manuellt under Aktivitet**, eller låt den befintliga inställningen för automatisk filloggning skriva båda loggfilerna.
 - Fel vid säkerhetskopiering, årsmapp, mappsökning och enskild misslyckad flytt klassas nu som fel i stället för enbart detaljlogg. Oväntade skriptfel rapporteras med fasta koder utan rå feltext.
@@ -518,7 +523,7 @@ Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-m
 
 - **Säkerhetskopian skrivs en gång i veckan – inte vid varje regeländring.** Förut skrevs `sortbro-regler-backup.json` om varje gång du sparade en regel. Det blev ett extra skrivsteg i varje sparning utan att skydda något mer. Nu skrivs båda filerna när veckan byts, eller direkt med knappen *Backa upp reglerna nu*.
 - **Veckokopian skrivs även om Thunderbird aldrig startas om.** Pulsen frågar en gång i minuten om veckan bytts, så en session som står öppen i veckor inte längre kan missa sin kopia. Ett misslyckat försök görs om, högst en gång i timmen.
-- **Ett test vaktar att allt hamnar i appmappens undermappar.** Varje filskrivning måste gå genom `Lasfilter/Loggar/`, `Lasfilter/Regelbackuper/`, `Lasfilter/Regler/` eller `Lasfilter/Filterfiler/` – ingenting får hamna löst i Hämtade filer.
+- **Ett test vaktar att allt hamnar i appmappens undermappar.** Varje filskrivning måste gå genom `Lasfilter/logs/`, `Lasfilter/Regelbackuper/`, `Lasfilter/Regler/` eller `Lasfilter/Filterfiler/` – ingenting får hamna löst i Hämtade filer.
 
 ## Nyheter i 1.0.9
 

@@ -1375,3 +1375,18 @@ test('provkörning skapar inga årsmappar',async()=>{
  assert.equal(f.api.created.length,0,'ett test lämnar inga spår i mappträdet');
  assert.equal(f.api.calls.length,0);
 });
+
+test('diagnosfel samlas även utan detaljlogg och utan rå exception-text',async()=>{
+ const f=fixture();f.e.hooks.debug=()=>{};
+ f.api.messages.query=async()=>{throw Error('SECRET@example.invalid');};
+ await f.e.diagnose(C.validateRule(base()));
+ assert.ok(f.logs.some(x=>x.event==='error'&&x.data.detail==='diagnos_query_failed'));
+ assert.doesNotMatch(JSON.stringify(f.logs),/SECRET/);
+});
+test('svepets överhoppade felmappar registreras utan detaljlogg',async()=>{
+ const f=fixture();f.e.hooks.debug=()=>{};
+ f.api.messages.query=async()=>{throw Error('SECRET@example.invalid');};
+ await assert.rejects(()=>f.e.sweepRule(C.validateRule(base())),{code:'sweep_error'});
+ assert.ok(f.logs.some(x=>x.event==='error'&&x.data.detail.startsWith('svep_query_failed')));
+ assert.doesNotMatch(JSON.stringify(f.logs),/SECRET/);
+});

@@ -267,6 +267,7 @@ const I18N={
   activityTitle:'Teknisk aktivitet',
   activitySub:'Inga ämnesrader, avsändaradresser eller mejltexter sparas här.',
   exportLogBtn:'Exportera logg',
+  exportErrorLogBtn:'Spara samlad fellogg',
   thTime:'Tid',
   thEvent:'Händelse',
   thLevel:'Nivå',
@@ -288,7 +289,7 @@ const I18N={
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
   fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt',
   storageNote:'Allt SortBro skapar hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: Loggar (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.',
-  fileLogNote:'Loggfilen skrivs om automatiskt efter nya händelser och innehåller inte ämnesrader, adresser eller mejltexter.',
+  fileLogNote:'Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.',
   autoBackupLabel:'Backa upp reglerna automatiskt en gång per vecka till Hämtade filer/Lasfilter/Regelbackuper/',
   brakeLabel:'Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl',
   toastBrakeOn:'Säkerhetsbromsen är på: en regel som plötsligt matchar för många stoppas innan något flyttas.',
@@ -938,6 +939,7 @@ const I18N={
   activityTitle:'Technical activity',
   activitySub:'No subject lines, sender addresses or message bodies are stored here.',
   exportLogBtn:'Export log',
+  exportErrorLogBtn:'Save combined error log',
   thTime:'Time',
   thEvent:'Event',
   thLevel:'Level',
@@ -959,7 +961,7 @@ const I18N={
   verboseLabel:'Show detailed diagnostics in Activity Log',
   fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/Loggar/lasfilter-logg.txt',
   storageNote:'Everything SortBro creates lands in subfolders of the app folder Downloads/Lasfilter/: Loggar (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads.',
-  fileLogNote:'The log file is updated automatically after new events and never contains subjects, addresses or message bodies.',
+  fileLogNote:'Also writes sortbro-fellogg.txt in the same folder: a combined error log for the last 30 days (up to 5,000 entries). No message bodies are stored. You can also save it under Activity.',
   autoBackupLabel:'Back up the rules automatically once a week to Downloads/Lasfilter/Regelbackuper/',
   brakeLabel:'Safety brake: stop a rule that suddenly matches an abnormal number of emails',
   toastBrakeOn:'The safety brake is on: a rule that suddenly matches too many emails is stopped before anything is moved.',
@@ -1356,12 +1358,18 @@ const locale=()=>currentLang==='en'?'en-GB':'sv-SE';
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function toast(text,error=false){const n=$('toast');n.textContent=text;n.style.background=error?'#8e3731':'';n.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>n.hidden=true,6500);}
-function alertError(err){toast(Terr(err.code||err.message),true);}
+function alertError(err){
+ toast(Terr(err.code||err.message),true);
+ const codes=['storage_error','display_error','move_error','sweep_error','uncertain_move','internal_error','invalid_storage'];
+ if(live&&!DEMO&&(!err.code||codes.includes(err.code)))rpc('reportUiError',{code:codes.includes(err.code)?err.code:'internal_error'}).catch(()=>{});
+}
 async function rpc(type,data={}){
  if(!live&&!DEMO)throw new C.RuleError('not_installed');
  const reply=DEMO?await LasDemo.request({type,...data}):await browser.runtime.sendMessage({type,...data,uiBuild:UI_BUILD});
  if(!reply?.success)throw new C.RuleError(reply?.error||'internal_error');return reply.data;
 }
+window.addEventListener('error',()=>{if(live&&!DEMO)rpc('reportUiError',{code:'javascript_error'}).catch(()=>{});});
+window.addEventListener('unhandledrejection',()=>{if(live&&!DEMO)rpc('reportUiError',{code:'unhandled_rejection'}).catch(()=>{});});
 function handle(id,event,fn){const n=$(id);if(n)n.addEventListener(event,async e=>{try{await fn(e);}catch(err){alertError(err);}});}
 const label=id=>folders.find(f=>f.id===id)?.label||T('missingFolder');
 /* Listorna ritas bara om när deras indata faktiskt ändrats. Under ett svep kommer
@@ -2256,7 +2264,7 @@ function renderBackups(){
  $('blockedInfo').textContent=state.blocked?state.blocked+T('blockedSome'):T('blockedNone');
  $('clearBlocked').disabled=!state.blocked||!!state.inflight;
 }
-async function download(data,filename,mime='application/json'){
+async function download(data,filename,mime='application/json',strict=false){
  const body=typeof data==='string'?data:JSON.stringify(data,null,2);
  const url=URL.createObjectURL(new Blob([body],{type:mime}));
  try{
@@ -2265,6 +2273,7 @@ async function download(data,filename,mime='application/json'){
   if(live&&!DEMO&&browser.downloads?.download)await browser.downloads.download({url,filename,saveAs:false,conflictAction:'overwrite'});
   else{const a=el('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();}
  }catch(err){
+  if(strict)throw new C.RuleError('internal_error');
   if(!String(err?.message||err||'').toLowerCase().includes('cancel')){
    const a=el('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();
   }
@@ -3042,6 +3051,11 @@ if($('exportSingleRule'))handle('exportSingleRule','click',async()=>{
  const singleFile=paths().rules+'sortbro-regel-'+slug+'.json';
  await download({format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:[rule],folders:folderHints},singleFile);
  toast(T('toastSingleExported').replace('{path}',singleFile));
+});
+handle('exportErrorLog','click',async()=>{
+ const file=paths().logs+'sortbro-fellogg.txt';
+ await download(await rpc('exportErrorLog'),file,'text/plain',true);
+ toast(T('logExported').replace('{path}',file));
 });
 handle('exportLog','click',async()=>{
  const file=paths().logs+'sortbro-tekniklogg-'+new Date().toISOString().slice(0,10)+'.json';

@@ -296,7 +296,7 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 
 | Mapp | Innehåll | Skapas av |
 | --- | --- | --- |
-| `Hämtade filer/Lasfilter/Loggar/` | `lasfilter-logg.txt` – den tekniska loggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
+| `Hämtade filer/Lasfilter/Loggar/` | `lasfilter-logg.txt` – den tekniska loggen, `sortbro-fellogg.txt` – den samlade felloggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
 | `Hämtade filer/Lasfilter/Regelbackuper/` | `sortbro-regler-backup.json` + en daterad veckokopia | automatisk säkerhetskopia en gång per vecka, eller *⇩ Backa upp reglerna nu* |
 | `Hämtade filer/Lasfilter/Regler/` | `sortbro-regler-ÅÅÅÅ-MM-DD.json` (alla regler) och `sortbro-regel-<namn>.json` (en regel) | *Exportera* i Regler |
 | `Hämtade filer/Lasfilter/Filterfiler/` | `msgFilterRules.dat` – filterfilen du själv kopierar in i profilen | *Skriv ut dina regler som filterfil* i Regler |
@@ -304,6 +304,18 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 **Samma sökvägar på Windows, macOS och Linux.** Sökvägarna skrivs med `/` och läggs under systemets nedladdningsmapp, som ligger i användarens hemkatalog på alla tre systemen – `%USERPROFILE%\Downloads` på Windows, `~/Downloads` på macOS och Linux (och `Hämtade filer` heter mappen på svenska Windows). Under mappen skapas undermapparna automatiskt av Thunderbirds nedladdnings-API, precis som när webbläsaren sparar en fil i en undermapp. Sökvägarna kommer från en enda källa i koden och visas i gränssnittet, så att texten och filen aldrig kan peka på olika ställen.
 
 Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen ovan och kvittot visar hela sökvägen. Vill du i stället välja plats själv vid export, säg till – då blir det en kryssruta för det.
+
+## En enda fellogg för snabb felsökning
+
+Börja i **`Hämtade filer/Lasfilter/Loggar/sortbro-fellogg.txt`**. Filen samlar SortBros registrerade fel från sorteringsmotorn, svep och diagnos, säkerhetskopiering, filloggning och gränssnittet. Vanliga lyckade flyttar och annan normal aktivitet är bortfiltrerade. Äldre fel som skrevs som detaljrader tas också med när de känns igen.
+
+- **Senaste felet först**, med UTC-tid, händelse, antal och tillgänglig detalj/felkod. Huvudet anger SortBro-version, Thunderbird-version och installationstyp för **aktuell session**, inte versionen vid varje historiskt fel.
+- **Högst 5 000 felposter från de senaste 30 dagarna**, sparade separat i tillägget och återlästa vid omstart. En livlig vanlig logg tränger därför inte undan felhistoriken. Äldre internlogg migreras första gången; redan bortgallrade händelser kan inte återskapas.
+- **Automatiskt** tillsammans med den tekniska filloggen, via den befintliga rutan under **Inställningar → Avancerat**. Stänger du av rutan skrivs ingen av filerna automatiskt. En oförändrad fellogg skrivs inte om efter varje lyckad flytt.
+- **Manuellt:** välj **Aktivitet → Spara samlad fellogg**. Det fungerar även när automatisk filloggning är av. Samma filnamn används, så du slipper många lösa rapporter.
+- Misslyckas ett filanrop sparas en felkod internt, utan att det startar en oändlig skrivloop. Nästa vanliga logghändelse ger ett nytt försök. Om disken inte går att skriva till kan förstås inte heller felloggen sparas där.
+
+**Avgränsning:** detta är SortBros egen felrapport, inte en läsare för befintliga filer på disken. Den läser inte Thunderbirds interna fellogg, andra tilläggs loggar, Windows-loggar eller uppdateringsskriptets utdata. Inga nya behörigheter behövs. Nya rapporter om oväntade skriptfel innehåller endast en fast felkod, aldrig rå exception-text, stackspår eller mejltext. En tom rapport betyder *inga registrerade fel i den sparade historiken*, inte att varje del av Thunderbird har kontrollerats.
 
 ## Uppdatera tillägget på din dator
 
@@ -488,6 +500,13 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.12
+
+- **Samlad fellogg:** `Loggar/sortbro-fellogg.txt` ger en gemensam startpunkt för felsökning, med senaste felet först och aktuella versionsuppgifter.
+- **Separat felhistorik:** upp till 5 000 fel från de senaste 30 dagarna behålls över omstarter, utan att normal aktivitet tränger undan dem.
+- **Spara manuellt under Aktivitet**, eller låt den befintliga inställningen för automatisk filloggning skriva båda loggfilerna.
+- Fel vid säkerhetskopiering, årsmapp, mappsökning och enskild misslyckad flytt klassas nu som fel i stället för enbart detaljlogg. Oväntade skriptfel rapporteras med fasta koder utan rå feltext.
 
 ## Nyheter i 1.0.11
 

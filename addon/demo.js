@@ -143,6 +143,7 @@ globalThis.LasDemo=(()=>{
    case 'queueSelected':data={queued:true};state.queued++;break;
    case 'catchUp':data={scanned:5,queued:2};state.queued+=2;break;
    case 'export':data={format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:state.config.rules,folders};break;
+   case 'exportErrorLog':data=LasCore.errorLogText(state.logs,{version:'demo',tbVersion:'demo'});break;
    case 'exportLog':data={format:'lasfilter-technical-log',version:1,events:state.logs};break;
    case 'import':{
     const b=m.backup;

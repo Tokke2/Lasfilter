@@ -382,6 +382,7 @@
               <h2 data-i18n="activityTitle">Teknisk aktivitet</h2>
               <p data-i18n="activitySub">Inga ämnesrader, avsändaradresser eller mejltexter sparas här.</p>
             </div>
+            <button id="exportErrorLog" class="button secondary" data-i18n="exportErrorLogBtn">Spara samlad fellogg</button>
             <button id="exportLog" class="button secondary" data-i18n="exportLogBtn">Exportera logg</button>
           </div>
           <div class="table-wrap">
@@ -463,7 +464,7 @@
               <input id="fileLog" type="checkbox" checked>
               <span data-i18n="fileLogLabel">Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/Loggar/lasfilter-logg.txt</span>
             </label>
-            <p class="muted" data-i18n="fileLogNote">Loggfilen skrivs om automatiskt efter nya händelser och innehåller inte ämnesrader, adresser eller mejltexter.</p>
+            <p class="muted" data-i18n="fileLogNote">Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.</p>
             <label class="toggle-label">
               <input id="autoBackup" type="checkbox" checked>
               <span data-i18n="autoBackupLabel">Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/Regelbackuper/</span>

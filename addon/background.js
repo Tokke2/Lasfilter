@@ -1,6 +1,6 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
+const App={engine:null,logs:[],errorLogs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
  /* "Lär av din flytt": domäner du själv flyttat till en mapp. Bara domän, mapp
     och antal sparas – aldrig ämne, namn eller mejltext. */
  learned:{off:false,entries:[],snooze:{}}};
@@ -72,14 +72,33 @@ App.installLogNote=()=>{
 };
 App.startDetail=()=>'thunderbird '+(App.tbVersion||'okand')+' sortbro '+String(B.runtime.getManifest()?.version||'okand')+
  ' installation '+(App.selfInfo.installType||'okand');
-App.writeTextLog=async()=>{
+App.errorLogText=()=>C.errorLogText(App.errorLogs,{version:B.runtime.getManifest().version,tbVersion:App.tbVersion,installType:App.selfInfo.installType});
+App.fileWriteChain=Promise.resolve();
+App.writeTextLog=()=>{
+ const task=App.fileWriteChain.then(()=>App.writeLogFiles());
+ App.fileWriteChain=task.catch(()=>{});return task;
+};
+App.writeLogFiles=async()=>{
  if(!App.engine?.config.fileLog)return;
  const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Installation: '+(App.selfInfo.installType||'okand'),'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
  for(const x of App.logs)lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
  const url=URL.createObjectURL(new Blob([lines.join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'}));
- try{await B.downloads.download({url,filename:App.paths.logs+'lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+ try{await B.downloads.download({url,filename:App.paths.logs+'lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}
+ catch{App.log('error',0,'teknisk_logg_skrivfel',false);}
+ finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+ /* Ett misslyckat filanrop får inte skapa en oändlig logg-/skrivloop.
+    Nästa vanliga händelse försöker igen. Fel finns kvar i internhistoriken. */
+ App.errorLogs=C.cleanErrorLogs(App.errorLogs);
+ const signature=JSON.stringify([App.errorLogs,B.runtime.getManifest().version,App.tbVersion]);
+ if(signature===App.lastErrorFile)return;
+ const errorUrl=URL.createObjectURL(new Blob([App.errorLogText()],{type:'text/plain;charset=utf-8'}));
+ try{
+  await B.downloads.download({url:errorUrl,filename:App.paths.logs+'sortbro-fellogg.txt',saveAs:false,conflictAction:'overwrite'});
+  App.lastErrorFile=signature;
+ }catch{App.log('error',0,'samlad_fellogg_skrivfel',false);}
+ finally{setTimeout(()=>URL.revokeObjectURL(errorUrl),60000);}
 };
-App.scheduleTextLog=()=>{clearTimeout(App.fileLogTimer);App.fileLogTimer=setTimeout(()=>App.writeTextLog().catch(()=>{}),1200);};
+App.scheduleTextLog=()=>{if(App.fileLogTimer)return;App.fileLogTimer=setTimeout(()=>{App.fileLogTimer=null;App.writeTextLog().catch(()=>{});},1200);};
 /* Automatisk säkerhetskopia av reglerna. Den skrivs till Hämtade filer, alltså
    utanför profilen: försvinner tillägget en dag ligger reglerna kvar och kan
    importeras tillbaka. Två filer:
@@ -132,7 +151,7 @@ App.autoBackup=async({force=false}={})=>{
   await write(App.autoBackupNames.dated(day));
  }catch{
   /* Misslyckas filen är det ingen katastrof – men det ska synas i loggen. */
-  App.log('debug',0,'reglerna kunde inte backas upp till Hamtade filer');
+  App.log('error',0,'reglerna kunde inte backas upp till Hamtade filer');
   return {written:false,reason:'failed',count:rules.length};
  }
  App.lastBackupWeek=week;
@@ -208,13 +227,18 @@ App.maybeClearCache=()=>{
  return App.clearCaches();
 };
 
-App.log=(name,count=0,detail='')=>{
+App.log=(name,count=0,detail='',scheduleFile=true)=>{
  const entry=C.event(name,count,Date.now(),detail);if(!entry)return;
  /* Samma klocka som stämplade raden avgör om den får ligga kvar – annars kan en
     rad som just skrivits gallras bort av en klocka som gått olika. */
  App.logs=C.cleanLogs([...App.logs,entry],Date.now());
- clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs})).catch(()=>{}),500);App.scheduleTextLog();
+ if(C.cleanErrorLogs([entry]).length)App.errorLogs=C.cleanErrorLogs([...App.errorLogs,entry]);
+ clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs,errorLogs:App.errorLogs})).catch(()=>{}),500);
+ if(scheduleFile)App.scheduleTextLog();
 };
+/* Fånga oväntade skriptfel utan exception-text, sökvägar eller mejldata. */
+globalThis.addEventListener?.('error',()=>App.log('error',0,'bakgrund: javascript_error'));
+globalThis.addEventListener?.('unhandledrejection',()=>App.log('error',0,'bakgrund: unhandled_rejection'));
 // Behåll alltid det första, mest specifika felet. Händelselyssnare ska inte
 // skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
@@ -967,6 +991,13 @@ App.handle=async msg=>{
    const folderHints=(await App.folderList().catch(()=>[])).map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
    return {format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:e.config.rules,folders:folderHints};
   }
+  case 'exportErrorLog':return App.errorLogText();
+  case 'reportUiError':{
+   /* Bara kända felkoder. Aldrig exception.message/stack eller mejlinnehåll. */
+   const codes=['storage_error','display_error','move_error','sweep_error','uncertain_move','internal_error','invalid_storage','javascript_error','unhandled_rejection'];
+   const code=codes.includes(msg.code)?msg.code:'internal_error';
+   App.log('error',0,'ui: '+code);return {ok:true};
+  }
   case 'exportLog':return {format:'lasfilter-technical-log',version:1,events:C.cleanLogs(App.logs)};
   case 'backupNow':return App.autoBackup({force:true});
   case 'import':return App.mutate(async()=>{
@@ -1050,13 +1081,13 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned']);
+ const data=await B.storage.local.get(['config','work','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  if(typeof data.cacheDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(data.cacheDay))App.lastCacheDay=data.cacheDay;
  let cfg=C.defaults(),fault='';
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
- App.logs=C.cleanLogs(data.logs);App.backups=[];
+ App.logs=C.cleanLogs(data.logs);App.errorLogs=C.cleanErrorLogs(Array.isArray(data.errorLogs)?data.errorLogs:data.logs);App.backups=[];
  for(const b of (Array.isArray(data.backups)?data.backups:[]).slice(0,5)){try{App.backups.push({time:b.time,config:C.config(b.config)});}catch{}}
  const p=data.prefs||{};
  if(['system','light','dark'].includes(p.theme))App.prefs.theme=p.theme;
@@ -1168,8 +1199,8 @@ App.engineBusy=()=>{
    som sker direkt efter loggningen skulle alltså slänga bort exakt den rad som
    förklarar omstarten. Här spolas allt ut först. */
 App.flushWrites=async()=>{
- clearTimeout(App.logTimer);clearTimeout(App.fileLogTimer);
- try{await App.write(()=>B.storage.local.set({logs:App.logs,work:App.engine?.recordList?.()||[]}));}catch{}
+ clearTimeout(App.logTimer);clearTimeout(App.fileLogTimer);App.fileLogTimer=null;
+ try{await App.write(()=>B.storage.local.set({logs:App.logs,errorLogs:App.errorLogs,work:App.engine?.recordList?.()||[]}));}catch{}
  try{await App.writeChain;}catch{}
 };
 App.applyPendingUpdate=async()=>{

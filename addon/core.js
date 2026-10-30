@@ -533,7 +533,26 @@ function cleanLogs(rows,now=Date.now()){
  return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
-const api={LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+/* Felarkivet gallras separat: normal aktivitet får inte tränga undan fel.
+   Äldre versioner skrev några tekniska fel som debug; ta med dem vid migrering. */
+function cleanErrorLogs(rows,now=Date.now()){
+ const failures=/reglerna kunde inte backas upp|arsmapp_kunde_inte_forberedas|arsmapp_saknas|diagnos_query_failed|svep_query_failed|olasta mejlet (gick inte att lasa|kunde inte hittas|visades inte)|flyttfel men kvar/;
+ return cleanLogs((Array.isArray(rows)?rows:[]).filter(r=>r?.event==='error'||r?.event==='queue_full'||(r?.event==='debug'&&failures.test(r.data?.detail||''))),now);
+}
+function errorLogText(rows,info={}){
+ const errors=cleanErrorLogs(rows),counts=new Map();
+ for(const x of errors)counts.set(x.event,(counts.get(x.event)||0)+1);
+ const lines=['SORTBRO – SAMLAD FELLOGG','Skapad: '+new Date().toISOString(),
+  'Version (aktuell session): '+(info.version||'okand'),'Thunderbird: '+(info.tbVersion||'okand'),'Installation: '+(info.installType||'okand'),
+  'Omfattning: SortBros registrerade fel, inte Thunderbird eller andra programs loggar.',
+  'Historik: högst 5000 fel från de senaste 30 dagarna. Senaste felet först.',
+  'Antal felposter: '+errors.length,...[...counts].map(([key,n])=>key+': '+n),'',
+  'Tid (UTC)\tHändelse\tAntal\tDetalj / felkod'];
+ for(const x of errors.slice().reverse())lines.push([x.time,x.event,x.data.count,x.data.detail||'-'].join('\t'));
+ if(!errors.length)lines.push('Inga registrerade fel i den sparade historiken.');
+ return lines.join('\r\n')+'\r\n';
+}
+const api={cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
 whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

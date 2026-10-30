@@ -156,7 +156,7 @@ class Engine {
     const made=await this.withTimeout(this.api.folders.create(base,year),8000);
     if(made?.id){folderId=made.id;this.yearCreated++;}
    }
-  }catch{this.debug('arsmapp_kunde_inte_forberedas ar='+year);}
+  }catch{this.log('error',0,'arsmapp_kunde_inte_forberedas ar='+year);}
   if(!folderId){this.debug('arsmapp_saknas ar='+year+' anvander_ordinarie_mal');return base;}
   this.yearFolderIds.set(key,folderId);
   return folderId;
@@ -403,7 +403,7 @@ class Engine {
      page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
     }
    }catch(error){
-    out.skippedFolders++;this.debug('diagnos_query_failed error_type='+(error?.name||'Error'));
+    out.skippedFolders++;this.log('error',0,'diagnos_query_failed');
    }finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
   }
   out.near=[...nearInbox,...nearOther].slice(0,C.LIMITS.examples);
@@ -504,7 +504,7 @@ class Engine {
     }catch(error){
      // En enskild IMAP-/nyhetsmapp kan vara frånkopplad eller sakna lokal
      // databas. Hoppa över just den mappen i stället för att stoppa kontot.
-     skippedFolders++;this.debug('svep_query_failed folder_index='+(searchedFolders+skippedFolders)+' error_type='+(error?.name||'Error'));
+     skippedFolders++;this.log('error',0,'svep_query_failed folder_index='+(searchedFolders+skippedFolders));
     }finally{
      if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});
      if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true,rulesVersion:this.config.rulesVersion});
@@ -675,7 +675,7 @@ class Engine {
     const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
     if(inTarget&&!inSource){await this.confirmMove(job.id,op,inTarget);return;}
     if(!inTarget&&inSource&&this.hooks.ackTimeout===undefined){
-     this.debug('jobb '+job.id+' flyttfel men kvar i kallmapp: hoppar over enskilt meddelande');
+     this.log('error',0,'flyttfel men kvar i kallmapp: hoppar over enskilt meddelande');
      this.pending.delete(job.id);this.inflight.delete(job.id);this.records.delete(job.record.key);this.stats.skipped++;await this.persist().catch(()=>{});return;
     }
    }

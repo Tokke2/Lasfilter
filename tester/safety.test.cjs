@@ -118,7 +118,9 @@ test('utan management-API gissar vi inget och kraschar inte',async()=>{
 test('loggfilens huvud namnger installationen – spåret om tillägget är borta',async()=>{
  let captured=null;
  const api=stubApi();
- api.__captureBlob=blob=>{captured=blob;return 'blob:x';};
+ let pending;
+ api.__captureBlob=blob=>{pending=blob;return 'blob:x';};
+ api.downloads.download=async arg=>{if(arg.filename.endsWith('/lasfilter-logg.txt'))captured=pending;return 1;};
  api.management={getSelf:async()=>({version:'1.0.0',installType:'development',mayDisable:true})};
  const {app}=await loadBackground(api);
  await app.writeTextLog();

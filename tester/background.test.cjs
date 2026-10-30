@@ -1410,3 +1410,88 @@ test('snabbmenyns titel följer språkvalet',async()=>{
  assert.equal(updates.at(-1)[0],'sortbro-rule-from-message','menyn uppdateras, inte en ny rad');
  assert.match(updates.at(-1)[1],/Create a filter/);
 });
+
+/* ── Samlad fellogg ─────────────────────────────────────────────────────── */
+test('samlad fellogg skrivs automatiskt i Loggar och innehåller inte normal aktivitet',async()=>{
+ const {api,files,written}=backupApi();
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ app.log('error',0,'motor_stoppad code=move_error');
+ app.log('moved',42);
+ await app.writeTextLog();
+ const file='Lasfilter/Loggar/sortbro-fellogg.txt';
+ assert.match(files[file],/motor_stoppad code=move_error/);
+ assert.doesNotMatch(files[file],/\tmoved\t/);
+ const n=written.filter(x=>x===file).length;
+ app.log('moved',1);
+ await app.writeTextLog();
+ assert.equal(written.filter(x=>x===file).length,n,'oförändrad fellogg skrivs inte om');
+ app.log('error',0,'nytt_fel');
+ await app.writeTextLog();
+ assert.match(files[file],/nytt_fel/);
+ assert.equal(written.filter(x=>x===file).length,n+1);
+});
+test('avstängd fillogg stoppar båda automatiska filerna men tillåter manuell felrapport',async()=>{
+ const {api,written}=backupApi();const {app}=await loadBackground(api);
+ fakeEngineWithRules(app);app.engine.config.fileLog=false;
+ app.log('error',0,'backup_misslyckades');
+ await app.writeTextLog();
+ assert.equal(written.length,0);
+ assert.match(await app.handle({type:'exportErrorLog'}),/backup_misslyckades/);
+});
+test('felhistoriken sparas och återställs separat, utan migreringsdubbletter',async()=>{
+ const {api}=backupApi();let stored={};
+ api.storage.local.get=async()=>({logs:[C.event('error',0,Date.now(),'gammalt_fel')]});
+ api.storage.local.set=async data=>Object.assign(stored,JSON.parse(JSON.stringify(data)));
+ const {app}=await loadBackground(api);
+ fakeEngineWithRules(app);
+ assert.equal(app.errorLogs.length,1,'migrerar intern gammal logg');
+ app.log('error',0,'nytt_fel');
+ app.logs=[C.event('moved',200)];
+ await app.flushWrites();
+ assert.equal(stored.errorLogs.length,2,'normal logg kan gallras utan att felen försvinner');
+ api.storage.local.get=async()=>stored;
+ const again=await loadBackground(api);
+ assert.equal(again.app.errorLogs.length,2,'omstart dubblar inte poster');
+ assert.match(again.app.errorLogText(),/gammalt_fel/);
+});
+test('fel på den vanliga loggfilen hamnar i felloggen',async()=>{
+ const {api,files}=backupApi();const write=api.downloads.download;
+ api.downloads.download=async arg=>{if(arg.filename.endsWith('/lasfilter-logg.txt'))throw Error('disk full');return write(arg);};
+ const {app}=await loadBackground(api);fakeEngineWithRules(app);
+ await app.writeTextLog();
+ assert.match(files['Lasfilter/Loggar/sortbro-fellogg.txt'],/teknisk_logg_skrivfel/);
+ assert.doesNotMatch(files['Lasfilter/Loggar/sortbro-fellogg.txt'],/disk full/,'rå exceptiontext sparas inte');
+});
+test('fel på felloggen skapar ingen oändlig skrivloop och kan hämtas manuellt',async()=>{
+ const {api}=backupApi();let calls=0;
+ api.downloads.download=async()=>{calls++;throw Error('privat feltext');};
+ const {app,tick}=await loadBackground(api);fakeEngineWithRules(app);app.engine.config.autoBackup=false;
+ await tick.flush(50);
+ const before=calls;
+ await tick.flush(50);
+ assert.equal(calls,before,'inga självgenererande filförsök');
+ assert.ok(calls<=4,'begränsat antal filanrop');
+ const text=await app.handle({type:'exportErrorLog'});
+ assert.match(text,/samlad_fellogg_skrivfel/);
+ assert.doesNotMatch(text,/privat feltext/);
+});
+test('UI-fel rapporteras med säkra felkoder, aldrig exception-innehåll',async()=>{
+ const {app}=await loadBackground();fakeEngineWithRules(app);
+ await app.handle({type:'reportUiError',code:'hemlig@adress.se med mejltext'});
+ await app.handle({type:'reportUiError',code:'sweep_error'});
+ const text=app.errorLogText();
+ assert.match(text,/ui: internal_error/);assert.match(text,/ui: sweep_error/);
+ assert.doesNotMatch(text,/hemlig|adress|mejltext/);
+});
+test('samtidiga logganrop startar nedladdningar i följd',async()=>{
+ const {api,files}=backupApi();const write=api.downloads.download;let active=0,max=0;
+ api.downloads.download=async arg=>{active++;max=Math.max(max,active);await new Promise(r=>setImmediate(r));const id=await write(arg);active--;return id;};
+ const {app}=await loadBackground(api);fakeEngineWithRules(app);
+ app.log('error',0,'forsta');
+ const first=app.writeTextLog();
+ app.log('error',0,'sista');
+ await Promise.all([first,app.writeTextLog()]);
+ assert.equal(max,1);
+ assert.match(files['Lasfilter/Loggar/sortbro-fellogg.txt'],/sista/);
+});

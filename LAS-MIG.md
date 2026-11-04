@@ -1,5 +1,7 @@
 # SortBro – smart mejlsortering för Thunderbird
 
+© Rickard Längkvist
+
 > Tilläggets id är `lasfilter@lokala-verktyg.invalid` och installationsfilen heter `SortBro-Thunderbird.xpi`. Versionen står i `addon/manifest.json`.
 
 Ett Thunderbird-tillägg med ett eget svenskt och engelskt gränssnitt (MV2, Thunderbird 140+). Det flyttar ett mejl som matchar dina regler först när Thunderbird har markerat det som läst **och** det inte längre visas i någon mejlflik eller något meddelandefönster. Tillägget börjar alltid i **testläge utan flyttar**.
@@ -500,6 +502,10 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.14
+
+- **Copyright:** © Rickard Längkvist visas i appens sidfot och dokumentationen. Licensvillkoren är oförändrade.
 
 ## Nyheter i 1.0.13
 

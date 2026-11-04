@@ -209,8 +209,11 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  el('langEn').click();
  await until(()=>el('quickTarget').value==='demo-buy','snabbregeln minns målmappen du använde sist',false,6000);
  check(el('quickTarget').value==='demo-buy','målmappen är förvald nästa gång: "'+el('quickTarget').value+'"');
+ check(txt('copyright')==='© Rickard Längkvist','copyright visas oförändrad på engelska');
  el('langSv').click();
  await until(()=>/Skapa regel|Lägg till/.test(el('quickAddBtn').textContent),'språket tillbaka till svenska');
+ check(txt('copyright')==='© Rickard Längkvist','copyright visas på svenska');
+ check(doc.querySelector('footer #copyright')!==null,'copyright ligger i appens gemensamma sidfot');
 
  /* --- Regelredigeraren: villkor, diagnos, test --- */
  await until(()=>/klarna|Webb/.test(el('ruleName').value),'regeln är öppen i redigeraren');

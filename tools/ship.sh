@@ -94,7 +94,7 @@ echo "$ZIP  ($(du -h "$ZIP" | cut -f1))"
 say "5/7 · kör testerna"
 [ -d tester/node_modules ] || (cd tester && npm install --silent)
 node --test tester/*.test.cjs
-(cd tester && node dom_check.cjs | tail -1)
+node tester/dom_check.cjs
 
 say "6/7 · kontrollerar att version, hash och adresser hör ihop"
 python3 tools/verify_release.py

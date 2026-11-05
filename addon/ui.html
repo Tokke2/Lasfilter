@@ -29,12 +29,12 @@
         </div>
       </div>
       <div class="nav-label" data-i18n="navMenu">MENY</div>
-      <nav aria-label="Huvudmeny">
-        <button data-view="rules" class="nav active"><span>▤</span> <span data-i18n="navRules">Start</span> <b id="navCount">0</b></button>
-        <button data-view="activity" class="nav"><span>◷</span> <span data-i18n="navActivity">Vad har hänt?</span></button>
-        <button data-view="settings" class="nav"><span>⚙</span> <span data-i18n="navSettings">Avancerat</span></button>
-        <button data-view="help" class="nav"><span>?</span> <span data-i18n="navHelp">Hjälp</span></button>
-        <button data-view="support" class="nav"><span>💚</span> <span data-i18n="navSupport">Stöd SortBro</span></button>
+      <nav aria-label="Huvudmeny" data-i18n-aria="ariaNav">
+        <button aria-label="Start" data-i18n-aria="navRules" data-view="rules" class="nav active"><span>▤</span> <span data-i18n="navRules">Start</span> <b id="navCount">0</b></button>
+        <button aria-label="Vad har hänt?" data-i18n-aria="navActivity" data-view="activity" class="nav"><span>◷</span> <span data-i18n="navActivity">Vad har hänt?</span></button>
+        <button aria-label="Avancerat" data-i18n-aria="navSettings" data-view="settings" class="nav"><span>⚙</span> <span data-i18n="navSettings">Avancerat</span></button>
+        <button aria-label="Hjälp" data-i18n-aria="navHelp" data-view="help" class="nav"><span>?</span> <span data-i18n="navHelp">Hjälp</span></button>
+        <button aria-label="Stöd SortBro" data-i18n-aria="navSupport" data-view="support" class="nav"><span>💚</span> <span data-i18n="navSupport">Stöd SortBro</span></button>
       </nav>
       <div class="sidebar-note">
         <div class="shield">✓</div>
@@ -52,23 +52,26 @@
             <button id="langSv" type="button" class="lang-btn active" title="Svenska">SV · Svenska</button>
             <button id="langEn" type="button" class="lang-btn" title="English">EN · English</button>
           </div>
-          <button id="themeQuick" class="icon-button" title="Växla ljust/mörkt tema" aria-label="Växla tema">◐</button>
+          <button id="themeQuick" class="icon-button" title="Växla ljust/mörkt tema" aria-label="Växla tema" data-i18n-aria="themeQuickTitle">◐</button>
           <span id="statusPill" class="pill amber">Ansluter…</span>
         </div>
       </header>
 
-      <section class="intro hero-card">
+      <section class="intro hero-card" id="introCard">
         <div class="hero-copy">
-          <div class="eyebrow" data-i18n="introEyebrow">ENKEL AUTOMATISK SORTERING</div>
-          <h1 data-i18n="introTitle">Flytta mejl automatiskt</h1>
-          <p data-i18n="introSub">Skapa en eller flera regler, välj olästa/lästa och målmapp. Klart.</p>
-          <p class="season-greeting" id="seasonGreeting">Ha en fin höstdag! 🍂</p>
+          <div id="introCopy">
+            <div class="eyebrow" data-i18n="introEyebrow">ENKEL AUTOMATISK SORTERING</div>
+            <h1 data-i18n="introTitle">Flytta mejl automatiskt</h1>
+            <p data-i18n="introSub">Skapa en eller flera regler, välj olästa/lästa och målmapp. Klart.</p>
+            <p class="season-greeting" id="seasonGreeting">Ha en fin höstdag! 🍂</p>
+          </div>
           <div class="intro-actions">
+            <button id="introToggle" type="button" class="button secondary" aria-expanded="true" aria-controls="introCopy seasonHeroArt setupSteps">Dölj introduktion</button>
             <button id="pause" class="button secondary">Pausa</button>
             <button id="mode" class="button primary">Slå på flytt</button>
             <label class="season-pick">
               <span data-i18n="seasonLabelShort">Årstid</span>
-              <select id="seasonQuick" aria-label="Årstidstema">
+              <select id="seasonQuick" aria-label="Årstidstema" data-i18n-aria="seasonLabel">
                 <option value="auto" data-i18n="seasonAuto">Auto</option>
                 <option value="spring">🌸 Vår</option>
                 <option value="summer">☀️ Sommar</option>
@@ -81,7 +84,7 @@
         <div class="hero-art" id="seasonHeroArt" aria-hidden="true"></div>
       </section>
 
-      <section class="setup-steps" aria-label="Kom igång">
+      <section id="setupSteps" class="setup-steps" aria-label="Kom igång" data-i18n-aria="ariaSetup">
         <div id="setup1" class="setup-step"><b>1</b><span><strong data-i18n="setup1Title">Välj exempelmejl</strong><small data-i18n="setup1Sub">Markera ett mejl i Thunderbird</small></span></div>
         <div id="setup2" class="setup-step"><b>2</b><span><strong data-i18n="setup2Title">Spara regeln</strong><small data-i18n="setup2Sub">Välj lästa/olästa och målmapp</small></span></div>
         <div id="setup3" class="setup-step"><b>3</b><span><strong data-i18n="setup3Title">Slå på flytt</strong><small data-i18n="setup3Sub">Tillägget sköter resten</small></span></div>
@@ -131,7 +134,7 @@
             <!-- Varför ligger det här mejlet här? Ett omvänt uppslag för markerat mejl. -->
             <div id="whyPanel" class="why-panel" hidden role="status" aria-live="polite"></div>
 
-            <div class="template-bar" id="templateBar" role="group" aria-label="1-klicksmallar">
+            <div class="template-bar" id="templateBar" role="group" aria-label="1-klicksmallar" data-i18n-aria="ariaTemplates">
               <span class="template-label" data-i18n="templateLabel">1-klicksmallar:</span>
               <button type="button" class="template-btn" data-template="faktura">🧾 <span data-i18n="tplInvoice">Fakturor &amp; Kvitton</span></button>
               <button type="button" class="template-btn" data-template="order">📦 <span data-i18n="tplOrder">Order &amp; Leverans</span></button>
@@ -152,7 +155,7 @@
               <p class="simple-help" data-i18n="quickRuleHelp">Klicka på en avsändare eller ett ämnesord – eller skriv själv. SortBro säger till hur många mejl i Inkorgen regeln träffar innan du sparar.</p>
               <div id="quickChips" class="quick-chips"></div>
               <div class="quick-rule-row">
-                <select id="quickField" aria-label="Fält">
+                <select id="quickField" aria-label="Fält" data-i18n-aria="ariaField">
                   <option value="domain" data-i18n="optDomain">Avsändardomän</option>
                   <option value="sender" data-i18n="optSender">Från (adress)</option>
                   <option value="subject" data-i18n="optSubject">Ämne</option>
@@ -161,12 +164,12 @@
                 <span id="quickCount" class="quick-count" hidden></span>
               </div>
               <div class="quick-rule-row">
-                <select id="quickTarget" aria-label="Målmapp"><option value="">Välj målmapp…</option></select>
+                <select id="quickTarget" aria-label="Målmapp" data-i18n-aria="ariaTarget"><option value="">Välj målmapp…</option></select>
                 <button id="quickNewFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
               </div>
               <div id="quickSentence" class="quick-sentence"></div>
               <div class="quick-rule-row">
-                <select id="quickExisting" aria-label="Befintlig regel"><option value="">Skapa ny regel…</option></select>
+                <select id="quickExisting" aria-label="Befintlig regel" data-i18n-aria="ariaExisting"><option value="">Skapa ny regel…</option></select>
               </div>
               <div class="quick-rule-row">
                 <button id="quickAddBtn" type="button" class="button small primary" data-i18n="quickAddBtn">＋ Lägg till filter</button>
@@ -181,7 +184,7 @@
               <div class="tb-filter-head">
                 <strong data-i18n="tbFilterTitle">🔁 Thunderbirds egna filter</strong>
                 <span class="tb-filter-actions">
-                  <select id="tbAccount" aria-label="Konto"></select>
+                  <select id="tbAccount" aria-label="Konto" data-i18n-aria="ariaAccount"></select>
                   <label class="button small secondary file-label"><span data-i18n="tbImportBtn">⇪ Importera filterfil…</span><input id="tbImportFile" type="file" accept=".dat,text/plain" hidden></label>
                   <button id="tbExportBtn" type="button" class="button small secondary" data-i18n="tbExportBtn">⇩ Exportera som filterfil</button>
                 </span>
@@ -196,7 +199,7 @@
             </div>
             <label class="search">
               <span>⌕</span>
-              <input id="ruleSearch" type="search" placeholder="Sök bland dina regler…" aria-label="Sök regler">
+              <input id="ruleSearch" type="search" placeholder="Sök namn, mapp eller villkor…" aria-label="Sök namn, mapp eller villkor" data-i18n-aria="ruleSearchPlaceholder">
             </label>
             <!-- Inlärda förslag: bara domän, mapp och antal – inget skapas utan ett klick. -->
             <div id="learnBar" class="learn-bar" hidden role="status" aria-live="polite"></div>
@@ -247,7 +250,7 @@
                 <div class="section-title">
                   <span class="step">2</span>
                   <h3 data-i18n="step2Title">Vilka liknande mejl?</h3>
-                  <select id="match" aria-label="Kombinera villkor">
+                  <select id="match" aria-label="Kombinera villkor" data-i18n-aria="ariaMatch">
                     <option value="all" data-i18n="matchAll">Alla ska stämma</option>
                     <option value="any" data-i18n="matchAny">Minst ett ska stämma</option>
                   </select>
@@ -430,6 +433,13 @@
                 <option value="winter" data-i18n="seasonWinter">❄️ Vinter</option>
               </select>
             </label>
+            <label class="field">
+              <span data-i18n="fontSizeLabel">Textstorlek</span>
+              <select id="fontSize"><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option></select>
+            </label>
+            <label class="field"><span data-i18n="densityLabel">Layout</span><select id="density"><option value="comfortable" data-i18n="densityComfortable">Luftig</option><option value="compact" data-i18n="densityCompact">Kompakt</option></select></label>
+            <label class="field"><span data-i18n="lineSpacingLabel">Radavstånd i lästext</span><select id="lineSpacing"><option value="normal" data-i18n="lineSpacingNormal">Normalt</option><option value="roomy" data-i18n="lineSpacingRoomy">Extra luftigt</option></select></label>
+            <p class="muted" data-i18n="appearanceNote">Layout ändrar avstånd, inte textstorlek. Radavstånd gäller förklaringar och detaljer.</p>
             <p class="muted" data-i18n="seasonNote">Årstiden färgar gränssnittet, hälsningen och SortBro-ikonen i verktygsfältet – i både ljust och mörkt läge.</p>
             <label class="field">
               <span data-i18n="moveModeLabel">Standardläge för regler (när regeln står på Standard)</span>
@@ -486,10 +496,7 @@
             </div>
             <p class="muted" id="backupStatus"></p>
             <p class="muted" data-i18n="shortcutsNote">Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns. Ctrl+Shift+L kör ett svep direkt.</p>
-            <label class="field">
-              <span data-i18n="fontSizeLabel">Textstorlek</span>
-              <select id="fontSize"><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option></select>
-            </label>
+
             <button id="refreshFolders" class="button secondary" data-i18n="refreshFoldersBtn">Uppdatera mapplistan</button>
             <p class="muted" data-i18n="windowNote">Thunderbird hanterar fönstrets storlek och placering. Tillägget minns språk, tema, textstorlek och senast valda regel.</p>
           </div>

@@ -6,6 +6,35 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  introHide:"Dölj introduktion",
+  introShow:"Visa introduktion",
+  densityLabel:"Layout",
+  densityCompact:"Kompakt",
+  densityComfortable:"Luftig",
+  lineSpacingLabel:"Radavstånd i lästext",
+  lineSpacingNormal:"Normalt",
+  lineSpacingRoomy:"Extra luftigt",
+  appearanceNote:"Layout ändrar avstånd, inte textstorlek. Radavstånd gäller förklaringar och detaljer.",
+  priorityConfirm:"Ändra ordning?\n\n”{name}”: plats {from} → {to}\n”{other}”: plats {to} → {from}\n\nFörsta matchande regeln vinner. Den nya ordningen gäller för fortsatt sortering.",
+  priorityChanged:"”{name}” har nu prioritet {n}.",
+  ariaNav:"Huvudmeny",
+  ariaSetup:"Kom igång",
+  ariaTemplates:"Regelmallar",
+  ariaField:"Fält",
+  ariaTarget:"Målmapp",
+  ariaExisting:"Befintlig regel",
+  ariaAccount:"Konto",
+  ariaMatch:"Kombinera villkor",
+  ariaConditionField:"Villkorsfält",
+  ariaConditionOp:"Jämförelse",
+  ariaConditionValue:"Villkorsvärde",
+  ariaConditionRemove:"Ta bort villkor",
+  ariaBranchField:"Fördelningsfält",
+  ariaBranchOp:"Fördelningsjämförelse",
+  ariaBranchValue:"Fördelningsvärde",
+  ariaBranchTarget:"Fördelningsmålmapp",
+  ariaBranchRemove:"Ta bort fördelning",
+  ruleEnable:"Aktivera {name}",
   pageTitle:'SortBro · Thunderbird',
   demoBanner:'FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.',
   installWarnHide:'Dölj',
@@ -196,7 +225,7 @@ const I18N={
   quickExistingDone:'{n} tillagt i regeln "{name}". Kombinationen är "minst ett av villkoren".',
   quickExistingNone:'Inget nytt att lägga till – värdet finns redan i regeln.',
   quickValuePlaceholder:'t.ex. fortnox.se, klarna.se eller Faktura…',
-  ruleSearchPlaceholder:'Sök bland dina regler…',
+  ruleSearchPlaceholder:'Sök namn, mapp eller villkor…',
   exportBtn:'↓ Exportera regler (.json)',
   importBtn:'↑ Importera (.json)',
   importMergeBtn:'＋ Lägg till från JSON',
@@ -698,6 +727,35 @@ const I18N={
   }
  },
  en:{
+  introHide:"Hide introduction",
+  introShow:"Show introduction",
+  densityLabel:"Layout",
+  densityCompact:"Compact",
+  densityComfortable:"Comfortable",
+  lineSpacingLabel:"Text line spacing",
+  lineSpacingNormal:"Normal",
+  lineSpacingRoomy:"Extra spacing",
+  appearanceNote:"Layout changes spacing, not font size. Line spacing applies to explanations and details.",
+  priorityConfirm:"Change order?\n\n“{name}”: position {from} → {to}\n“{other}”: position {to} → {from}\n\nThe first matching rule wins. The new order applies to subsequent sorting.",
+  priorityChanged:"“{name}” now has priority {n}.",
+  ariaNav:"Main menu",
+  ariaSetup:"Getting started",
+  ariaTemplates:"Rule templates",
+  ariaField:"Field",
+  ariaTarget:"Target folder",
+  ariaExisting:"Existing rule",
+  ariaAccount:"Account",
+  ariaMatch:"Combine conditions",
+  ariaConditionField:"Condition field",
+  ariaConditionOp:"Comparison",
+  ariaConditionValue:"Condition value",
+  ariaConditionRemove:"Remove condition",
+  ariaBranchField:"Branch field",
+  ariaBranchOp:"Branch comparison",
+  ariaBranchValue:"Branch value",
+  ariaBranchTarget:"Branch target folder",
+  ariaBranchRemove:"Remove branch",
+  ruleEnable:"Enable {name}",
   pageTitle:'SortBro · Thunderbird',
   demoBanner:'PREVIEW · Sample data only. No emails are read or moved.',
   installWarnHide:'Hide',
@@ -888,7 +946,7 @@ const I18N={
   quickExistingDone:'{n} added to the rule "{name}". The combination is "at least one of the conditions".',
   quickExistingNone:'Nothing new to add – the value is already in the rule.',
   quickValuePlaceholder:'e.g. fortnox.se, klarna.se or Invoice…',
-  ruleSearchPlaceholder:'Search your rules…',
+  ruleSearchPlaceholder:'Search name, folder or condition…',
   exportBtn:'↓ Export rules (.json)',
   importBtn:'↑ Import (.json)',
   importMergeBtn:'＋ Add from JSON',
@@ -1396,6 +1454,9 @@ const Terr=code=>I18N[currentLang]?.errors?.[code]??I18N.sv.errors[code]??I18N[c
 const Tevent=ev=>I18N[currentLang]?.events?.[ev]??I18N.sv.events[ev]??T('events').fallback;
 const locale=()=>currentLang==='en'?'en-GB':'sv-SE';
 
+function a11y(node,key,attribute='aria-label'){
+ node.setAttribute(attribute,T(key));node.dataset[attribute==='title'?'i18nTitle':'i18nAria']=key;
+}
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function toast(text,error=false){const n=$('toast');n.textContent=text;n.style.background=error?'#8e3731':'';n.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>n.hidden=true,6500);}
 function alertError(err){
@@ -1505,12 +1566,26 @@ function applyLanguage(lang){
   if(trg.options[0])trg.options[0].textContent=T('chooseTarget');
   trg.value=tVal;
  }
+ for(const node of document.querySelectorAll('[data-i18n-aria]'))node.setAttribute('aria-label',T(node.dataset.i18nAria));
+ for(const node of document.querySelectorAll('[data-i18n-title]'))node.title=T(node.dataset.i18nTitle);
  updateReadPolicy();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
  if(state)applySeason(state.prefs);
  repaint();
 }
 
+function applyAppearance(prefs){
+ const root=document.documentElement,size=Number(prefs.fontSize)||14;
+ root.dataset.density=prefs.density==='compact'?'compact':'comfortable';
+ root.dataset.lineSpacing=prefs.lineSpacing==='roomy'?'roomy':'normal';
+ root.dataset.largeText=String(size>=20);
+ $('density').value=root.dataset.density;$('lineSpacing').value=root.dataset.lineSpacing;
+ const collapsed=prefs.introCollapsed===true;
+ for(const id of ['introCopy','seasonHeroArt','setupSteps'])$(id).hidden=collapsed;
+ $('introCard').classList.toggle('intro-collapsed',collapsed);
+ $('introToggle').textContent=T(collapsed?'introShow':'introHide');
+ $('introToggle').setAttribute('aria-expanded',String(!collapsed));
+}
 function applyTheme(prefs){
  let theme=prefs.theme;if(theme==='system')theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
  document.documentElement.dataset.theme=theme;document.documentElement.style.setProperty('--base',(prefs.fontSize||14)+'px');
@@ -1523,6 +1598,7 @@ function applyTheme(prefs){
   if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');
  }
  if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;$('autoBackup').checked=state.config.autoBackup!==false;$('brake').checked=state.config.brake!==false;}
+ applyAppearance(prefs);
  /* Veckostatus: när den senaste automatiska veckokopian skrevs. */
  renderCache(state);
  if($('backupStatus'))$('backupStatus').textContent=state.config.autoBackup===false?'':(state.lastBackupWeek?T('backupLastWeek').replace('{week}',state.lastBackupWeek):T('backupNoWeek'));
@@ -1804,13 +1880,20 @@ function applyTemplate(key){
 }
 
 /* ===== ＋ Ny mapp ===== */
-function openFolderModal(presetAccountId,suggestedName=''){
+let folderReturnFocus=null;
+function closeFolderModal(){
+ $('folderModal').hidden=true;document.querySelector('.shell').inert=false;
+ if(folderReturnFocus?.isConnected)folderReturnFocus.focus();
+ folderReturnFocus=null;
+}
+function openFolderModal(presetAccountId,suggestedName='',opener=document.activeElement){
  const modal=$('folderModal');if(!modal)return;
  const parent=$('folderParent');
  if(parent)selectOptions(parent,folders,T('newFolderRoot'),'');
  if(!$('source')?.value&&presetAccountId)accountOptions(presetAccountId);
  if($('folderName'))$('folderName').value=(suggestedName||'').slice(0,64);
- modal.hidden=false;
+ folderReturnFocus=opener;closeRuleMenus();
+ document.querySelector('.shell').inert=true;modal.hidden=false;
  $('folderName')?.focus();
 }
 async function createFolderFromModal(){
@@ -1821,7 +1904,7 @@ async function createFolderFromModal(){
  const src=$('source')?.value||'',target=$('target')?.value||'';
  accountOptions(src);targetOptions(created?.id||target);
  if($('quickTarget')&&created?.id){$('quickTarget').value=created.id;rememberQuickTarget(created.id);}
- const modal=$('folderModal');if(modal)modal.hidden=true;
+ closeFolderModal();
  renderRules();toast(T('toastFolderCreated'));
 }
 
@@ -2060,7 +2143,7 @@ function renderLearnBar(){
 function renderRules(){
  /* Allt listan läser: reglerna, sökordet, markeringen, språket och mapplistan
     (den behövs för konfliktvarningen och för att visa mappnamn). */
- const sig=JSON.stringify([state.config.rules,selectedId,$('ruleSearch')?.value||'',currentLang,folders.map(f=>[f.id,f.name,f.label,f.accountId]),state.config.paused,state.fault,state.moveMode,state.openWindow]);
+ const sig=JSON.stringify([state.config.rules,selectedId,$('ruleSearch')?.value||'',currentLang,folders.map(f=>[f.id,f.name,f.label,f.accountId,f.accountName]),state.config.paused,state.fault,state.moveMode,state.openWindow]);
  if(unchanged('rules',sig))return;
  paintRules();
 }
@@ -2079,6 +2162,19 @@ document.addEventListener('keydown',event=>{
  const button=document.querySelector('.rule-menu-toggle[aria-expanded="true"]');
  if(button){event.preventDefault();closeRuleMenus();button.focus();}
 });
+async function moveRulePriority(ruleId,step){
+ if(dirty){toast(T('saveBeforePriority'));return;}
+ const rules=[...state.config.rules],revision=state.config.revision,i=rules.findIndex(r=>r.id===ruleId),j=i+step;
+ if(i<0||j<0||j>=rules.length)return;
+ const name=rules[i].name,other=rules[j].name;
+ const values={name,other,from:String(i+1),to:String(j+1)};
+ const question=T('priorityConfirm').replace(/\{(name|other|from|to)\}/g,(_,key)=>values[key]);
+ if(!confirm(question))return;
+ [rules[i],rules[j]]=[rules[j],rules[i]];
+ renderStatus(await rpc('saveRules',{rules,revision}));loadRule(ruleId);
+ const row=[...document.querySelectorAll('.rule-row')].find(r=>r.dataset.ruleId===ruleId);row?.querySelector('.rule-menu-toggle')?.focus();
+ toast(T('priorityChanged').replace('{name}',name).replace('{n}',String(j+1)));
+}
 function ruleConditionLabel(c){return fieldShortText(c.field)+' · '+(OPERATOR_LABELS[c.op]?T(OPERATOR_LABELS[c.op]):c.op)+(String(c.value??'').trim()?' · '+c.value:'');}
 function paintRules(){
  const list=$('ruleList');list.replaceChildren();const search=C.norm($('ruleSearch').value);
@@ -2090,12 +2186,12 @@ function paintRules(){
   const add=(id,other,winner)=>{if(!conflictMap.has(id))conflictMap.set(id,[]);conflictMap.get(id).push({other,winner,fields:c.fields});};
   add(c.aId,c.bId,true);add(c.bId,c.aId,false);
  }
- const shown=state.config.rules.filter(r=>C.norm(r.name).includes(search));
+ const shown=state.config.rules.filter(r=>C.ruleMatchesSearch(r,search,folders));
  if(!shown.length){list.append(el('p','empty',state.config.rules.length?T('emptyNoMatch'):T('emptyNoRules')));return;}
  for(const rule of shown){
   const row=el('div','rule-row'+(selectedId===rule.id?' selected':''));row.dataset.ruleId=rule.id;
   const position=state.config.rules.findIndex(r=>r.id===rule.id);
-  const check=el('input');check.type='checkbox';check.checked=rule.enabled;check.setAttribute('aria-label',(currentLang==='en'?'Enable ':'Aktivera ')+rule.name);
+  const check=el('input');check.type='checkbox';check.checked=rule.enabled;check.setAttribute('aria-label',T('ruleEnable').replace('{name}',rule.name));
   check.addEventListener('change',async()=>{try{
    if(dirty&&!confirm(T('confirmDiscardEditor'))){check.checked=!check.checked;return;}
    const rules=state.config.rules.map(r=>r.id===rule.id?{...r,enabled:check.checked}:r);
@@ -2193,13 +2289,7 @@ function paintRules(){
    button.addEventListener('click',async()=>{button.disabled=true;try{await fn();}catch(err){alertError(err);}finally{button.disabled=disabled;}});quick.append(button);
   };
   action('ruleExport',()=>exportRuleFile(rule));
-  for(const [key,step] of [['ruleUp',-1],['ruleDown',1]])action(key,async()=>{
-   if(dirty){toast(T('saveBeforePriority'));return;}
-   const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===rule.id),j=i+step;
-   if(i<0||j<0||j>=rules.length)return;
-   [rules[i],rules[j]]=[rules[j],rules[i]];
-   renderStatus(await rpc('saveRules',{rules,revision:state.config.revision}));loadRule(rule.id);
-  },position+step<0||position+step>=state.config.rules.length);
+  for(const [key,step] of [['ruleUp',-1],['ruleDown',1]])action(key,()=>moveRulePriority(rule.id,step),position+step<0||position+step>=state.config.rules.length);
   action('ruleDelete',async()=>{
    if(dirty&&!confirm(T('confirmDiscardEditor')))return;
    if(!confirm(T('ruleDeleteNamed').replace('{name}',rule.name)))return;
@@ -2277,7 +2367,7 @@ function syncConditionInput(input,field,op,value){
 function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},target:''}){
  if($('branches').children.length>=8){toast(T('maxBranches'));return;}
  const row=el('div','branch-row'),field=el('select'),op=el('select'),value=el('input'),target=el('select'),remove=el('button','remove-condition','×');
- field.setAttribute('aria-label','Fördelningsfält');op.setAttribute('aria-label','Fördelningsjämförelse');value.setAttribute('aria-label','Fördelningsvärde');value.required=true;target.setAttribute('aria-label','Fördelningsmålmapp');remove.type='button';remove.title='Ta bort fördelning';remove.setAttribute('aria-label','Ta bort fördelning');
+ a11y(field,'ariaBranchField');a11y(op,'ariaBranchOp');a11y(value,'ariaBranchValue');value.required=true;a11y(target,'ariaBranchTarget');remove.type='button';a11y(remove,'ariaBranchRemove','title');a11y(remove,'ariaBranchRemove');
  fillFieldSelect(field,b.condition.field);fillOpSelect(op,b.condition.field,b.condition.op);
  syncConditionInput(value,b.condition.field,op.value,String(b.condition.value??''));
  selectOptions(target,folders,T('chooseTarget'),b.target);
@@ -2289,7 +2379,7 @@ function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},targ
 function addCondition(c={field:'domain',op:'equals',value:''}){
  if($('conditions').children.length>=8){toast(T('maxConditions'));return;}
  const row=el('div','condition-row'),field=el('select'),op=el('select'),value=el('input'),remove=el('button','remove-condition','×');
- field.setAttribute('aria-label','Villkorsfält');op.setAttribute('aria-label','Jämförelse');value.setAttribute('aria-label','Villkorsvärde');value.required=true;remove.type='button';remove.title='Ta bort villkor';remove.setAttribute('aria-label','Ta bort villkor');
+ a11y(field,'ariaConditionField');a11y(op,'ariaConditionOp');a11y(value,'ariaConditionValue');value.required=true;remove.type='button';a11y(remove,'ariaConditionRemove','title');a11y(remove,'ariaConditionRemove');
  fillFieldSelect(field,c.field);fillOpSelect(op,c.field,c.op);
  syncConditionInput(value,c.field,op.value,String(c.value??''));
  field.addEventListener('change',()=>{fillOpSelect(op,field.value,'');syncConditionInput(value,field.value,op.value,'');dirty=true;});
@@ -2325,7 +2415,10 @@ function loadRule(id='',presetAccount=''){
 const logKey=log=>log.time+'|'+log.event+'|'+(log.data?.count||0)+'|'+(log.data?.detail||'');
 function logRow(log){
  const tr=el('tr');
- for(const text of [new Date(log.time).toLocaleString(locale()),Tevent(log.event)+(log.data.detail?' – '+log.data.detail:''),log.level,log.data.count])tr.append(el('td','',text));
+ tr.append(el('td','numeric-value',new Date(log.time).toLocaleString(locale())));
+ const eventCell=el('td','',Tevent(log.event));
+ if(log.data.detail)eventCell.append(el('span','technical-value',' – '+log.data.detail));
+ tr.append(eventCell,el('td','technical-value',log.level),el('td','numeric-value',log.data.count));
  return tr;
 }
 function renderActivity(){
@@ -2861,10 +2954,7 @@ handle('test','click',async()=>{
  $('testResult').textContent='TEST · '+(reasons[result.reason]||reasons.no_match)+T('testNoMove')+(result.matches?T('testTargetPrefix')+label(result.target)+'. ':'')+T('testTail')+(result.outsideSource?T('testOutside'):'');$('testResult').hidden=false;
 });
 handle('delete','click',async()=>{if(!selectedId||!confirm(T('confirmDelete')))return;const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==selectedId),revision:editRevision});dirty=false;renderStatus(next);loadRule();});
-for(const [id,step] of [['up',-1],['down',1]])handle(id,'click',async()=>{
- if(dirty){toast(T('saveBeforePriority'));return;}const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===selectedId),j=i+step;if(i<0||j<0||j>=rules.length)return;
- [rules[i],rules[j]]=[rules[j],rules[i]];renderStatus(await rpc('saveRules',{rules,revision:editRevision}));loadRule(selectedId);
-});
+for(const [id,step] of [['up',-1],['down',1]])handle(id,'click',()=>moveRulePriority(selectedId,step));
 handle('pause','click',async()=>{renderStatus(await rpc('setMode',{revision:state.config.revision,paused:!state.config.paused,dryRun:state.config.dryRun}));});
 handle('mode','click',async()=>{
  const becomingLive=state.config.dryRun;
@@ -3164,6 +3254,8 @@ if($('importMergeSettings'))handle('importMergeSettings','change',()=>handleRule
 handle('clearBlocked','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
 if($('clearFault'))handle('clearFault','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
 handle('theme','change',async()=>{state.prefs=await rpc('prefs',{prefs:{theme:$('theme').value}});applyTheme(state.prefs);});
+handle('introToggle','click',async()=>{state.prefs=await rpc('prefs',{prefs:{introCollapsed:!state.prefs.introCollapsed}});applyAppearance(state.prefs);});
+for(const id of ['density','lineSpacing'])handle(id,'change',async()=>{state.prefs=await rpc('prefs',{prefs:{[id]:$(id).value}});applyAppearance(state.prefs);});
 handle('fontSize','change',async()=>{state.prefs=await rpc('prefs',{prefs:{fontSize:Number($('fontSize').value)}});applyTheme(state.prefs);});
 handle('themeQuick','click',async()=>{state.prefs=await rpc('prefs',{prefs:{theme:document.documentElement.dataset.theme==='dark'?'light':'dark'}});applyTheme(state.prefs);});
 async function switchLanguage(nextLang){
@@ -3200,12 +3292,23 @@ handle('refreshFolders','click',async()=>{folders=await rpc('folders');repaint()
 
 /* ===== Nya funktioner: mallar, förslag, ny mapp, årstid ===== */
 for(const btn of document.querySelectorAll('#templateBar .template-btn'))btn.addEventListener('click',()=>applyTemplate(btn.dataset.template));
-if($('newFolderBtn'))handle('newFolderBtn','click',()=>openFolderModal($('source')?.value||''));
-if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',()=>openFolderModal($('source')?.value||'',quickFolderSuggestion()));
-if($('folderCancelBtn'))handle('folderCancelBtn','click',()=>{$('folderModal').hidden=true;});
+if($('newFolderBtn'))handle('newFolderBtn','click',e=>openFolderModal($('source')?.value||'','',e.currentTarget));
+if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',e=>openFolderModal($('source')?.value||'',quickFolderSuggestion(),e.currentTarget));
+if($('folderCancelBtn'))handle('folderCancelBtn','click',closeFolderModal);
 if($('folderCreateBtn'))handle('folderCreateBtn','click',createFolderFromModal);
 if($('folderName'))$('folderName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();createFolderFromModal().catch(alertError);}});
-if($('folderModal'))$('folderModal').addEventListener('click',e=>{if(e.target===$('folderModal'))$('folderModal').hidden=true;});
+if($('folderModal')){
+ $('folderModal').addEventListener('click',e=>{if(e.target===$('folderModal'))closeFolderModal();});
+ $('folderModal').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeFolderModal();return;}
+  if(e.key!=='Tab')return;
+  const items=[...$('folderModal').querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')];
+  const first=items[0],last=items.at(-1);
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+ });
+ document.addEventListener('focusin',e=>{if(!$('folderModal').hidden&&!$('folderModal').contains(e.target))$('folderName').focus();});
+}
 async function setSeasonPref(value){
  if(!SEASON_CHOICES.includes(value))return;
  state.prefs=await rpc('prefs',{prefs:{season:value}});

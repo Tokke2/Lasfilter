@@ -503,6 +503,26 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.16
+
+De valda förslagen **1, 6, 7, 9, 10, 11, 14, 22, 23, 24 och 25** är genomförda:
+
+| Förslag | Förbättring |
+| --- | --- |
+| 1 | Regelsökningen söker i namn, villkor, konton, käll-/målmappar och alternativa mål. Flera sökord måste alla finnas, men kan matcha olika delar av regeln. Sökningen är bokstavlig, inte reguljära uttryck. |
+| 6 | **Dölj introduktion / Visa introduktion** fäller ihop hälsning, illustration och kom-igång-steg. Paus, flyttläge och säkerhetsvarningar är fortfarande åtkomliga. Valet sparas över omstart. |
+| 7 | **Avancerat → Utseende & grundläge → Layout:** Kompakt eller Luftig. Det ändrar avstånd och padding, aldrig textstorleken. |
+| 9 | Prioritetsnumret visas i regellistan. Både menyns och editorns omordning visar de två regelnamnen och deras gamla/nya positioner och kräver godkännande. Första matchande regel vinner. |
+| 10 | Mappdialogen håller tangentbordsfokus inne i dialogen. Escape, Avbryt, bakgrundsklick och lyckad mappskapning återlämnar fokus till öppningsknappen. Bakgrunden är inaktiv medan dialogen är öppen. |
+| 11 | Misslyckade DOM-kontroller ger nu felkod. Ett regressionstest framkallar ett fel för att bevisa detta. Både det lokala släppskriptet och GitHub-arbetsflödet stoppar före publicering om testerna fallerar. |
+| 14 | Automatiska tester jämför svenska och engelska nycklar, platshållare och använda text-/tillgänglighetsetiketter. Dynamiska villkorsfält och borttagningsknappar får översatta namn även efter språkbyte. |
+| 22 | Gemensam textskala ersätter de mycket små etiketterna. Småtexter använder minst 12 CSS-pixlar och växer med vald grundstorlek. |
+| 23 | **Textstorlek** erbjuder 12–24. Vid stor text växlar arbetsytan till en kolumn och villkorsfälten flödar om. Inga externa typsnitt laddas ned. |
+| 24 | **Radavstånd i lästext:** Normalt eller Extra luftigt. Gäller förklaringar och detaljer, utan att ändra kontrollernas textstorlek. |
+| 25 | Räknare, tider och prioritet använder tabellsiffror. Tekniska loggvärden och sökvägsfält använder monospace; långa tekniska texter kan radbrytas. |
+
+Utseendevalen sparas lokalt. Snabba ändringar köas så att inställningarna inte skriver över varandra. Äldre installationer får Luftig layout, Normalt radavstånd och synlig introduktion; den tidigare valda textstorleken behålls. Inga nya behörigheter, ingen ändrad backupfrekvens och inga automatiska regeländringar.
+
 ## Nyheter i 1.0.15
 
 - **Tydligare lista över skapade regler:** namn, målmapp, prioritet och på/av-status visas direkt. Långa villkor och inställningar tar inte längre plats i varje rad.

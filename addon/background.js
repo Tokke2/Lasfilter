@@ -1,6 +1,6 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],errorLogs:[],backups:[],prefs:{theme:'system',fontSize:14,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
+const App={engine:null,logs:[],errorLogs:[],backups:[],prefs:{theme:'system',fontSize:14,density:'comfortable',lineSpacing:'normal',introCollapsed:false,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
  /* "Lär av din flytt": domäner du själv flyttat till en mapp. Bara domän, mapp
     och antal sparas – aldrig ämne, namn eller mejltext. */
  learned:{off:false,entries:[],snooze:{}}};
@@ -1018,10 +1018,13 @@ App.handle=async msg=>{
    App.log('backup_restored',rules.length);return App.snapshot();
   });
   case 'clearBlocked':return App.mutate(async()=>{await e.clearBlocked();await App.save({...e.config,paused:false,revision:e.config.revision+1});App.log('settings_saved');return App.snapshot();});
-  case 'prefs':{
+  case 'prefs':return App.write(async()=>{
    const p=msg.prefs||{},next={...App.prefs};
    if(['system','light','dark'].includes(p.theme))next.theme=p.theme;
-   if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)next.fontSize=p.fontSize;
+   if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=24)next.fontSize=p.fontSize;
+   if(['compact','comfortable'].includes(p.density))next.density=p.density;
+   if(['normal','roomy'].includes(p.lineSpacing))next.lineSpacing=p.lineSpacing;
+   if(typeof p.introCollapsed==='boolean')next.introCollapsed=p.introCollapsed;
    if(typeof p.lastRule==='string'&&p.lastRule.length<=80)next.lastRule=p.lastRule;
    if(typeof p.lastTarget==='string'&&p.lastTarget.length<=80)next.lastTarget=p.lastTarget;
    if(['sv','en'].includes(p.lang))next.lang=p.lang;
@@ -1031,8 +1034,8 @@ App.handle=async msg=>{
     for(const [k,v] of Object.entries(p.filterUris).slice(0,10))if(typeof k==='string'&&k.length>=1&&k.length<=64&&typeof v==='string'&&v.length<=240)clean[k]=v;
     next.filterUris=clean;
    }
-   await App.write(()=>B.storage.local.set({prefs:next}));App.prefs=next;App.applySeasonIcon();App.syncMenu();return next;
-  }
+   await B.storage.local.set({prefs:next});App.prefs=next;App.applySeasonIcon();App.syncMenu();return next;
+  });
   /* Provkörning är slut: aktivera, förläng en vecka eller stäng av regeln. */
   case 'trialResolve':return App.mutate(async()=>{
    const ruleId=String(msg.ruleId||'');
@@ -1091,7 +1094,10 @@ App.ready=(async()=>{
  for(const b of (Array.isArray(data.backups)?data.backups:[]).slice(0,5)){try{App.backups.push({time:b.time,config:C.config(b.config)});}catch{}}
  const p=data.prefs||{};
  if(['system','light','dark'].includes(p.theme))App.prefs.theme=p.theme;
- if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=18)App.prefs.fontSize=p.fontSize;
+ if(Number.isInteger(p.fontSize)&&p.fontSize>=12&&p.fontSize<=24)App.prefs.fontSize=p.fontSize;
+ if(['compact','comfortable'].includes(p.density))App.prefs.density=p.density;
+ if(['normal','roomy'].includes(p.lineSpacing))App.prefs.lineSpacing=p.lineSpacing;
+ if(typeof p.introCollapsed==='boolean')App.prefs.introCollapsed=p.introCollapsed;
  if(typeof p.lastRule==='string'&&p.lastRule.length<=80)App.prefs.lastRule=p.lastRule;
  if(typeof p.lastTarget==='string'&&p.lastTarget.length<=80)App.prefs.lastTarget=p.lastTarget;
  if(['sv','en'].includes(p.lang))App.prefs.lang=p.lang;

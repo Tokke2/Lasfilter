@@ -552,7 +552,19 @@ function errorLogText(rows,info={}){
  if(!errors.length)lines.push('Inga registrerade fel i den sparade historiken.');
  return lines.join('\r\n')+'\r\n';
 }
-const api={cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+/* Fritextsökning är bokstavlig och lokal. Varje sökord måste finnas någonstans
+   i namn, villkor, käll-/målmapp, konto eller alternativa mål. */
+function ruleMatchesSearch(rule,query,folders=[]){
+ const words=norm(query).split(/\s+/).filter(Boolean);if(!words.length)return true;
+ const folderText=id=>{const f=folders.find(f=>f.id===id);return f?[f.name,f.label,f.accountName].join(' '):'';};
+ const conditionText=c=>[c?.field,c?.op,c?.value].join(' ');
+ const text=norm([rule.name,folderText(rule.source),folderText(rule.target),
+  ...folders.filter(f=>rule.scope==='account'&&f.accountId===rule.sourceAccount).map(f=>f.accountName||''),
+  ...(rule.conditions||[]).map(conditionText),
+  ...(rule.branches||[]).map(b=>conditionText(b.condition)+' '+folderText(b.target))].join(' '));
+ return words.every(word=>text.includes(word));
+}
+const api={ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
 whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

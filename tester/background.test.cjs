@@ -1495,3 +1495,31 @@ test('samtidiga logganrop startar nedladdningar i följd',async()=>{
  assert.equal(max,1);
  assert.match(files['Lasfilter/logs/sortbro-fellogg.txt'],/sista/);
 });
+
+/* Utseendeinställningar ska fungera även efter en riktig bakgrundsomstart. */
+test('utseendeval och textstorlek 24 sparas och återläses',async()=>{
+ const api=stubApi();let stored={};
+ api.storage.local.get=async()=>stored;
+ api.storage.local.set=async patch=>Object.assign(stored,JSON.parse(JSON.stringify(patch)));
+ const {app}=await loadBackground(api);fakeEngineWithRules(app);
+ const prefs=await app.handle({type:'prefs',prefs:{fontSize:24,density:'compact',lineSpacing:'roomy',introCollapsed:true}});
+ assert.equal(prefs.fontSize,24);assert.equal(prefs.density,'compact');assert.equal(prefs.lineSpacing,'roomy');assert.equal(prefs.introCollapsed,true);
+ const again=await loadBackground(api);
+ for(const key of ['fontSize','density','lineSpacing','introCollapsed'])assert.equal(again.app.prefs[key],prefs[key],key);
+});
+test('ogiltiga utseendeval ignoreras utan att förstöra giltiga inställningar',async()=>{
+ const {app}=await loadBackground();fakeEngineWithRules(app);
+ await app.handle({type:'prefs',prefs:{fontSize:24,density:'compact',lineSpacing:'roomy',introCollapsed:true}});
+ const p=await app.handle({type:'prefs',prefs:{fontSize:100,density:'tiny',lineSpacing:'huge',introCollapsed:'false'}});
+ assert.equal(p.fontSize,24);assert.equal(p.density,'compact');assert.equal(p.lineSpacing,'roomy');assert.equal(p.introCollapsed,true);
+});
+test('äldre och ogiltigt lagrade utseendeval får säkra standardvärden',async()=>{
+ const api=stubApi();api.storage.local.get=async()=>({prefs:{fontSize:25,density:'tiny',lineSpacing:99,introCollapsed:'yes'}});
+ const {app}=await loadBackground(api);
+ assert.equal(app.prefs.fontSize,14);assert.equal(app.prefs.density,'comfortable');assert.equal(app.prefs.lineSpacing,'normal');assert.equal(app.prefs.introCollapsed,false);
+});
+test('snabba parallella utseendeval skriver inte över varandra',async()=>{
+ const {app}=await loadBackground();fakeEngineWithRules(app);
+ await Promise.all([app.handle({type:'prefs',prefs:{density:'compact'}}),app.handle({type:'prefs',prefs:{fontSize:24}}),app.handle({type:'prefs',prefs:{lineSpacing:'roomy',introCollapsed:true}})]);
+ assert.equal(app.prefs.fontSize,24);assert.equal(app.prefs.density,'compact');assert.equal(app.prefs.lineSpacing,'roomy');assert.equal(app.prefs.introCollapsed,true);
+});

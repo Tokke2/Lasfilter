@@ -8,7 +8,7 @@ const {JSDOM,VirtualConsole}=require('jsdom');
 const fs=require('fs');
 const ADDON=process.argv[2]||path.join(__dirname,'..','addon');
 let pass=0,fail=0;const errors=[];
-const check=(ok,label)=>{if(ok){pass++;console.log('PASS: '+label);}else{fail++;errors.push(label);console.log('FAIL: '+label);}};
+const check=(ok,label)=>{if(ok){pass++;console.log('PASS: '+label);}else{process.exitCode=1;fail++;errors.push(label);console.log('FAIL: '+label);}};
 process.on('exit',()=>console.log('\n'+pass+' kontroller godkända'+(fail?', '+fail+' misslyckade':'')+(errors.length?'\nMisslyckade: '+errors.join(' | '):'')));
 
 const jsdomErrors=[];
@@ -677,9 +677,86 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  el('langSv').click();await until(()=>/Åtgärder för/.test(menuFor(ids[1]).getAttribute('aria-label')),'svenska tillbaka');
  w.confirm=()=>true;
 
+ /* ── Valda förbättringar: sökning, läsbarhet, ordning och dialog ────────── */
+ el('ruleSearch').value='support.example';fire(el('ruleSearch'),'input');
+ await until(()=>rows()===1,'sökning hittar regel via villkoret');
+ check(ruleRows()[0].dataset.ruleId===ids[1],'villkorssökning väljer rätt regel');
+ el('ruleSearch').value='Ekonomi';fire(el('ruleSearch'),'input');
+ await until(()=>rows()===1&&ruleRows()[0].dataset.ruleId===ids[0],'sökning hittar målmappens sökväg');
+ check(ruleRows()[0].dataset.ruleId===ids[0],'målsökning väljer rätt regel');
+ el('ruleSearch').value='fortnox fakturor';fire(el('ruleSearch'),'input');
+ await until(()=>rows()===1,'flera ord kan matcha olika delar av regeln');
+ el('ruleSearch').value='';fire(el('ruleSearch'),'input');await until(()=>rows()===2,'sökningen återställd');
+ const priorityBefore=saved().map(r=>r.id).join(',');let orderQuestion='';
+ w.confirm=text=>{orderQuestion=text;return false;};
+ menuFor(ids[0]).click();actionFor(ids[0],'ruleUp').click();
+ await until(()=>!!orderQuestion,'ordningen måste godkännas');
+ check(/Fortnox fakturor/.test(orderQuestion)&&/Webbsupport/.test(orderQuestion),'förhandsvisningen namnger båda berörda reglerna');
+ check(/2 → 1/.test(orderQuestion)&&/1 → 2/.test(orderQuestion),'förhandsvisningen visar gamla och nya positioner');
+ check(saved().map(r=>r.id).join(',')===priorityBefore,'avbruten omordning ändrar ingenting');
+ w.confirm=()=>true;
+ byId(ids[0]).querySelector('.rule-open').click();el('up').click();
+ await until(()=>saved()[0].id===ids[0]&&rows()===2,'editorns prioritetsknapp använder samma omordning');
+ check(saved()[0].id===ids[0],'godkänd ändring genomförs från editorn');
+ await until(()=>/prioritet 1/.test(txt('toast')),'omordningen kvitteras med ny position');
+
+ el('introToggle').click();await until(()=>el('introCopy').hidden,'introduktionen kan döljas');
+ check(el('setupSteps').hidden&&el('seasonHeroArt').hidden,'även kom-igång-stegen och bilden döljs');
+ check(el('introToggle').getAttribute('aria-expanded')==='false','dold introduktion har rätt tillgänglighetsstatus');
+ check(!el('pause').closest('[hidden]')&&!el('mode').closest('[hidden]'),'paus och flyttläge är alltid åtkomliga');
+ await w.refresh();check(el('introCopy').hidden,'dold introduktion bevaras vid statusuppdatering');
+ el('introToggle').click();await until(()=>!el('introCopy').hidden,'introduktionen kan visas igen');
+ check(!el('setupSteps').hidden,'kom-igång-stegen återkommer');
+ doc.querySelector('[data-view="settings"]').click();
+ const baseSize=doc.documentElement.style.getPropertyValue('--base');
+ el('density').value='compact';fire(el('density'),'change');
+ await until(()=>doc.documentElement.dataset.density==='compact','kompakt layout aktiveras');
+ check(doc.documentElement.style.getPropertyValue('--base')===baseSize,'kompakt layout minskar inte textstorleken');
+ el('fontSize').value='24';fire(el('fontSize'),'change');
+ await until(()=>doc.documentElement.style.getPropertyValue('--base')==='24px','24 pixlars grundtext kan väljas');
+ check(doc.documentElement.dataset.largeText==='true','stor text aktiverar omflöde');
+ el('lineSpacing').value='roomy';fire(el('lineSpacing'),'change');
+ await until(()=>doc.documentElement.dataset.lineSpacing==='roomy','luftigare radavstånd aktiveras');
+ await w.refresh();
+ check(el('fontSize').value==='24'&&el('density').value==='compact'&&el('lineSpacing').value==='roomy','utseendeval finns kvar efter uppdatering');
+ el('fontSize').value='14';fire(el('fontSize'),'change');
+ el('density').value='comfortable';fire(el('density'),'change');
+ el('lineSpacing').value='normal';fire(el('lineSpacing'),'change');
+ await until(()=>doc.documentElement.dataset.largeText==='false'&&doc.documentElement.dataset.density==='comfortable'&&doc.documentElement.dataset.lineSpacing==='normal','normal layout återställd');
+
+ doc.querySelector('[data-view="rules"]').click();
+ el('newFolderBtn').focus();el('newFolderBtn').click();
+ check(!el('folderModal').hidden&&doc.activeElement===el('folderName'),'dialogen sätter fokus på mappnamnet');
+ check(doc.querySelector('.shell').inert===true,'bakgrunden är inaktiv medan dialogen är öppen');
+ el('folderCancelBtn').focus();el('folderCancelBtn').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+ check(doc.activeElement===el('folderParent'),'Tab från sista kontrollen går till första');
+ el('folderParent').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
+ check(doc.activeElement===el('folderCancelBtn'),'Shift+Tab från första går till sista');
+ el('folderName').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+ check(el('folderModal').hidden&&doc.activeElement===el('newFolderBtn'),'Escape stänger dialogen och lämnar tillbaka fokus');
+ check(doc.querySelector('.shell').inert===false,'bakgrunden blir aktiv igen');
+ el('quickNewFolderBtn').focus();el('quickNewFolderBtn').click();el('folderCancelBtn').click();
+ check(el('folderModal').hidden&&doc.activeElement===el('quickNewFolderBtn'),'Avbryt återgår till rätt öppningsknapp');
+ el('newFolderBtn').focus();el('newFolderBtn').click();el('folderModal').click();
+ check(el('folderModal').hidden&&doc.activeElement===el('newFolderBtn'),'bakgrundsklick återställer också fokus');
+
+ /* Både statiska och dynamiskt skapade etiketter följer språkbytet. */
+ el('addCondition').click();el('addBranch').click();
+ el('langEn').click();await until(()=>doc.documentElement.lang==='en','byt till engelska för tillgänglighetskontroll');
+ check(el('conditions').querySelector('select').getAttribute('aria-label')==='Condition field','dynamiska villkor får engelsk etikett');
+ check(el('branches').querySelector('select').getAttribute('aria-label')==='Branch field','dynamiska fördelningar får engelsk etikett');
+ check(el('conditions').querySelector('.remove-condition').getAttribute('aria-label')==='Remove condition','ikonknappen får ett begripligt engelskt namn');
+ check(doc.querySelector('nav').getAttribute('aria-label')==='Main menu','statiska tillgänglighetsetiketter översätts');
+ const unnamed=[...doc.querySelectorAll('button')].filter(n=>!(n.getAttribute('aria-label')||n.getAttribute('aria-labelledby')||n.textContent.trim()||n.title));
+ check(unnamed.length===0,'alla knappar i testvyn har ett tillgängligt namn');
+ check(el('logRows').querySelector('.numeric-value')!==null,'loggtider och antal markeras för tabellsiffror');
+ check(el('logRows').querySelector('.technical-value')!==null,'tekniska loggvärden skiljs från brödtext');
+ el('langSv').click();await until(()=>doc.documentElement.lang==='sv','tillbaka till svenska');
+ w.eval('dirty=false;');
+
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
     kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */
  await sleep(400);
  check(jsdomErrors.length===0,'inga skriptfel: '+(jsdomErrors.slice(0,2).join(' | ')||'inga'));
  dom.window.close();
-})();
+})().catch(err=>{console.error(err);process.exitCode=1;dom.window.close();});

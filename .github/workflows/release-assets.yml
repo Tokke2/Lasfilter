@@ -29,6 +29,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Kör tester före publicering
+        run: |
+          npm ci --prefix tester
+          node --test tester/*.test.cjs
+          node tester/dom_check.cjs
+
       - name: Kontrollera att version, hash och adresser hör ihop
         run: python3 tools/verify_release.py
 

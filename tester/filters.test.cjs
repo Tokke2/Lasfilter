@@ -146,7 +146,7 @@ test('mappsökvägen läses ur adressen och går före namnet',()=>{
   {id:'p1',accountId:'a',name:'Fakturor',path:'Privat/Fakturor'},
   {id:'p2',accountId:'a',name:'Fakturor',path:'Ekonomi/Fakturor'}];
  assert.equal(F.matchFolder(folders,'Fakturor','a','Ekonomi/Fakturor'),'p2','rätt gren väljs');
- assert.equal(F.matchFolder(folders,'Fakturor','a','Okand/Fakturor'),'p1','annars faller den tillbaka på namnet');
+ assert.equal(F.matchFolder(folders,'Fakturor','a','Okand/Fakturor'),'','tvetydiga namn kräver eget mappval i stället för en gissning');
  const parsed=F.parseFilterFile(rad('name="Fakturor"',moveTo('imap://u@h.se/Ekonomi/Fakturor'),'condition="AND (from,contains,a@b.se)"'));
  assert.equal(F.toSortBroRule(parsed.rules[0],{folders,accountId:'a',inboxId:'inbox'}).target,'p2');
 });

@@ -485,28 +485,28 @@ App.changed=()=>{
 };
 App.folderList=async()=>{
  const accounts=await B.accounts.list(true),items=[],seen=new Set();
- function walk(f,account){
-  if(f.id&&!seen.has(f.id)){seen.add(f.id);if(C.usableFolder(f))items.push({id:f.id,accountId:account.id,accountName:account.name,name:f.name,path:f.path||'',type:f.type||'',label:account.name+' · '+(f.path||f.name),specialUse:f.specialUse||[]});}
-  for(const child of f.subFolders||[])walk(child,account);
+ function walk(f,account,parentId=''){
+  if(f.id&&!seen.has(f.id)){seen.add(f.id);if(C.usableFolder(f))items.push({id:f.id,accountId:account.id,accountName:account.name,accountEmail:account.identities?.find(i=>i.email)?.email||'',parentId,name:f.name,path:f.path||'',type:f.type||'',label:account.name+' · '+(f.path||f.name),specialUse:f.specialUse||[]});}
+  for(const child of f.subFolders||[])walk(child,account,f.id||parentId);
  }
  for(const a of accounts){if(a.rootFolder)walk(a.rootFolder,a);else for(const f of a.folders||[])walk(f,a);}
  return items;
 };
 App.captureTab=async tab=>{if(tab?.type==='mail')App.mailTab=tab.id;};
 /* ＋ Ny mapp: skapar målmappen direkt i Thunderbird, utan att lämna SortBro. */
-App.createFolder=async(parentId,name)=>{
- const clean=typeof name==='string'?name.trim().replace(/[\u0000-\u001f]/g,''):'';
+App.createFolder=async(parentId,name,accountId='')=>{
+ const clean=typeof name==='string'?name.trim().normalize('NFC').replace(/[\u0000-\u001f]/g,''):'';
  if(!clean||clean.length>64||/[\\/]/.test(clean))throw new C.RuleError('bad_folder_name');
  if(typeof B.folders?.create!=='function')throw new C.RuleError('bad_request');
  let parent=typeof parentId==='string'?parentId.trim():'';
  if(!parent){
   const accounts=await B.accounts.list(true);
-  parent=accounts.find(a=>a.rootFolder)?.rootFolder?.id||'';
+  parent=accounts.find(a=>(!accountId||a.id===accountId)&&a.rootFolder)?.rootFolder?.id||'';
   if(!parent)throw new C.RuleError('unsafe_folder');
  }
  let siblings=[];
  try{siblings=await App.folderList();}catch{}
- if(siblings.some(f=>f.name&&f.name.toLowerCase()===clean.toLowerCase()&&f.id!==parent))throw new C.RuleError('folder_exists');
+ if(siblings.some(f=>f.parentId===parent&&f.name&&C.norm(f.name)===C.norm(clean)))throw new C.RuleError('folder_exists');
  let folder;
  try{folder=await B.folders.create(parent,clean);}
  catch{throw new C.RuleError('folder_create_failed');}
@@ -777,14 +777,20 @@ App.extractImportedRules=(backup,currentFolders=[],existingRules=[])=>{
   if(typeof id!=='string'||!id.trim())return id;
   if(!currentFolders.length||folderById.has(id))return id;
   const hint=hintById.get(id);
+  const unique=rows=>rows.length===1?rows[0].id:id;
   if(hint){
-   const byLabel=currentFolders.find(f=>f.label===hint.label)||currentFolders.find(f=>f.name===hint.name&&f.accountName===hint.accountName)||currentFolders.find(f=>f.name===hint.name);
-   if(byLabel)return byLabel.id;
+   const byLabel=hint.label?currentFolders.filter(f=>C.norm(f.label)===C.norm(hint.label)):[];
+   if(byLabel.length)return unique(byLabel);
+   const byAccount=hint.name&&hint.accountName?currentFolders.filter(f=>C.norm(f.name)===C.norm(hint.name)&&C.norm(f.accountName)===C.norm(hint.accountName)):[];
+   if(byAccount.length)return unique(byAccount);
+   const byName=hint.name?currentFolders.filter(f=>C.norm(f.name)===C.norm(hint.name)):[];
+   if(byName.length)return unique(byName);
   }
-  const tail=decodeURIComponent(id.split('/').pop()||'').trim().toLowerCase();
+  let tail=id.split('/').pop()||'';try{tail=decodeURIComponent(tail);}catch{}
+  tail=C.norm(tail).trim();
   if(tail){
-   const byTail=currentFolders.find(f=>(f.name||'').toLowerCase()===tail||(f.label||'').toLowerCase()===id.toLowerCase());
-   if(byTail)return byTail.id;
+   const byTail=currentFolders.filter(f=>C.norm(f.name)===tail||C.norm(f.label)===C.norm(id));
+   if(byTail.length)return unique(byTail);
   }
   return id;
  };
@@ -819,7 +825,7 @@ App.handle=async msg=>{
  switch(msg.type){
   case 'status':return App.snapshot();
   case 'folders':return App.folderList();
-  case 'createFolder':return App.createFolder(msg.parentId,msg.name);
+  case 'createFolder':return App.createFolder(msg.parentId,msg.name,msg.accountId);
   case 'inboxHints':return App.inboxHints(msg);
   case 'quickPreview':return App.quickPreview(msg);
   case 'filterExport':return App.filterExport(msg);
@@ -846,7 +852,7 @@ App.handle=async msg=>{
     reason=!r.enabled?'disabled':(onlyUnread&&m.read===true)?'already_read':(!allowUnread&&m.read!==true)?'unread':(!allowUnread&&(await e.displayed()).has(m.id))?'displayed':'eligible';
     await e.validateRuleFolders(r);
    }
-   App.log('simulated',1);return {matches,reason,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&m.folder?.id!==r.source)};
+   App.log('simulated',1);return {matches,reason,conditions:C.explainRule(r,m).conditions.map(c=>c.ok),paused:e.config.paused===true,dryRun:e.config.dryRun===true,trial:C.trialActive(r),fault:!!e.fault,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&(r.scope==='account'?m.folder?.accountId!==r.sourceAccount:m.folder?.id!==r.source))};
   }
   case 'catchUp':{
    const r=await App.engine.catchUp(msg.ruleId);

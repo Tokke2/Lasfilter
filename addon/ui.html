@@ -163,7 +163,7 @@
                 <input id="quickValue" type="text" maxlength="256" placeholder="t.ex. fortnox.se, klarna.se eller Faktura…">
                 <span id="quickCount" class="quick-count" hidden></span>
               </div>
-              <div class="quick-rule-row">
+              <div class="quick-rule-row quick-target-row">
                 <select id="quickTarget" aria-label="Målmapp" data-i18n-aria="ariaTarget"><option value="">Välj målmapp…</option></select>
                 <button id="quickNewFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
               </div>
@@ -256,6 +256,7 @@
                   </select>
                 </div>
                 <p class="simple-help" data-i18n="step2Help">Avsändaren fylls i automatiskt från exempelmejlet. Du kan lägga till upp till 8 villkor per regel.</p>
+                <p id="matchHelp" class="match-help"></p>
                 <div class="condition-head">
                   <span data-i18n="colField">Fält</span>
                   <span data-i18n="colOp">Villkor</span>
@@ -279,10 +280,9 @@
 
               <div class="form-section">
                 <div class="section-title"><span class="step">3</span><h3 data-i18n="step3Title">Vart och när ska mejlen flyttas?</h3></div>
-                <label class="field">
-                  <span data-i18n="targetLabel">Välj målmapp</span>
+                <div class="target-area">
                   <select id="target" required><option value="">Välj en mapp…</option></select>
-                </label>
+                </div>
 
                 <div class="archive-box">
                   <label class="toggle-label">
@@ -672,10 +672,10 @@
       <div class="eyebrow" data-i18n="newFolderEyebrow">NY MAPP I THUNDERBIRD</div>
       <h2 id="folderModalTitle" data-i18n="newFolderTitle">Skapa en ny målmapp</h2>
       <p class="muted" data-i18n="newFolderHelp">Mappen skapas direkt i ditt konto. Välj namn och var den ska ligga.</p>
-      <label class="field">
+      <div class="field">
         <span data-i18n="newFolderParentLabel">Placera i</span>
         <select id="folderParent"><option value="">Kontots rotmapp</option></select>
-      </label>
+      </div>
       <label class="field">
         <span data-i18n="newFolderNameLabel">Mappnamn</span>
         <input id="folderName" maxlength="64" placeholder="t.ex. Fakturor 2026">

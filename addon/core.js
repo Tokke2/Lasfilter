@@ -185,7 +185,7 @@ function suggestWords(messages,{rules=[],limit=6,minCount=3,minLength=4}={}){
   const dom=email(m?.author).split('@')[1]||'';if(dom)domains.add(dom);
   if(typeof m?.subject!=='string')continue;
   const words=new Set();
-  for(const w of m.subject.toLocaleLowerCase('sv-SE').split(/[^\p{L}\p{N}]+/u)){
+  for(const w of norm(m.subject).split(/[^\p{L}\p{N}]+/u)){
    if(w.length<minLength||!/\p{L}/u.test(w)||STOPWORDS.has(w))continue;
    if(blockValues.some(v=>v.includes(w)))continue;
    words.add(w);
@@ -261,6 +261,7 @@ function listOf(value){return Array.isArray(value)?value.filter(v=>typeof v==='s
 function valuesFor(message){const address=email(message.author);return {sender:address,domain:address.split('@')[1]||'',subject:typeof message.subject==='string'?message.subject.slice(0,20000):'',
  recipient:listOf(message.recipients),cc:[listOf(message.ccList),listOf(message.bccList)].filter(Boolean).join(' '),
  size:Number.isSafeInteger(message.size)?message.size:null,date:Number.isFinite(+new Date(message.date))?+new Date(message.date):null};}
+const conditionNeedle=c=>norm(c.field==='sender'?(email(c.value)||c.value):c.value);
 function condHit(c,values,now=Date.now()){
  if(c.field==='size'){
   const size=values.size;if(!Number.isFinite(size))return false;
@@ -276,7 +277,7 @@ function condHit(c,values,now=Date.now()){
   if(c.op==='afterThisYear')return year>new Date(now).getFullYear();
   return c.op==='before'?year<n:year>n;
  }
- const hay=norm(values[c.field]),needle=norm(c.value);if(!hay||!needle)return false;
+ const hay=norm(values[c.field]),needle=conditionNeedle(c);if(!hay||!needle)return false;
  if(c.op==='equals')return hay===needle;if(c.op==='contains')return hay.includes(needle);
  if(c.op==='starts')return hay.startsWith(needle);return hay.endsWith(needle);
 }
@@ -336,22 +337,22 @@ function config(raw){
 function textSetPossible(conds){
  const eq=conds.filter(c=>c.op==='equals');
  if(eq.length){
-  const v=norm(eq[0].value);
-  if(eq.some(c=>norm(c.value)!==v))return false; /* två olika equals kan aldrig båda stämma */
+  const v=conditionNeedle(eq[0]);
+  if(eq.some(c=>conditionNeedle(c)!==v))return false; /* två olika equals kan aldrig båda stämma */
   return conds.every(c=>{
-   const n=norm(c.value);
+   const n=conditionNeedle(c);
    if(c.op==='equals')return true;
    if(c.op==='contains')return v.includes(n);
    if(c.op==='starts')return v.startsWith(n);
    return v.endsWith(n);
   });
  }
- const starts=conds.filter(c=>c.op==='starts').map(c=>norm(c.value));
+ const starts=conds.filter(c=>c.op==='starts').map(c=>conditionNeedle(c));
  if(starts.length){
   const longest=starts.reduce((a,b)=>b.length>=a.length?b:a);
   if(!starts.every(x=>longest.startsWith(x)))return false; /* "anna" och "bob" kan inte båda vara början */
  }
- const ends=conds.filter(c=>c.op==='ends').map(c=>norm(c.value));
+ const ends=conds.filter(c=>c.op==='ends').map(c=>conditionNeedle(c));
  if(ends.length){
   const longest=ends.reduce((a,b)=>b.length>=a.length?b:a);
   if(!ends.every(x=>longest.endsWith(x)))return false;
@@ -526,7 +527,7 @@ const EVENTS=new Set(['start','settings_saved','rules_saved','restored','queued'
 function event(name,count=0,now=Date.now(),detail=''){
  if(!EVENTS.has(name))return null;
  const data={count:Number.isSafeInteger(count)&&count>=0?count:0};
- if(['debug','error','brake'].includes(name)&&typeof detail==='string'&&detail.trim())data.detail=detail.trim().replace(/[^a-zA-Z0-9åäöÅÄÖ _:=,.;+()/-]/g,'?').slice(0,500);
+ if(['debug','error','brake'].includes(name)&&typeof detail==='string'&&detail.trim())data.detail=detail.trim().normalize('NFC').replace(/[^a-zA-Z0-9åäöÅÄÖ _:=,.;+()/-]/g,'?').slice(0,500);
  return {time:new Date(now).toISOString(),app:'lasfilter',level:['error','queue_full'].includes(name)?'ERROR':'INFO',event:name,data};
 }
 function cleanLogs(rows,now=Date.now()){

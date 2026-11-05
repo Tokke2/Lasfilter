@@ -25,7 +25,7 @@ const dom=new JSDOM(fs.readFileSync(path.join(ADDON,'ui.html'),'utf8'),{
   /* Låtsas att sidan är installerad i Thunderbird: bara getManifest, inget runtime.id,
      så demon körs som vanligt men sidfoten kan visa manifestets version. */
   w.browser={runtime:{getManifest:()=>({version:'9.9.9'})}};
-  w.structuredClone=structuredClone;
+  w.structuredClone=structuredClone;w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;
   w.confirm=()=>true;
   w.Element.prototype.scrollIntoView=function(){};
   w.URL.createObjectURL=()=>'blob:x';
@@ -206,7 +206,6 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(el('quickCount').hidden===true,'ingen gammal siffra ligger kvar');
  el('quickTarget').value='demo-buy';fire(el('quickTarget'),'change');
  await sleep(120);
- el('quickTarget').value='';
  el('langEn').click();
  await until(()=>el('quickTarget').value==='demo-buy','snabbregeln minns målmappen du använde sist',false,6000);
  check(el('quickTarget').value==='demo-buy','målmappen är förvald nästa gång: "'+el('quickTarget').value+'"');
@@ -729,8 +728,8 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(!el('folderModal').hidden&&doc.activeElement===el('folderName'),'dialogen sätter fokus på mappnamnet');
  check(doc.querySelector('.shell').inert===true,'bakgrunden är inaktiv medan dialogen är öppen');
  el('folderCancelBtn').focus();el('folderCancelBtn').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
- check(doc.activeElement===el('folderParent'),'Tab från sista kontrollen går till första');
- el('folderParent').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
+ check(doc.activeElement===el('folderParentAccount'),'Tab från sista kontrollen går till första');
+ el('folderParentAccount').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
  check(doc.activeElement===el('folderCancelBtn'),'Shift+Tab från första går till sista');
  el('folderName').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
  check(el('folderModal').hidden&&doc.activeElement===el('newFolderBtn'),'Escape stänger dialogen och lämnar tillbaka fokus');
@@ -752,6 +751,89 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(el('logRows').querySelector('.numeric-value')!==null,'loggtider och antal markeras för tabellsiffror');
  check(el('logRows').querySelector('.technical-value')!==null,'tekniska loggvärden skiljs från brödtext');
  el('langSv').click();await until(()=>doc.documentElement.lang==='sv','tillbaka till svenska');
+ w.eval('dirty=false;');
+
+ /* Konto före mapp: separata konton, Unicode-sökning och oförändrade sparade ID:n. */
+ w.eval(`folders.push(
+  {id:'second-year',accountId:'second',accountName:'Björns konto',accountEmail:'björn@example.se',name:'Årsöversikt',path:'/Bokföring/Årsöversikt/Beställningar från leverantörer',label:'Björns konto · /Bokföring/Årsöversikt/Beställningar från leverantörer'},
+  {id:'second-buy',accountId:'second',accountName:'Björns konto',name:'Inköp',path:'/Inköp',label:'Björns konto · /Inköp'});`);
+ const pickerRule={id:'picker-rule',name:'Årsöversikt',enabled:true,scope:'account',source:'demo-in',sourceAccount:'demo',target:'second-year',match:'all',readFilter:'read',conditions:[{field:'subject',op:'contains',value:'Wordfence'},{field:'subject',op:'contains',value:'Faktura'},{field:'sender',op:'contains',value:'faktura@'}],branches:[]};
+ const pickerState=w.LasDemo.setState({});
+ w.LasDemo.setState({config:{...pickerState.config,paused:true,dryRun:true,rules:[pickerRule],revision:pickerState.config.revision+1}});
+ await w.refresh();w.loadRule('picker-rule');
+ check(el('targetAccount').value==='second'&&el('target').value==='second-year','sparad målmapp återställer rätt konto även vid flytt mellan konton');
+ check(el('source').value==='demo','källkontot ändras inte av målkontot');
+ check([...el('target').options].filter(o=>o.value).every(o=>o.value.startsWith('second-')),'mappvalet innehåller bara valt kontos mappar');
+ check(/björn@example.se/.test(el('targetAccount').selectedOptions[0].textContent),'e-postadress visas tillsammans med kontonamnet');
+ check(txt('targetPath').includes('Bokföring › Årsöversikt › Beställningar från leverantörer'),'hela den valda sökvägen visas separat');
+ el('targetSearch').value='åRSÖVERSIKT'.normalize('NFD');fire(el('targetSearch'),'input');
+ check(el('target').options.length===2&&el('target').value==='second-year','svensk mappsökning hittar kombinerade tecken utan att tappa valt ID');
+ check(w.eval('dirty')===false,'mappsökning ändrar inte regeln eller osparat-läget');
+ el('targetSearch').value='finns-inte';fire(el('targetSearch'),'input');
+ check(el('target').value==='second-year','sökfilter får aldrig kasta bort en befintlig målmapp');
+ el('targetSearch').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ check(doc.activeElement===el('target'),'Enter i mappsökning går till mappvalet utan att spara regeln');
+ el('targetAccount').value='demo';fire(el('targetAccount'),'change');
+ check(el('target').value===''&&el('targetSearch').value==='','kontobyte tömmer mappval och sökning, utan att välja första mappen');
+ check([...el('target').options].some(o=>o.value==='demo-buy')&&![...el('target').options].some(o=>o.value==='second-buy'),'lika mappnamn i andra konton blandas inte');
+ check(w.eval('dirty')===true,'ändrat målkonto gör utkastet osparat');
+ w.folderPicker(el('target'),'removed-folder',{reset:true});
+ check(el('target').value==='removed-folder'&&/saknas/.test(txt('targetPath')),'en saknad sparad mapp visas som saknad och byts inte ut');
+ w.folderPicker(el('target'),'',{reset:true});
+ check(el('target').disabled&&!el('targetAccount').disabled,'mappval väntar på kontoval');
+ el('targetAccount').value='second';fire(el('targetAccount'),'change');
+ el('targetSearch').value='ej-en-mapp';fire(el('targetSearch'),'input');
+ check(el('target').value===''&&/Inga mappar/.test(txt('targetPath')),'tom sökträff får tydlig text och ingen påhittad målmapp');
+ w.loadRule('picker-rule');
+ el('langEn').click();await until(()=>doc.documentElement.lang==='en','mappväljaren byter till engelska');
+ check(el('targetAccount').value==='second'&&el('target').value==='second-year','språkbyte bevarar destinationen');
+ check(/Destination email account/.test(el('targetAccount').closest('label').textContent),'kontosteget översätts');
+ el('langSv').click();await until(()=>doc.documentElement.lang==='sv','mappväljaren tillbaka på svenska');
+ el('addBranch').click();
+ const branch=el('branches').lastElementChild,branchAccount=branch.querySelector('.folder-account select'),branchTarget=branch.querySelector('.folder-choice');
+ branchAccount.value='second';fire(branchAccount,'change');branchTarget.value='second-buy';fire(branchTarget,'change');branch.children[2].value='Årsrapport';
+ check(w.draft().branches[0].target==='second-buy','fördelningar sparar riktigt mapp-ID genom konto-först-väljaren');
+ w.folderPicker(el('quickTarget'),'second-buy');fire(el('quickTarget'),'change');
+ el('quickNewFolderBtn').click();
+ check(el('folderParentAccount').value==='second','snabbregelns nya mapp använder målkontot, inte källkontot');
+ el('folderCancelBtn').click();
+ el('quickTargetAccount').value='demo';fire(el('quickTargetAccount'),'change');
+ w.targetOptions(el('target').value);
+ check(el('quickTarget').value===''&&el('quickTargetAccount').value==='demo','uppdatering återställer inte senast använda mapp efter avsiktligt kontobyte');
+ el('langEn').click();await until(()=>doc.documentElement.lang==='en','språkbyte med tömd snabbmapp');
+ check(el('quickTarget').value===''&&el('quickTargetAccount').value==='demo','inte heller språkbyte återställer gammal snabbmapp');
+ el('langSv').click();await until(()=>doc.documentElement.lang==='sv','åter till svenska');
+ el('quickFetchBtn').click();await until(()=>/Hämtat|hämtat/.test(txt('toast')),'hämta markerat mejl till tom snabbmapp');
+ check(el('quickTarget').value===''&&el('quickTargetAccount').value==='demo','hämta mejl väljer bara konto – aldrig en gissad målmapp');
+ w.loadRule('picker-rule');el('test').click();await until(()=>!el('testResult').hidden,'regeltest med blandade träffar');
+ check(el('testResult').querySelectorAll('.condition-pass').length===2&&el('testResult').querySelectorAll('.condition-fail').length===1,'regeltestet visar två träffar och ett missat villkor');
+ check(/Wordfence/.test(el('testResult').querySelector('.condition-fail')?.textContent||''),'exakt villkoret Wordfence visas som missat');
+ check(/pausad/.test(txt('testResult'))&&/Testläge/.test(txt('testResult')),'paus och testläge redovisas utan falskt löfte om flytt');
+ check(el('match').value==='all'&&w.LasDemo.setState({}).config.rules[0].match==='all','diagnosen ändrar inte OCH till ELLER');
+ el('match').value='any';fire(el('match'),'change');
+ check(/Minst ett villkor/.test(txt('matchHelp')),'ELLER-läget förklarar att ett villkor räcker');
+ el('langEn').click();await until(()=>doc.documentElement.lang==='en','testa engelsk villkorsdiagnos');
+ el('test').click();await until(()=>/Does not match/.test(txt('testResult')),'villkorsresultat på engelska');
+ check(/Does not match.*Wordfence/.test(txt('testResult')),'även villkorsdiagnosen översätts');
+ el('langSv').click();await until(()=>doc.documentElement.lang==='sv','åter till svenska efter diagnos');
+
+ /* Äldre svensk filterfil går genom samma byte-avkodning som Thunderbird-importen. */
+ el('tbAccount').value='demo';
+ const swedishFilter=filterFile(tbRule('Åsa – Ändringar','imap://u@h.se/Okand','AND (subject,contains,Årsöversikt)')).replace('–','-');
+ setFile(el('tbImportFile'),Buffer.from(swedishFilter,'latin1'));
+ await until(()=>el('tbImportReview').textContent.includes('Åsa'),'Windows-1252-fil importerad');
+ check(/Årsöversikt/.test(txt('tbImportReview'))&&!/�/.test(txt('tbImportReview')),'åäö bevaras även i äldre svensk filterfil');
+ const importRow=el('tbImportReview').querySelector('.tb-row'),importAccount=importRow.querySelector('.folder-account select'),importTarget=importRow.querySelector('.folder-choice');
+ check(!!importAccount&&importTarget.disabled,'importgranskningen använder också konto före mapp');
+ importAccount.value='second';fire(importAccount,'change');importTarget.value='second-buy';fire(importTarget,'change');
+ check(w.eval('tbImport.filters[0].target')==='second-buy','importen behåller ett uttryckligen valt mål i annat konto');
+
+ /* Ny mapp i snabbflödet ska inte skriva över regelutkastets målmapp. */
+ const mainBeforeFolder=el('target').value;
+ el('quickNewFolderBtn').click();el('folderName').value='Årsrapport';el('folderCreateBtn').click();
+ await until(()=>el('folderModal').hidden,'ny svensk mapp skapad');
+ check(el('quickTarget').selectedOptions[0]?.textContent==='Årsrapport','ny mapp väljs med sitt riktiga ID');
+ check(el('target').value===mainBeforeFolder,'snabbflödets nya mapp ändrar inte huvudregelns destination');
  w.eval('dirty=false;');
 
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en

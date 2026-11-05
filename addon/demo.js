@@ -5,6 +5,7 @@ globalThis.LasDemo=(()=>{
   {id:'demo-web',accountId:'demo',label:'Exempelkonto · Webb',name:'Webb'},
   {id:'demo-buy',accountId:'demo',label:'Exempelkonto · Inköp',name:'Inköp'},
   {id:'demo-arkiv',accountId:'demo',label:'Exempelkonto · Arkiv',name:'Arkiv'}];
+ for(const f of folders){f.accountName='Exempelkonto';f.path='/'+f.label.split(' · ').slice(1).join(' · ').replaceAll(' / ','/');f.parentId='demo-root';}
  let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,brake:true,rules:[
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
@@ -28,11 +29,14 @@ globalThis.LasDemo=(()=>{
     state.prefs={...state.prefs,...p};data=state.prefs;break;
    }
    case 'createFolder':{
-    const name=String(m.name||'').trim();
-    if(!name||name.length>64)throw new LasCore.RuleError('bad_folder_name');
-    if(folders.some(f=>(f.name||'').toLowerCase()===name.toLowerCase()))throw new LasCore.RuleError('folder_exists');
-    const parent=folders.find(f=>f.id===m.parentId)||folders[0];
-    const folder={id:'demo-new-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),accountId:parent?.accountId||'demo',accountName:parent?.accountName||'Exempelkonto',name,label:(parent?.accountName||'Exempelkonto')+' · '+name};
+    const name=String(m.name||'').trim().normalize('NFC');
+    if(!name||name.length>64||/[\\/\u0000-\u001f]/.test(name))throw new LasCore.RuleError('bad_folder_name');
+    const parent=folders.find(f=>f.id===m.parentId),account=folders.find(f=>f.accountId===(m.accountId||parent?.accountId||'demo'));
+    if(!account)throw new LasCore.RuleError('unsafe_folder');
+    const parentId=parent?.id||account.accountId+'-root';
+    if(folders.some(f=>f.parentId===parentId&&LasCore.norm(f.name)===LasCore.norm(name)))throw new LasCore.RuleError('folder_exists');
+    const path=(parent?.path||'')+'/'+name;
+    const folder={id:'demo-new-'+crypto.randomUUID(),accountId:account.accountId,accountName:account.accountName,parentId,name,path,label:account.accountName+' · '+path};
     folders.push(folder);data=folder;break;
    }
    /* Snabbregeln: samma svar som bakgrunden, med fiktiva men rimliga siffror. */
@@ -138,7 +142,11 @@ globalThis.LasDemo=(()=>{
    case 'pendingPrefill':data=mockPrefill;mockPrefill=null;break;
    case 'prefillConsumed':data=true;break;
    case 'saveRules':saveRules(m.rules);data=state;break;
-   case 'testRule':{const rule=LasCore.validateRule(m.rule),matched=LasCore.match(rule,{...selected,folder:{id:selected.source}},true,true);data={matches:matched,reason:matched?(rule.enabled?'displayed':'disabled'):'no_match',read:true,target:rule.target,author:selected.author,subject:selected.subject,outsideSource:matched&&selected.source!==rule.source};break;}
+   case 'testRule':{
+    const rule=LasCore.validateRule(m.rule),message={...selected,folder:{id:selected.source,accountId:selected.sourceAccount}},matched=LasCore.match(rule,message,true,true);
+    const rf=rule.readFilter||'default',direct=rf==='both'||rf==='unread'||(rf==='default'&&state.config.moveMode==='direct');
+    data={matches:matched,reason:!matched?'no_match':!rule.enabled?'disabled':rf==='unread'?'already_read':direct?'eligible':'displayed',conditions:LasCore.explainRule(rule,message).conditions.map(c=>c.ok),paused:state.config.paused,dryRun:state.config.dryRun,trial:LasCore.trialActive(rule),fault:!!state.fault,read:true,target:LasCore.targetFor(rule,message),author:selected.author,subject:selected.subject,outsideSource:matched&&(rule.scope==='account'?selected.sourceAccount!==rule.sourceAccount:selected.source!==rule.source)};break;
+   }
    case 'setMode':state.config.paused=m.paused;state.config.dryRun=m.dryRun;state.config.revision++;state.queued=0;data=state;break;
    case 'queueSelected':data={queued:true};state.queued++;break;
    case 'catchUp':data={scanned:5,queued:2};state.queued+=2;break;

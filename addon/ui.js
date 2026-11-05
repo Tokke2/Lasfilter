@@ -256,6 +256,22 @@ const I18N={
   step3Title:'Vart och när ska mejlen flyttas?',
   targetLabel:'Välj målmapp',
   chooseTarget:'Välj en målmapp…',
+  targetAccountLabel:"1. E-postkonto för målmappen",
+  targetFolderLabel:"2. Mapp i valt konto",
+  targetSearchLabel:"Sök mapp",
+  targetSearchPlaceholder:"Sök i hela mappsökvägen…",
+  targetAccountFirst:"Välj e-postkonto först…",
+  targetEmpty:"Inga mappar matchar sökningen.",
+  targetMissing:"Målmappen saknas. Välj konto och mapp igen.",
+  targetSelected:"Vald mapp",
+  matchAllHelp:"Alla villkor måste stämma på samma mejl. Två ämnesvillkor kräver att båda texterna finns i ämnet.",
+  matchAnyHelp:"Minst ett villkor räcker. Avsändare och ämne krävs inte samtidigt i detta läge.",
+  testConditionYes:"Stämmer",
+  testConditionNo:"Stämmer inte",
+  testPaused:"Sorteringen är pausad.",
+  testDryRun:"Testläge är på: inga mejl flyttas.",
+  testTrial:"Regeln provkörs: inga mejl flyttas.",
+  testStopped:"Sorteringen är stoppad av ett fel. Kontrollera statusen.",
   ruleMoveUnreadLabel:'Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)',
   unreadMoveNote:'Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.',
   ruleOpenWindowLabel:'Öppna olästa mejl i ett nytt fönster efter flytten',
@@ -977,6 +993,22 @@ const I18N={
   step3Title:'Where and when should emails move?',
   targetLabel:'Target folder',
   chooseTarget:'Select a target folder…',
+  targetAccountLabel:"1. Destination email account",
+  targetFolderLabel:"2. Folder in selected account",
+  targetSearchLabel:"Find folder",
+  targetSearchPlaceholder:"Search the full folder path…",
+  targetAccountFirst:"Choose an email account first…",
+  targetEmpty:"No folders match your search.",
+  targetMissing:"The target folder is missing. Choose its account and folder again.",
+  targetSelected:"Selected folder",
+  matchAllHelp:"Every condition must match the same email. Two subject conditions require both texts in the subject.",
+  matchAnyHelp:"One matching condition is enough. Sender and subject are not both required in this mode.",
+  testConditionYes:"Matches",
+  testConditionNo:"Does not match",
+  testPaused:"Sorting is paused.",
+  testDryRun:"Test mode is on: no emails will be moved.",
+  testTrial:"This rule is in trial mode: no emails will be moved.",
+  testStopped:"Sorting has stopped because of an error. Check its status.",
   ruleMoveUnreadLabel:'Move unread emails right away too (otherwise they wait until you have read them)',
   unreadMoveNote:'Box ticked: unread emails matching the rule are moved right away. Cleared: they stay put and move only after you have read them.',
   ruleOpenWindowLabel:'Open unread emails in a new window after the move',
@@ -1559,7 +1591,7 @@ function applyLanguage(lang){
   val.placeholder=condPlaceholderFor(fVal);
  }
  for(const row of $('branches')?.children||[]){
-  const f=row.children[0],op=row.children[1],val=row.children[2],trg=row.children[3];
+  const f=row.children[0],op=row.children[1],val=row.children[2],trg=row.querySelector('.folder-choice');
   const fVal=f.value,opVal=op.value,tVal=trg.value;
   fillFieldSelect(f,fVal);fillOpSelect(op,fVal,opVal);
   val.placeholder=T('branchPlaceholder');
@@ -1568,7 +1600,8 @@ function applyLanguage(lang){
  }
  for(const node of document.querySelectorAll('[data-i18n-aria]'))node.setAttribute('aria-label',T(node.dataset.i18nAria));
  for(const node of document.querySelectorAll('[data-i18n-title]'))node.title=T(node.dataset.i18nTitle);
- updateReadPolicy();
+ for(const select of document.querySelectorAll('#folderModal .folder-choice, #tbImportReview .folder-choice'))folderPicker(select,select.value);
+ updateReadPolicy();updateMatchHelp();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
  if(state)applySeason(state.prefs);
  repaint();
@@ -1718,7 +1751,7 @@ function renderTbReview(){
    f.selected=check.checked;
   });
   row.append(check,main,select);
-  box.append(row);
+  box.append(row);folderPicker(select,f.target||'',{disabled:!importable});
  });
  const ready=chosen().length;
  if(tbImport.filters.some(usable)){
@@ -1730,16 +1763,13 @@ function renderTbReview(){
  }
 }
 
-/* Läser en fil som användaren valt. Fil.text() finns i moderna versioner;
-   FileReader är reserven för äldre motorer (och för testmiljöer). */
-function fileText(file){
- if(typeof file?.text==='function')return file.text();
- return new Promise((resolve,reject)=>{
-  const reader=new FileReader();
-  reader.onload=()=>resolve(String(reader.result??''));
-  reader.onerror=()=>reject(new C.RuleError('bad_schema'));
-  reader.readAsText(file);
+/* Läs bytes så UTF-8 och äldre svenska Windows-filter kan skiljas åt. */
+async function fileText(file){
+ const bytes=typeof file?.arrayBuffer==='function'?await file.arrayBuffer():await new Promise((resolve,reject)=>{
+  const reader=new FileReader();reader.onload=()=>resolve(reader.result);
+  reader.onerror=()=>reject(new C.RuleError('bad_schema'));reader.readAsArrayBuffer(file);
  });
+ return LasFilters.decodeFilterBytes(bytes);
 }
 async function fileTextOf(input){
  const file=input?.files?.[0];
@@ -1874,7 +1904,7 @@ function applyTemplate(key){
  if($('target'))targetOptions(auto?.id||$('target').value||'');
  if($('delete'))$('delete').disabled=true;
  if($('editorTitle'))$('editorTitle').textContent=T('editorNew');
- updateReadPolicy();dirty=true;showView('rules');renderRules();
+ updateReadPolicy();updateMatchHelp();dirty=true;showView('rules');renderRules();
  $('ruleForm')?.scrollIntoView({behavior:'smooth',block:'center'});
  toast(T('tplApplied')+(auto?'':' '+T('tplTargetHint')));
 }
@@ -1889,7 +1919,7 @@ function closeFolderModal(){
 function openFolderModal(presetAccountId,suggestedName='',opener=document.activeElement){
  const modal=$('folderModal');if(!modal)return;
  const parent=$('folderParent');
- if(parent)selectOptions(parent,folders,T('newFolderRoot'),'');
+ if(parent)folderPicker(parent,'',{root:true,reset:true,accountId:presetAccountId||''});
  if(!$('source')?.value&&presetAccountId)accountOptions(presetAccountId);
  if($('folderName'))$('folderName').value=(suggestedName||'').slice(0,64);
  folderReturnFocus=opener;closeRuleMenus();
@@ -1899,11 +1929,15 @@ function openFolderModal(presetAccountId,suggestedName='',opener=document.active
 async function createFolderFromModal(){
  const name=$('folderName')?.value||'';
  const parentId=$('folderParent')?.value||'';
- const created=await rpc('createFolder',{parentId,name});
+ const accountId=$('folderParentAccount')?.value||'';
+ if(!accountId)throw new C.RuleError('choose_source');
+ const quick=folderReturnFocus?.id==='quickNewFolderBtn';
+ const created=await rpc('createFolder',{parentId,name,accountId});
  folders=await rpc('folders');repaint();
  const src=$('source')?.value||'',target=$('target')?.value||'';
- accountOptions(src);targetOptions(created?.id||target);
- if($('quickTarget')&&created?.id){$('quickTarget').value=created.id;rememberQuickTarget(created.id);}
+ accountOptions(src);targetOptions(quick?target:(created?.id||target));
+ if(quick&&created?.id){folderPicker($('quickTarget'),created.id);rememberQuickTarget(created.id);}
+ else if(created?.id)dirty=true;
  closeFolderModal();
  renderRules();toast(T('toastFolderCreated'));
 }
@@ -2313,15 +2347,60 @@ function selectOptions(select,items,placeholder,value=''){
  select.replaceChildren();const blank=el('option','',placeholder);blank.value='';select.append(blank);
  for(const f of items){const o=el('option','',f.label);o.value=f.id;select.append(o);}select.value=value;
 }
-function accounts(){const seen=new Set();return folders.filter(f=>{if(!f.accountId||seen.has(f.accountId))return false;seen.add(f.accountId);return true;}).map(f=>({id:f.accountId,label:f.accountName||f.accountId}));}
-function accountOptions(value=''){selectOptions($('source'),accounts(),T('chooseAccount'),value);}
-function targetOptions(value=''){
- selectOptions($('target'),folders,T('chooseTarget'),value);
- if($('quickTarget')){
-  const qVal=$('quickTarget').value;
-  selectOptions($('quickTarget'),folders,T('chooseTarget'),qVal||rememberedTarget()||value||'');
- }
+function accounts(){
+ const seen=new Set();return folders.filter(f=>{if(!f.accountId||seen.has(f.accountId))return false;seen.add(f.accountId);return true;})
+  .map(f=>({id:f.accountId,label:[f.accountName||f.accountId,f.accountEmail].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ')}));
 }
+function accountOptions(value=''){selectOptions($('source'),accounts(),T('chooseAccount'),value);}
+/* Varje väljare äger sitt konto/sökfält. ID:n för Thunderbird-mappar ändras aldrig.
+   En avsiktligt tömd väljare får inte återställas från senast använda målmapp. */
+const folderPickers=new WeakMap();let folderPickerSeq=0;
+function folderPicker(select,value='',options={}){
+ let p=folderPickers.get(select);
+ if(!p){
+  const wrap=el('div','folder-picker'),account=el('select'),search=el('input'),hint=el('p','folder-path');
+  const base=select.id||('folderChoice'+(++folderPickerSeq));
+  select.id=base;account.id=base+'Account';search.id=base+'Search';hint.id=base+'Path';
+  search.type='search';search.maxLength=200;search.autocomplete='off';
+  select.classList.add('folder-choice');select.setAttribute('aria-describedby',hint.id);
+  const field=(control,key,cls)=>{const label=el('label','field '+cls);const title=el('span');title.dataset.i18n=key;label.append(title,control);return label;};
+  select.replaceWith(wrap);
+  wrap.append(field(account,'targetAccountLabel','folder-account'),field(search,'targetSearchLabel','folder-search'),field(select,'targetFolderLabel','folder-select'),hint);
+  p={wrap,account,search,hint,root:false,disabled:false};folderPickers.set(select,p);
+  account.addEventListener('change',()=>{search.value='';folderPicker(select,'',{accountId:account.value});select.dispatchEvent(new Event('change',{bubbles:true}));});
+  search.addEventListener('input',event=>{event.stopPropagation();folderPicker(select,select.value);});
+  search.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();select.focus();}});
+  select.addEventListener('change',()=>folderPicker(select,select.value));
+ }
+ Object.assign(p,{root:options.root??p.root,disabled:options.disabled??p.disabled});
+ const selected=folders.find(f=>f.id===value),missing=!!value&&!selected;
+ const accountId=selected?.accountId??options.accountId??(options.reset?'':p.account.value);
+ if(options.reset)p.search.value='';
+ selectOptions(p.account,accounts(),T('chooseAccount'),accountId);
+ const query=C.norm(p.search.value).trim().split(/\s+/).filter(Boolean);
+ const pathOf=f=>(f.path||f.name||f.label||'').split('/').filter(Boolean).join(' › ');
+ const all=folders.filter(f=>f.accountId===p.account.value);
+ const choices=all.filter(f=>f.id===value||query.every(word=>C.norm((f.path||'')+' '+f.name).includes(word)))
+  .map(f=>({id:f.id,label:pathOf(f)})).sort((a,b)=>a.label.localeCompare(b.label,currentLang==='sv'?'sv':'en',{numeric:true}));
+ selectOptions(select,choices,!p.account.value?T('targetAccountFirst'):p.root?T('newFolderRoot'):T('chooseTarget'),value);
+ if(missing){const o=el('option','',T('targetMissing'));o.value=value;select.append(o);select.value=value;}
+ p.account.disabled=p.disabled;p.search.disabled=p.disabled||!p.account.value;select.disabled=p.disabled||!p.account.value;
+ p.search.placeholder=T('targetSearchPlaceholder');
+ for(const title of p.wrap.querySelectorAll('[data-i18n]'))title.textContent=T(title.dataset.i18n);
+ const accountLabel=accounts().find(a=>a.id===p.account.value)?.label||'';
+ p.hint.textContent=missing?T('targetMissing'):selected?T('targetSelected')+': '+accountLabel+' · '+pathOf(selected):!p.account.value?T('targetAccountFirst'):p.root&&!value?accountLabel+' · '+T('newFolderRoot'):!choices.length?T('targetEmpty'):'';
+ select.title=selected?accountLabel+' · '+pathOf(selected):'';
+ return p;
+}
+function targetOptions(value='',reset=false){
+ folderPicker($('target'),value,{reset});
+ if($('quickTarget')){
+  const q=$('quickTarget'),initial=!folderPickers.has(q);
+  folderPicker(q,initial?(rememberedTarget()||value||''):q.value);
+ }
+ for(const select of document.querySelectorAll('#branches .folder-choice'))folderPicker(select,select.value);
+}
+function updateMatchHelp(){if($('matchHelp'))$('matchHelp').textContent=$('match').value==='any'?T('matchAnyHelp'):T('matchAllHelp');}
 /* Villkorsfält: text, mottagare, storlek i kB och datum (dagar eller årtal). */
 const CONDITION_FIELDS=[['domain','optDomain'],['sender','optSender'],['subject','optSubject'],['recipient','optRecipient'],['cc','optCc'],['size','optSize'],['date','optDate']];
 const OPERATOR_LABELS={equals:'opEquals',contains:'opContains',starts:'opStarts',ends:'opEnds',larger:'opLarger',smaller:'opSmaller',older:'opOlder',newer:'opNewer',before:'opBeforeYear',after:'opAfterYear',beforeThisYear:'opBeforeThisYear',afterThisYear:'opAfterThisYear'};
@@ -2374,7 +2453,7 @@ function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},targ
  field.addEventListener('change',()=>{fillOpSelect(op,field.value,'');syncConditionInput(value,field.value,op.value,'');dirty=true;});
  op.addEventListener('change',()=>{syncConditionInput(value,field.value,op.value,value.value);dirty=true;});
  remove.addEventListener('click',()=>{row.remove();dirty=true;});
- row.append(field,op,value,target,remove);$('branches').append(row);
+ row.append(field,op,value,target,remove);$('branches').append(row);folderPicker(target,b.target);
 }
 function addCondition(c={field:'domain',op:'equals',value:''}){
  if($('conditions').children.length>=8){toast(T('maxConditions'));return;}
@@ -2390,7 +2469,7 @@ function addCondition(c={field:'domain',op:'equals',value:''}){
 function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',yearFolders:$('ruleYearFolders')?.checked===true,
   trialUntil:$('ruleTrial')?.checked===true?(old?.trialUntil&&old.trialUntil>Date.now()?old.trialUntil:Date.now()+C.LIMITS.trialDays*86400000):0,
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
- branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.children[3].value}))});}
+ branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.querySelector('.folder-choice').value}))});}
 /* Enkel regel-export använder samma validerade utkast som sparningen. */
 const buildRule=()=>draft();
 function loadRule(id='',presetAccount=''){
@@ -2403,7 +2482,7 @@ function loadRule(id='',presetAccount=''){
  setTrialFields(rule);
  updateReadPolicy();
  const ruleAccount=rule?(rule.sourceAccount||folders.find(f=>f.id===rule.source)?.accountId||''):(presetAccount||accounts()[0]?.id||'');
- accountOptions(ruleAccount);targetOptions(rule?.target||'');
+ accountOptions(ruleAccount);targetOptions(rule?.target||'',true);updateMatchHelp();
  $('conditions').replaceChildren();for(const c of rule?.conditions||[{field:'domain',op:'equals',value:''}])addCondition(c);
  $('branches').replaceChildren();for(const b of rule?.branches||[])addBranchRow(b);
  $('testResult').hidden=true;$('delete').disabled=!rule;
@@ -2605,7 +2684,7 @@ function importIntoEditor(){
   return merged;
  }
  for(const cond of merged.added)addCondition(cond);
- if(merged.added.length&&merged.suggestedMatch==='any'&&($('match').value==='all'))$('match').value='any';
+ if(merged.added.length&&merged.suggestedMatch==='any'&&($('match').value==='all'))$('match').value='any';updateMatchHelp();
  if(merged.added.length)dirty=true;
  const parts=[T(merged.added.length&&merged.suggestedMatch==='any'?'importAddedAny':'importAdded').replace('{n}',merged.added.length)];
  const skipped=merged.skipped+parsed.skipped;
@@ -2673,8 +2752,8 @@ handle('duplicate','click',()=>{
 async function fetchSelectedIntoEditor({forceNew=false}={}){
  const m=await rpc('selected');if(!folders.some(f=>f.accountId===m.sourceAccount))throw new C.RuleError('unsafe_folder');
  const existing=selectedId?state.config.rules.find(r=>r.id===selectedId):null;
- const existingVal=existing?.conditions?.[0]?.value?.trim()?.toLowerCase()||'';
- const incomingVal=(m.domain||m.email||m.subject||'').trim().toLowerCase();
+ const existingVal=C.norm(existing?.conditions?.[0]?.value).trim();
+ const incomingVal=C.norm(m.domain||m.email||m.subject).trim();
  if(forceNew||(existing&&existingVal&&incomingVal&&existingVal!==incomingVal)){
   loadRule('',m.sourceAccount);
  }
@@ -2692,8 +2771,7 @@ if($('quickFetchBtn'))handle('quickFetchBtn','click',async()=>{
  const field=$('quickField')?.value||'domain';
  if($('quickValue'))$('quickValue').value=field==='domain'?(m.domain||m.email||''):field==='sender'?(m.email||m.author||''):(m.subject||'').slice(0,256);
  if($('quickTarget')&&!$('quickTarget').value){
-  const sameAcc=folders.find(f=>f.accountId===m.sourceAccount&&!(f.specialUse||[]).includes('inbox'));
-  if(sameAcc)$('quickTarget').value=sameAcc.id;
+  folderPicker($('quickTarget'),'',{accountId:m.sourceAccount||''});
  }
  $('quickTarget')?.focus();
  toast(T('toastFromSelected'));
@@ -2948,10 +3026,18 @@ if($('quickValue'))$('quickValue').addEventListener('keydown',e=>{
  if(e.key==='Enter'){e.preventDefault();$('quickAddBtn')?.click();}
  else if(e.key==='Escape'){e.preventDefault();$('quickValue').value='';updateQuickPreview().catch(()=>{});}
 });
+handle('match','change',updateMatchHelp);
 handle('test','click',async()=>{
- const result=await rpc('testRule',{rule:draft()});
+ const rule=draft(),result=await rpc('testRule',{rule});
  const reasons={no_match:T('testReasonNoMatch'),disabled:T('testReasonDisabled'),unread:T('testReasonUnread'),already_read:T('testReasonAlreadyRead'),displayed:T('testReasonDisplayed'),eligible:T('testReasonEligible')};
  $('testResult').textContent='TEST · '+(reasons[result.reason]||reasons.no_match)+T('testNoMove')+(result.matches?T('testTargetPrefix')+label(result.target)+'. ':'')+T('testTail')+(result.outsideSource?T('testOutside'):'');$('testResult').hidden=false;
+ const box=$('testResult');
+ box.append(el('p','',rule.match==='any'?T('matchAnyHelp'):T('matchAllHelp')));
+ const list=el('ul','test-conditions');
+ (result.conditions||[]).forEach((ok,i)=>{if(!rule.conditions[i])return;list.append(el('li',ok?'condition-pass':'condition-fail',(ok?'✓ '+T('testConditionYes'):'✕ '+T('testConditionNo'))+' · '+ruleConditionLabel(rule.conditions[i])));});
+ box.append(list);
+ for(const [flag,key] of [[result.paused,'testPaused'],[result.dryRun,'testDryRun'],[result.trial,'testTrial'],[result.fault,'testStopped']])if(flag)box.append(el('p','test-block',T(key)));
+
 });
 handle('delete','click',async()=>{if(!selectedId||!confirm(T('confirmDelete')))return;const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==selectedId),revision:editRevision});dirty=false;renderStatus(next);loadRule();});
 for(const [id,step] of [['up',-1],['down',1]])handle(id,'click',()=>moveRulePriority(selectedId,step));
@@ -3230,7 +3316,7 @@ function renderTbAccounts(){
 handle('export','click',exportAllRules);
 if($('exportSettings'))handle('exportSettings','click',exportAllRules);
 async function exportRuleFile(rule){
- const slug=(rule.name||'regel').toLowerCase().replace(/[^a-z0-9åäö_-]+/gi,'-').replace(/^-+|-+$/g,'')||'regel';
+ const slug=C.norm(rule.name||'regel').replace(/[^a-z0-9åäö_-]+/gi,'-').replace(/^-+|-+$/g,'')||'regel';
  const folderHints=folders.map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
  const singleFile=paths().rules+'sortbro-regel-'+slug+'.json';
  await download({format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:[rule],folders:folderHints},singleFile);
@@ -3292,8 +3378,8 @@ handle('refreshFolders','click',async()=>{folders=await rpc('folders');repaint()
 
 /* ===== Nya funktioner: mallar, förslag, ny mapp, årstid ===== */
 for(const btn of document.querySelectorAll('#templateBar .template-btn'))btn.addEventListener('click',()=>applyTemplate(btn.dataset.template));
-if($('newFolderBtn'))handle('newFolderBtn','click',e=>openFolderModal($('source')?.value||'','',e.currentTarget));
-if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',e=>openFolderModal($('source')?.value||'',quickFolderSuggestion(),e.currentTarget));
+if($('newFolderBtn'))handle('newFolderBtn','click',e=>openFolderModal($('targetAccount')?.value||$('source')?.value||'','',e.currentTarget));
+if($('quickNewFolderBtn'))handle('quickNewFolderBtn','click',e=>openFolderModal($('quickTargetAccount')?.value||$('source')?.value||'',quickFolderSuggestion(),e.currentTarget));
 if($('folderCancelBtn'))handle('folderCancelBtn','click',closeFolderModal);
 if($('folderCreateBtn'))handle('folderCreateBtn','click',createFolderFromModal);
 if($('folderName'))$('folderName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();createFolderFromModal().catch(alertError);}});

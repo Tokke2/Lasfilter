@@ -141,7 +141,7 @@ function folderPathFromUri(uri){
 }
 /* Sökvägen skriven så att den går att jämföra: gemener, utan inledande snedstreck. */
 function pathKey(value){
- return clean(value).split('/').filter(Boolean).map(seg=>seg.trim().toLocaleLowerCase('sv-SE')).join('/');
+ return clean(value).split('/').filter(Boolean).map(seg=>seg.trim().normalize('NFKC').toLocaleLowerCase('sv-SE')).join('/');
 }
 /* Kontots URI-prefix (allt före mappsökvägen) – används för att kunna exportera tillbaka. */
 function uriPrefix(uri){
@@ -152,22 +152,24 @@ function uriPrefix(uri){
 /* Målmappen letas bara i det valda kontot – en mapp med samma namn i ett annat konto
    är inte samma mapp, och fel konto i en regel är värre än att behöva välja själv. */
 function matchFolder(folders,name,accountId='',path=''){
- const want=String(name||'').toLocaleLowerCase('sv-SE');
+ const want=String(name||'').normalize('NFKC').toLocaleLowerCase('sv-SE');
  const wantPath=pathKey(path);
  const list=(Array.isArray(folders)?folders:[]).filter(f=>!accountId||!f.accountId||f.accountId===accountId);
  /* Hela sökvägen går före namnet: två mappar kan heta Fakturor i olika grenar. */
  if(wantPath){
-  const byPath=list.find(f=>{const have=pathKey(f.path||'');return have&&(have===wantPath||have.endsWith('/'+wantPath));});
-  if(byPath)return byPath.id;
+  const exactPath=list.filter(f=>pathKey(f.path||'')===wantPath);
+  if(exactPath.length)return exactPath.length===1?exactPath[0].id:'';
+  const suffix=list.filter(f=>pathKey(f.path||'').endsWith('/'+wantPath));
+  if(suffix.length)return suffix.length===1?suffix[0].id:'';
  }
  if(!want)return '';
- const nameOf=f=>String(f.name||'').toLocaleLowerCase('sv-SE');
- const exact=list.find(f=>nameOf(f)===want);
- if(exact)return exact.id;
- const starts=list.find(f=>nameOf(f).startsWith(want));
- if(starts)return starts.id;
- const loose=list.find(f=>nameOf(f).includes(want)||(nameOf(f).length>=3&&want.includes(nameOf(f))));
- return loose?.id||'';
+ const nameOf=f=>String(f.name||'').normalize('NFKC').toLocaleLowerCase('sv-SE');
+ const exact=list.filter(f=>nameOf(f)===want);
+ if(exact.length)return exact.length===1?exact[0].id:'';
+ const starts=list.filter(f=>nameOf(f).startsWith(want));
+ if(starts.length)return starts.length===1?starts[0].id:'';
+ const loose=list.filter(f=>nameOf(f).includes(want)||(nameOf(f).length>=3&&want.includes(nameOf(f))));
+ return loose.length===1?loose[0].id:'';
 }
 /* En tolklad filterregel -> utkast till SortBro-regel + redovisning av vad som inte följer med. */
 function toSortBroRule(tb,{folders=[],accountId='',inboxId='',namePrefix='',maxConditions=8}={}){
@@ -298,7 +300,13 @@ function buildFilterFile(rules,{uriOf={}}={}){
  return {text:out.join('\r\n')+'\r\n',report};
 }
 
-const api={FIL_VERSION,parseFilterFile,parseCondition,toSortBroRule,importReport,folderNameFromUri,folderPathFromUri,pathKey,uriPrefix,matchFolder,fromSortBroRule,buildFilterFile,CODE_TEXT,TBFIELDS,TB_SB_OPS};
+/* Thunderbird skriver UTF-8. Äldre Windows-exporter kan vara Windows-1252.
+   Prova strikt UTF-8 först så att åäö aldrig ersätts med U+FFFD vid import. */
+function decodeFilterBytes(bytes){
+ try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}
+ catch{return new TextDecoder('windows-1252').decode(bytes);}
+}
+const api={decodeFilterBytes,FIL_VERSION,parseFilterFile,parseCondition,toSortBroRule,importReport,folderNameFromUri,folderPathFromUri,pathKey,uriPrefix,matchFolder,fromSortBroRule,buildFilterFile,CODE_TEXT,TBFIELDS,TB_SB_OPS};
 root.LasFilters=api;
 if(typeof module!=='undefined')module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

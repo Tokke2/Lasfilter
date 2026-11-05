@@ -1523,3 +1523,50 @@ test('snabba parallella utseendeval skriver inte över varandra',async()=>{
  await Promise.all([app.handle({type:'prefs',prefs:{density:'compact'}}),app.handle({type:'prefs',prefs:{fontSize:24}}),app.handle({type:'prefs',prefs:{lineSpacing:'roomy',introCollapsed:true}})]);
  assert.equal(app.prefs.fontSize,24);assert.equal(app.prefs.density,'compact');assert.equal(app.prefs.lineSpacing,'roomy');assert.equal(app.prefs.introCollapsed,true);
 });
+
+/* Konto-först och svenska mappnamn. */
+function swedishAccounts(api){
+ const leaf=(id,accountId,name,path,subFolders=[])=>({id,accountId,name,path,subFolders});
+ api.accounts.list=async()=>['a','b'].map(id=>({id,name:id==='a'?'Åsas konto':'Björns konto',identities:[{email:id+'@example.se'}],rootFolder:{id:id+'-root',accountId:id,isRoot:true,subFolders:[
+  leaf(id+'-in',id,'Inkorg','/Inkorg'),leaf(id+'-year',id,'Årsöversikt','/Årsöversikt'),leaf(id+'-book',id,'Bokföring','/Bokföring')
+ ]}}));
+}
+test('mapplistan bär konto, adress, full sökväg och förälder utan att ändra ID',async()=>{
+ const {app,api}=await loadBackground();swedishAccounts(api);
+ const list=await app.folderList(),folder=list.find(f=>f.id==='a-year');
+ assert.equal(list.length,6);assert.equal(folder.parentId,'a-root');assert.equal(folder.accountName,'Åsas konto');
+ assert.equal(folder.accountEmail,'a@example.se');assert.equal(folder.path,'/Årsöversikt');
+});
+test('ny mapp skapas i valt kontos rot, inte i första kontot',async()=>{
+ const {app,api}=await loadBackground();swedishAccounts(api);const calls=[];
+ api.folders.create=async(parent,name)=>{calls.push({parent,name});return {id:'new',accountId:'b',name};};
+ await app.createFolder('','Ärenden'.normalize('NFD'),'b');
+ assert.deepEqual(calls,[{parent:'b-root',name:'Ärenden'}]);
+ await assert.rejects(()=>app.createFolder('','Annat','unknown'),e=>e.code==='unsafe_folder');
+ assert.equal(calls.length,1,'okänt konto får ingen reservmapp i ett annat konto');
+});
+test('lika svenska mappnamn tillåts i annan gren men inte bland syskon',async()=>{
+ const {app,api}=await loadBackground();swedishAccounts(api);let created=0;
+ api.folders.create=async(parent,name)=>{created++;return {id:'new',name,accountId:'a'};};
+ await assert.rejects(()=>app.createFolder('a-root','ÅRSÖVERSIKT'.normalize('NFD'),'a'),e=>e.code==='folder_exists');
+ await app.createFolder('a-book','Årsöversikt','a');
+ assert.equal(created,1);
+});
+test('regeltestet visar varje villkor och ändrar aldrig OCH till ELLER',async()=>{
+ const {app}=await loadBackground();const engine=fakeEngine(app,{displayed:async()=>new Set([42])});
+ engine.config.paused=true;engine.config.dryRun=true;
+ app.selected=async()=>({id:42,read:true,author:'wordpress@limos.se',subject:'[limos.se] Din webbplats har uppdaterats till WordPress 7.1.4',folder:{id:'other-in-a',accountId:'a'}});
+ const rule={id:'wordpress',name:'WordPress',enabled:true,source:'inbox',sourceAccount:'a',scope:'account',target:'target',match:'all',conditions:[{field:'subject',op:'contains',value:'Wordfence'},{field:'subject',op:'contains',value:'WordPress'},{field:'sender',op:'contains',value:'wordpress@'}]};
+ const out=await app.handle({type:'testRule',rule});
+ assert.equal(out.matches,false);assert.equal(out.reason,'no_match');assert.deepEqual(Array.from(out.conditions),[false,true,true]);
+ assert.equal(out.paused,true);assert.equal(out.dryRun,true);assert.equal(rule.match,'all');
+ const matching=await app.handle({type:'testRule',rule:{...rule,conditions:rule.conditions.slice(1)}});
+ assert.equal(matching.matches,true);assert.equal(matching.reason,'displayed');assert.equal(matching.outsideSource,false,'andra mappar inom samma källkonto är inte utanför källan');
+});
+test('JSON-import hittar svenska normaliserade mappnamn men gissar inte vid dubbletter',async()=>{
+ const {app}=await loadBackground();
+ const backup={format:'lasfilter-rules',version:1,rules:[{id:'r',name:'År',source:'in',target:'old'}],folders:[{id:'old',name:'Årsöversikt'.normalize('NFD'),accountName:'Åsas konto'.normalize('NFD'),label:'Åsas konto · /Årsöversikt'.normalize('NFD')}]};
+ const folders=[{id:'new',accountId:'a',name:'Årsöversikt',accountName:'Åsas konto',label:'Åsas konto · /Årsöversikt'}];
+ assert.equal(app.extractImportedRules(backup,folders)[0].target,'new');
+ assert.equal(app.extractImportedRules(backup,[...folders,{...folders[0],id:'second'}])[0].target,'old');
+});

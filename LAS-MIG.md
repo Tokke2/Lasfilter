@@ -503,6 +503,18 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.17
+
+- **E-postkonto först, sedan målmapp.** Samma väljare används i huvudregeln, snabbregeln, fördelningar och filterimporten. Kontonamnet kompletteras med e-postadress när Thunderbird tillhandahåller den. Sök i hela mappsökvägen och läs den valda sökvägen under fältet. Sparade mapp-ID:n och mål i andra konton bevaras. Vid kontobyte måste du själv välja en ny mapp; ingen första mapp gissas fram.
+- **Ny mapp i rätt konto.** Dialogen utgår från målkontot, även när källkontot är ett annat. Samma namn tillåts i olika konton eller föräldramappar. En verklig dubblett bland syskon stoppas även om åäö är skrivna med kombinerade Unicode-tecken. En mapp skapad i snabbflödet ändrar inte huvudregelns utkast.
+- **Svenska tecken.** Normaliserad jämförelse av mappnamn/sökvägar i importer, hela avsändaradresser med internationella domäner, ämnesförslag och loggtext. Å, ä och ö fortsätter vara egna bokstäver – de blir inte a eller o. Filterfiler läses som UTF-8, med Windows-1252 som reserv för äldre Windows-filer. JSON och filterexport bevarar svenska namn och villkor. Tvetydiga mappträffar väljs inte automatiskt.
+- **Tydligare regeltest.** **Kontrollera** visar *stämmer / stämmer inte* för varje villkor på det markerade mejlet, samt paus, testläge och regelns provkörning när de gäller. En förklaring vid villkoren visar skillnaden mellan **Alla ska stämma** och **Minst ett ska stämma**. Testet flyttar ingenting och skriver inte om regeln.
+- **Luftigare smal layout.** Villkorsvärden får en egen rad i smala fönster eller vid stor text. Mappval, långa sökvägar, fördelningar och importgranskning får utrymme att radbrytas. Svenska/engelska, ljus/mörk vy, tangentbord och textstorlek 12–24 behålls.
+
+**Exempel: varför ett WordPress-mejl inte matchar.** Om regeln kräver ämne *Wordfence*, ämne *WordPress* och avsändare *wordpress@*, med **Alla ska stämma**, måste samma mejl uppfylla alla tre. Ett WordPress-uppdateringsmejl utan ordet Wordfence matchar inte. Byt inte slentrianmässigt hela regeln till **Minst ett**: då kan även enbart avsändaren räcka. Separata regler kan användas om olika ämnen ska kombineras med samma avsändarkrav. I läget *Endast lästa* väntar en matchande regel dessutom tills mejlet är läst och inte längre visas.
+
+Inga sparade regler skrivs om, inga nya behörigheter eller tilläggsberoenden införs, och backupfrekvensen är oförändrad. Installera den nya XPI:n ovanpå den befintliga – **avinstallera inte först**, eftersom det kan radera sparade regler och inställningar.
+
 ## Nyheter i 1.0.16
 
 De valda förslagen **1, 6, 7, 9, 10, 11, 14, 22, 23, 24 och 25** är genomförda:

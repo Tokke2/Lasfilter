@@ -503,6 +503,14 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.15
+
+- **Tydligare lista över skapade regler:** namn, målmapp, prioritet och på/av-status visas direkt. Långa villkor och inställningar tar inte längre plats i varje rad.
+- **En meny per regel, under ⋯:** Redigera, Kör nu, Duplicera, Exportera, Flytta upp, Flytta ned och Ta bort. Under **Detaljer & inställningar** finns käll-/målmappar, villkor, alternativa mål samt valen för olästa mejl och nytt fönster.
+- **Kompakta konfliktvarningar:** en synlig rad visar antal möjliga överlappningar. Fäll ut den för att se vilka regler som berörs och vilken som har företräde. Säkerhetsbromsen är oförändrad.
+- **Säkra menyval:** borttagning namnger regeln och kräver godkännande; export använder den sparade regeln, inte ett annat utkast. Duplicering skapar bara ett utkast. Omordning fungerar även i en filtrerad lista. Osparade ändringar skyddas.
+- Menyn kan stängas med Escape eller klick utanför. Den ligger i sidans flöde, fungerar i smala fönster och har svenska och engelska etiketter. Körknappen uppdateras vid paus och motorfel även när inga regler ändrats.
+
 ## Nyheter i 1.0.14
 
 - **Copyright:** © Rickard Längkvist visas i appens sidfot och dokumentationen. Licensvillkoren är oförändrade.

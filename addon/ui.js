@@ -81,7 +81,27 @@ const I18N={
   statMoved:'flyttade sedan start',
   statMatched:'matchade sedan start',
   rulesTitle:'Dina automatiska flyttar',
-  rulesSub:'Lägg upp hur många regler du vill. Varje regel visar villkor, oläst/läst-val och målmapp.',
+  rulesSub:'Välj en regel för att redigera. Fler val under ⋯.',
+  ruleMenuLabel:"Åtgärder för {name}",
+  ruleDetails:"Detaljer & inställningar",
+  ruleEdit:"Redigera",
+  ruleRun:"Kör nu",
+  ruleCopy:"Duplicera",
+  ruleExport:"Exportera",
+  ruleUp:"Flytta upp",
+  ruleDown:"Flytta ned",
+  ruleDelete:"Ta bort…",
+  ruleOn:"På",
+  ruleOff:"Av",
+  ruleOverlap:"Överlapp · {n}",
+  ruleOrder:"Prioritet {n}",
+  ruleSource:"Från",
+  ruleTarget:"Till",
+  ruleConditions:"Villkor",
+  ruleAll:"Alla villkor ska matcha",
+  ruleAny:"Minst ett villkor ska matcha",
+  ruleDeleteNamed:"Ta bort ”{name}”? Inga mejl tas bort.",
+  ruleTargetMore:"+ {n} alternativa mål",
   newFromSelectedBtn:'✉ Ny från markerat mejl',
   newRuleBtn:'＋ Ny tom regel',
   quickRuleTitle:'⚡ Skapa regel på tio sekunder',
@@ -182,7 +202,7 @@ const I18N={
   importMergeBtn:'＋ Lägg till från JSON',
   exportSingleRuleBtn:'↓ Exportera regel (.json)',
   jsonBackupSub:'Exportera dina regler till en JSON-fil eller importera regler från en JSON-fil (ersätt alla eller lägg till).',
-  priorityNote:'Reglerna körs uppifrån och ned (första träff gäller). Ändra ordning med Prioritet-knapparna.',
+  priorityNote:'Första träff gäller. Ändra ordning via ⋯.',
   editorEyebrow:'REGELREDIGERING',
   editorNew:'Ny regel',
   editorEdit:'Redigera regel',
@@ -753,7 +773,27 @@ const I18N={
   statMoved:'moved since start',
   statMatched:'matched since start',
   rulesTitle:'Your automatic rules',
-  rulesSub:'Create as many rules as you like. Each row shows conditions, read/unread mode and target folder.',
+  rulesSub:'Select a rule to edit. More actions under ⋯.',
+  ruleMenuLabel:"Actions for {name}",
+  ruleDetails:"Details & settings",
+  ruleEdit:"Edit",
+  ruleRun:"Run now",
+  ruleCopy:"Duplicate",
+  ruleExport:"Export",
+  ruleUp:"Move up",
+  ruleDown:"Move down",
+  ruleDelete:"Delete…",
+  ruleOn:"On",
+  ruleOff:"Off",
+  ruleOverlap:"Overlap · {n}",
+  ruleOrder:"Priority {n}",
+  ruleSource:"From",
+  ruleTarget:"To",
+  ruleConditions:"Conditions",
+  ruleAll:"All conditions must match",
+  ruleAny:"At least one condition must match",
+  ruleDeleteNamed:"Delete “{name}”? No emails will be deleted.",
+  ruleTargetMore:"+ {n} alternative targets",
   newFromSelectedBtn:'✉ New from selected email',
   newRuleBtn:'＋ New blank rule',
   quickRuleTitle:'⚡ Create a rule in ten seconds',
@@ -854,7 +894,7 @@ const I18N={
   importMergeBtn:'＋ Add from JSON',
   exportSingleRuleBtn:'↓ Export rule (.json)',
   jsonBackupSub:'Export your rules to a JSON file or import rules from a JSON file (replace all or append).',
-  priorityNote:'Rules are evaluated top to bottom (first match wins). Reorder with the Priority buttons.',
+  priorityNote:'First match wins. Reorder via ⋯.',
   editorEyebrow:'RULE EDITOR',
   editorNew:'New rule',
   editorEdit:'Edit rule',
@@ -2020,10 +2060,26 @@ function renderLearnBar(){
 function renderRules(){
  /* Allt listan läser: reglerna, sökordet, markeringen, språket och mapplistan
     (den behövs för konfliktvarningen och för att visa mappnamn). */
- const sig=JSON.stringify([state.config.rules,selectedId,$('ruleSearch')?.value||'',currentLang,folders.length]);
+ const sig=JSON.stringify([state.config.rules,selectedId,$('ruleSearch')?.value||'',currentLang,folders.map(f=>[f.id,f.name,f.label,f.accountId]),state.config.paused,state.fault,state.moveMode,state.openWindow]);
  if(unchanged('rules',sig))return;
  paintRules();
 }
+/* Menyerna är vanliga knappar/disclosure, inte ARIA-menyer: Tab och Enter
+   fungerar som i resten av appen. Escape stänger och lämnar tillbaka fokus. */
+function closeRuleMenus(except=null){
+ document.querySelectorAll('.rule-menu-toggle').forEach(button=>{
+  if(button===except)return;
+  button.setAttribute('aria-expanded','false');
+  const panel=document.getElementById(button.getAttribute('aria-controls'));if(panel)panel.hidden=true;
+ });
+}
+document.addEventListener('click',event=>{if(!event.target.closest('.rule-menu-toggle,.rule-menu-panel'))closeRuleMenus();});
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Escape')return;
+ const button=document.querySelector('.rule-menu-toggle[aria-expanded="true"]');
+ if(button){event.preventDefault();closeRuleMenus();button.focus();}
+});
+function ruleConditionLabel(c){return fieldShortText(c.field)+' · '+(OPERATOR_LABELS[c.op]?T(OPERATOR_LABELS[c.op]):c.op)+(String(c.value??'').trim()?' · '+c.value:'');}
 function paintRules(){
  const list=$('ruleList');list.replaceChildren();const search=C.norm($('ruleSearch').value);
  /* Konfliktkartan: vilka regler som kan träffa samma mejl och skicka det olika väg.
@@ -2037,7 +2093,8 @@ function paintRules(){
  const shown=state.config.rules.filter(r=>C.norm(r.name).includes(search));
  if(!shown.length){list.append(el('p','empty',state.config.rules.length?T('emptyNoMatch'):T('emptyNoRules')));return;}
  for(const rule of shown){
-  const row=el('div','rule-row'+(selectedId===rule.id?' selected':''));
+  const row=el('div','rule-row'+(selectedId===rule.id?' selected':''));row.dataset.ruleId=rule.id;
+  const position=state.config.rules.findIndex(r=>r.id===rule.id);
   const check=el('input');check.type='checkbox';check.checked=rule.enabled;check.setAttribute('aria-label',(currentLang==='en'?'Enable ':'Aktivera ')+rule.name);
   check.addEventListener('change',async()=>{try{
    if(dirty&&!confirm(T('confirmDiscardEditor'))){check.checked=!check.checked;return;}
@@ -2046,21 +2103,29 @@ function paintRules(){
   }catch(e){check.checked=!check.checked;alertError(e);}});
   const main=el('div','rule-main');
   const btn=el('button','rule-open');btn.type='button';btn.append(el('strong','',rule.name));
-  const c=rule.conditions[0];
-  const fieldName=fieldShortText(c.field);
-  const valueText=String(c.value??'').trim()||T(c.op==='beforeThisYear'?'opBeforeThisYear':c.op==='afterThisYear'?'opAfterThisYear':'condPlaceholderThisYear');
-  btn.append(el('small','',fieldName+' · '+valueText+(rule.conditions.length>1?'  + '+(rule.conditions.length-1)+T('moreConditionsSuffix'):'')));
-  const f=folders.find(f=>f.id===rule.target);btn.append(el('small','','↳ '+(f?.label||T('missingFolderShort'))));
-  btn.append(el('span','rule-tag',ruleTagText(rule)));
+  btn.title=T('ruleEdit')+' · '+rule.name;
+  const f=folders.find(f=>f.id===rule.target);
+  const target=el('small','rule-target','↳ '+(f?.name||f?.label||T('missingFolderShort')));target.title=f?.label||T('missingFolderShort');btn.append(target);
+  if(rule.branches?.length)btn.append(el('small','',T('ruleTargetMore').replace('{n}',rule.branches.length)));
+  const meta=el('div','rule-meta');
+  meta.append(el('span','rule-order',T('ruleOrder').replace('{n}',position+1)),el('span','rule-status'+(rule.enabled?' is-on':''),T(rule.enabled?'ruleOn':'ruleOff')));
+  const details=el('details','rule-details');details.append(el('summary','',T('ruleDetails')));
+  const body=el('div','rule-details-body');
+  const source=rule.scope==='account'?(accounts().find(a=>a.id===rule.sourceAccount)?.label||T('missingFolderShort')):label(rule.source);
+  body.append(el('p','',T('ruleSource')+': '+source),el('p','',T('ruleTarget')+': '+(f?.label||T('missingFolderShort'))));
+  for(const branch of rule.branches||[])body.append(el('p','',ruleConditionLabel(branch.condition)+' → '+label(branch.target)));
+  body.append(el('strong','',T('ruleConditions')+' · '+T(rule.match==='any'?'ruleAny':'ruleAll')));
+  const conditions=el('ul');for(const c of rule.conditions)conditions.append(el('li','',ruleConditionLabel(c)));
+  body.append(conditions,el('p','rule-mode-detail',ruleTagText(rule)));
   if(rule.trialUntil>0){
    const days=C.trialDaysLeft(rule);
    btn.append(el('span','rule-tag trial-tag',T('trialBadge')+(days?' · '+T(days===1?'trialDayLeft':'trialDaysLeft').replace('{n}',days):'')));
   }
-  btn.addEventListener('click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule(rule.id);});
+  btn.addEventListener('click',()=>{if(!dirty||confirm(T('confirmDiscard'))){loadRule(rule.id);$('ruleName').focus();}});
   const opts=el('div','rule-inline-opts');
   const moveUnreadLbl=el('label'),moveUnreadChk=el('input');moveUnreadChk.type='checkbox';
   const rf=rule.readFilter||'default';
-  moveUnreadChk.checked=rf==='both'||rf==='unread';
+  moveUnreadChk.checked=rf==='both'||rf==='unread'||(rf==='default'&&state.moveMode==='direct');
   moveUnreadLbl.append(moveUnreadChk,el('span','',T('inlineMoveUnread')));
   const openWinLbl=el('label'),openWinChk=el('input');openWinChk.type='checkbox';
   const ua=rule.unreadAction||'default';
@@ -2070,6 +2135,7 @@ function paintRules(){
   moveUnreadChk.addEventListener('change',async e=>{
    e.stopPropagation();
    try{
+    if(dirty&&!confirm(T('confirmDiscardEditor'))){moveUnreadChk.checked=!moveUnreadChk.checked;return;}
     const nextRf=moveUnreadChk.checked?'both':'read';
     const rules=state.config.rules.map(r=>r.id===rule.id?{...r,readFilter:nextRf}:r);
     const next=await rpc('saveRules',{rules,revision:state.config.revision});
@@ -2080,6 +2146,7 @@ function paintRules(){
   openWinChk.addEventListener('change',async e=>{
    e.stopPropagation();
    try{
+    if(dirty&&!confirm(T('confirmDiscardEditor'))){openWinChk.checked=!openWinChk.checked;return;}
     const nextUa=openWinChk.checked?'window':'keep';
     const rules=state.config.rules.map(r=>r.id===rule.id?{...r,unreadAction:nextUa}:r);
     const next=await rpc('saveRules',{rules,revision:state.config.revision});
@@ -2088,11 +2155,16 @@ function paintRules(){
    }catch(err){openWinChk.checked=!openWinChk.checked;alertError(err);}
   });
   opts.append(moveUnreadLbl,openWinLbl);
-  main.append(btn,opts);
-  const quick=el('div','rule-quick');
-  const runBtn=el('button','rule-mini-btn','▶');runBtn.type='button';runBtn.title=T('runRuleNowTitle');runBtn.disabled=!rule.enabled||!!state.fault||state.config.paused;
+  body.append(opts);details.append(body);main.append(btn,meta);
+  const menu=el('button','rule-menu-toggle','⋯');menu.type='button';menu.title=T('ruleMenuLabel').replace('{name}',rule.name);menu.setAttribute('aria-label',menu.title);menu.setAttribute('aria-expanded','false');
+  const panel=el('div','rule-menu-panel');panel.id='rule-actions-'+position;panel.hidden=true;menu.setAttribute('aria-controls',panel.id);
+  menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')==='true';closeRuleMenus(menu);menu.setAttribute('aria-expanded',String(!open));panel.hidden=open;if(!open)row.scrollIntoView({block:'nearest'});});
+  const quick=el('div','rule-action-grid');
+  const editBtn=el('button','rule-action',T('ruleEdit'));editBtn.type='button';editBtn.dataset.action='ruleEdit';
+  editBtn.addEventListener('click',()=>{if(dirty&&!confirm(T('confirmDiscard')))return;closeRuleMenus();loadRule(rule.id);$('ruleName').focus();});
+  const runBtn=el('button','rule-action',T('ruleRun'));runBtn.type='button';runBtn.dataset.action='ruleRun';runBtn.title=T('runRuleNowTitle');runBtn.disabled=!rule.enabled||!!state.fault||state.config.paused;
   runBtn.addEventListener('click',async e=>{
-   e.stopPropagation();
+   e.stopPropagation();runBtn.disabled=true;
    try{
     const r=await rpc('catchUp',{ruleId:rule.id});renderStatus(await rpc('status'));
     const extra=r.queued?'':
@@ -2101,8 +2173,9 @@ function paintRules(){
      (r.scanned?(currentLang==='en'?' No email matched the rule.':' Inga mejl matchade regeln.'):'');
     toast(currentLang==='en'?'Rule "'+rule.name+'": scanned '+r.scanned+', queued '+r.queued+'.'+extra:'Regel "'+rule.name+'": skannade '+r.scanned+', köade '+r.queued+'.'+extra);
    }catch(err){alertError(err);}
+   finally{runBtn.disabled=!rule.enabled||!!state.fault||state.config.paused;}
   });
-  const dupBtn=el('button','rule-mini-btn','⧉');dupBtn.type='button';dupBtn.title=T('dupRuleTitle');
+  const dupBtn=el('button','rule-action',T('ruleCopy'));dupBtn.type='button';dupBtn.dataset.action='ruleCopy';dupBtn.title=T('dupRuleTitle');
   dupBtn.addEventListener('click',e=>{
    e.stopPropagation();
    if(dirty&&!confirm(T('confirmDiscard')))return;
@@ -2114,13 +2187,35 @@ function paintRules(){
    dirty=true;renderRules();$('ruleName').focus();
    toast(T('toastDuplicated'));
   });
-  quick.append(runBtn,dupBtn);
-  row.append(check,main,quick);list.append(row);
+  quick.append(editBtn,runBtn,dupBtn);
+  const action=(key,fn,disabled=false)=>{
+   const button=el('button','rule-action'+(key==='ruleDelete'?' rule-action-danger':''),T(key));button.type='button';button.dataset.action=key;button.disabled=disabled;
+   button.addEventListener('click',async()=>{button.disabled=true;try{await fn();}catch(err){alertError(err);}finally{button.disabled=disabled;}});quick.append(button);
+  };
+  action('ruleExport',()=>exportRuleFile(rule));
+  for(const [key,step] of [['ruleUp',-1],['ruleDown',1]])action(key,async()=>{
+   if(dirty){toast(T('saveBeforePriority'));return;}
+   const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===rule.id),j=i+step;
+   if(i<0||j<0||j>=rules.length)return;
+   [rules[i],rules[j]]=[rules[j],rules[i]];
+   renderStatus(await rpc('saveRules',{rules,revision:state.config.revision}));loadRule(rule.id);
+  },position+step<0||position+step>=state.config.rules.length);
+  action('ruleDelete',async()=>{
+   if(dirty&&!confirm(T('confirmDiscardEditor')))return;
+   if(!confirm(T('ruleDeleteNamed').replace('{name}',rule.name)))return;
+   const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==rule.id),revision:state.config.revision});
+   dirty=false;renderStatus(next);loadRule(selectedId===rule.id?'':selectedId);
+  });
+  panel.append(quick,details);row.append(check,main,menu,panel);list.append(row);
   const clash=conflictMap.get(rule.id);
   if(clash&&clash.length){
-   const other=state.config.rules.find(r=>r.id===clash[0].other);
-   const fields=clash[0].fields.map(fieldShortText).join(', ');
-   list.append(el('p','rule-conflict','⚠ '+T('conflictTitle').replace('{name}',other?.name||clash[0].other).replace('{fields}',fields)+' '+(clash[0].winner?T('conflictWinner'):T('conflictLoser'))));
+   const warning=el('details','rule-conflict');warning.append(el('summary','','⚠ '+T('ruleOverlap').replace('{n}',clash.length)));
+   for(const conflict of clash){
+    const other=state.config.rules.find(r=>r.id===conflict.other);
+    const fields=conflict.fields.map(fieldShortText).join(', ');
+    warning.append(el('p','',T('conflictTitle').replace('{name}',other?.name||conflict.other).replace('{fields}',fields)+' '+(conflict.winner?T('conflictWinner'):T('conflictLoser'))));
+   }
+   row.append(warning);
   }
  }
 }
@@ -3044,14 +3139,14 @@ function renderTbAccounts(){
 }
 handle('export','click',exportAllRules);
 if($('exportSettings'))handle('exportSettings','click',exportAllRules);
-if($('exportSingleRule'))handle('exportSingleRule','click',async()=>{
- const rule=buildRule();
+async function exportRuleFile(rule){
  const slug=(rule.name||'regel').toLowerCase().replace(/[^a-z0-9åäö_-]+/gi,'-').replace(/^-+|-+$/g,'')||'regel';
  const folderHints=folders.map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
  const singleFile=paths().rules+'sortbro-regel-'+slug+'.json';
  await download({format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:[rule],folders:folderHints},singleFile);
  toast(T('toastSingleExported').replace('{path}',singleFile));
-});
+}
+if($('exportSingleRule'))handle('exportSingleRule','click',()=>exportRuleFile(buildRule()));
 handle('exportErrorLog','click',async()=>{
  const file=paths().logs+'sortbro-fellogg.txt';
  await download(await rpc('exportErrorLog'),file,'text/plain',true);

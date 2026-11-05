@@ -123,6 +123,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>/Kan krocka med/.test(el('ruleList').textContent),'konflikten syns i regellistan',false,6000);
  const conflictNotes=[...doc.querySelectorAll('.rule-conflict')].map(n=>n.textContent);
  check(conflictNotes.length===2,'båda reglerna får en varning ('+conflictNotes.length+')');
+ check([...doc.querySelectorAll('.rule-conflict')].every(n=>!n.open&&/Överlapp/.test(n.querySelector('summary').textContent)),'korta varningsrader syns även när förklaringen är hopfälld');
  check(/Krock två/.test(conflictNotes[0])&&/Krock ett/.test(conflictNotes[1]),'varningen pekar på den andra regeln');
  check(/Domän/i.test(conflictNotes[0]),'och namnger fältet som kan krocka: "'+conflictNotes[0].slice(0,110)+'"');
  check(/ligger först och vinner/.test(conflictNotes[0]),'den första regeln säger att den vinner');
@@ -578,6 +579,103 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(el('ruleOpenWindow').disabled===false,'fönstervalet går att göra när olästa flyttas');
  check(!el('unreadChoiceNote').classList.contains('muted-out'),'och förklaringen syns igen');
  check(/efter flytten/i.test(doc.querySelector('[data-i18n="ruleOpenWindowLabel"]')?.textContent||''),'rutan säger att fönstret kommer efter flytten');
+
+ /* ── Kompakta regler och menyn för sparade regler ─────────────────────── */
+ w.LasDemo.setState({config:{...w.LasCore.defaults(),dryRun:true,paused:false,rules:[
+  {...conflictRules[0],id:'menu-1',name:'Fortnox fakturor',target:'demo-fin',enabled:true},
+  {...conflictRules[1],id:'menu-2',name:'Webbsupport',target:'demo-web',enabled:true,conditions:[{field:'domain',op:'equals',value:'support.example'}]},
+  {...conflictRules[0],id:'menu-3',name:'Arkivera äldre',target:'demo-arkiv',enabled:true,conditions:[{field:'date',op:'older',value:'90'}]}
+ ]},fault:'',trials:[],learn:{off:false,suggestions:[]}});
+ w.eval("dirty=false;selectedId='';$('ruleSearch').value='';repaint();");
+ await w.refresh();
+ const ruleRows=()=>[...doc.querySelectorAll('#ruleList .rule-row')];
+ const saved=()=>w.LasDemo.setState({}).config.rules;
+ const byId=id=>ruleRows().find(row=>row.dataset.ruleId===id);
+ const menuFor=id=>byId(id).querySelector('.rule-menu-toggle');
+ const actionFor=(id,key)=>byId(id).querySelector('[data-action="'+key+'"]');
+ const ids=saved().map(r=>r.id);
+ check(ruleRows().every(row=>row.querySelector('.rule-menu-panel').hidden),'regelmenyerna är stängda från början');
+ check(ruleRows().every(row=>!row.querySelector('.rule-details').open),'långa detaljer är hopfällda');
+ check(byId(ids[0]).querySelector('.rule-target').textContent.includes('Fakturor'),'kompakt rad visar målmapp');
+ check(byId(ids[0]).querySelector('.rule-status').textContent==='På','aktiverad regel har textstatus');
+ check(byId(ids[0]).querySelector('.rule-order').textContent==='Prioritet 1','ordningen syns');
+ check(!byId(ids[0]).querySelector('.rule-main').textContent.includes('fortnox.se'),'villkorstexten ligger inte i sammanfattningen');
+ menuFor(ids[0]).click();
+ check(menuFor(ids[0]).getAttribute('aria-expanded')==='true','menyknappen beskriver öppet läge');
+ check(!byId(ids[0]).querySelector('.rule-menu-panel').hidden,'menyn visar sina åtgärder');
+ check(byId(ids[0]).querySelectorAll('.rule-action').length===7,'sju namngivna åtgärder per regel');
+ check(actionFor(ids[0],'ruleUp').disabled,'första regeln kan inte flyttas upp');
+ check(actionFor(ids[2],'ruleDown').disabled,'sista regeln kan inte flyttas ned');
+ menuFor(ids[1]).click();
+ check(byId(ids[0]).querySelector('.rule-menu-panel').hidden,'bara en meny är öppen åt gången');
+ doc.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ check(byId(ids[1]).querySelector('.rule-menu-panel').hidden,'Escape stänger menyn');
+ check(doc.activeElement===menuFor(ids[1]),'Escape återlämnar fokus till menyknappen');
+ menuFor(ids[0]).click();el('ruleSearch').click();
+ check(byId(ids[0]).querySelector('.rule-menu-panel').hidden,'klick utanför stänger menyn');
+ menuFor(ids[0]).click();byId(ids[0]).querySelector('.rule-details summary').click();
+ check(byId(ids[0]).querySelector('.rule-details').open,'detaljerna går att fälla ut');
+ check(byId(ids[0]).querySelector('.rule-details-body').textContent.includes('fortnox.se'),'villkoren finns kvar under detaljer');
+ check(byId(ids[0]).querySelectorAll('.rule-inline-opts input').length===2,'oläst- och fönstervalen finns kvar');
+ w.eval("state.fault='storage_error';renderStatus(state);");
+ check(actionFor(ids[0],'ruleRun').disabled,'nytt motorfel spärrar körknappen utan regeländring');
+ w.eval("state.fault='';renderStatus(state);");
+ check(!actionFor(ids[0],'ruleRun').disabled,'rensat fel uppdaterar knappen');
+ /* Att pausa ska ändra körknappen även utan ändringar i reglerna. */
+ el('pause').click();await until(()=>actionFor(ids[0],'ruleRun').disabled,'paus spärrar menyns körknapp');
+ check(actionFor(ids[0],'ruleRun').disabled,'körknappen spärras när bevakningen är pausad');
+ el('pause').click();await until(()=>!actionFor(ids[0],'ruleRun').disabled,'återupptagning frigör körknappen');
+ let called=[];const menuRequest=w.LasDemo.request;
+ w.LasDemo.request=async m=>{called.push(m);return menuRequest(m);};
+ menuFor(ids[1]).click();actionFor(ids[1],'ruleRun').click();
+ await until(()=>called.some(m=>m.type==='catchUp'),'kör från menyn skickar ett uppdrag');
+ check(called.find(m=>m.type==='catchUp').ruleId===ids[1],'kör rätt regel, inte den i editorn');
+ await until(()=>!actionFor(ids[1],'ruleRun').disabled,'körknappen återaktiveras');
+ w.LasDemo.request=menuRequest;
+ /* Export från menyn använder den sparade regeln, aldrig ett annat utkast. */
+ byId(ids[0]).querySelector('.rule-open').click();
+ el('ruleName').value='OSPARAT UTKAST';fire(el('ruleName'),'input');
+ const priorBlob=blob;
+ menuFor(ids[1]).click();actionFor(ids[1],'ruleExport').click();
+ await until(()=>blob!==priorBlob,'menyexporten skapar fil');
+ const exportedRule=JSON.parse(await blobText(blob));
+ check(exportedRule.rules.length===1&&exportedRule.rules[0].id===ids[1],'menyexporten innehåller exakt rätt sparade regel');
+ check(el('ruleName').value==='OSPARAT UTKAST','exporten rör inte utkastet');
+ w.confirm=()=>false;
+ menuFor(ids[1]).click();actionFor(ids[1],'ruleEdit').click();
+ check(el('ruleName').value==='OSPARAT UTKAST','nej till att kasta utkast hindrar byte');
+ actionFor(ids[1],'ruleCopy').click();
+ check(el('ruleName').value==='OSPARAT UTKAST','duplicering skyddar också osparade ändringar');
+ const unreadToggle=byId(ids[1]).querySelector('.rule-inline-opts input');
+ const oldUnread=unreadToggle.checked;unreadToggle.checked=!oldUnread;fire(unreadToggle,'change');
+ check(unreadToggle.checked===oldUnread,'ändring av olästval kan avbrytas när utkast finns');
+ w.confirm=()=>true;w.eval('dirty=false;');
+ /* Ordning ändras i hela listan, även när bara en sökträff visas. */
+ el('ruleSearch').value=saved()[1].name;fire(el('ruleSearch'),'input');
+ await until(()=>rows()===1,'sök fram en regel före omordning');
+ menuFor(ids[1]).click();actionFor(ids[1],'ruleUp').click();
+ await until(()=>saved()[0].id===ids[1],'flytta upp rätt regel från en filtrerad lista');
+ check(saved()[0].id===ids[1]&&saved()[1].id===ids[0],'sökningen ändrar inte prioriteringslogiken');
+ el('ruleSearch').value='';fire(el('ruleSearch'),'input');await until(()=>rows()===3,'hela listan återkommer');
+ /* Menyns duplicering skapar bara ett utkast. */
+ menuFor(ids[1]).click();actionFor(ids[1],'ruleCopy').click();
+ check(saved().length===3,'duplicering aktiverar inte en ny regel automatiskt');
+ check(/kopia/i.test(el('ruleName').value),'kopian öppnas som ett redigerbart utkast');
+ w.eval('dirty=false;');
+ let confirmation='';w.confirm=text=>{confirmation=text;return false;};
+ menuFor(ids[2]).click();actionFor(ids[2],'ruleDelete').click();
+ await sleep(30);
+ check(saved().length===3,'nej till borttagning behåller regeln');
+ check(confirmation.includes(saved().find(r=>r.id===ids[2]).name),'borttagning namnger rätt regel');
+ w.confirm=()=>true;actionFor(ids[2],'ruleDelete').click();
+ await until(()=>saved().length===2&&rows()===2,'godkänd borttagning tar bort regeln');
+ await until(()=>w.eval('dirty===false'),'borttagningen har uppdaterat editorn');
+ check(!saved().some(r=>r.id===ids[2]),'bara den valda regeln tas bort');
+ el('langEn').click();await until(()=>/Actions for/.test(menuFor(ids[1]).getAttribute('aria-label')),'menyetiketten översätts');
+ check(actionFor(ids[1],'ruleDelete').textContent==='Delete…','menyvalen finns på engelska');
+ check(byId(ids[1]).querySelector('.rule-details summary').textContent==='Details & settings','detaljvalet finns på engelska');
+ el('langSv').click();await until(()=>/Åtgärder för/.test(menuFor(ids[1]).getAttribute('aria-label')),'svenska tillbaka');
+ w.confirm=()=>true;
 
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
     kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */

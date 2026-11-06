@@ -292,7 +292,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(rows()===beforePartial+1,'en regel skapades, inte noll och inte två');
  check(!el('tbImportReview').hidden,'den felande raden ligger kvar i listan');
  check(/Kunde inte sparas:/.test(el('tbImportReview').textContent),'raden förklarar varför: "'+el('tbImportReview').textContent.slice(0,140)+'"');
- check([...el('tbImportReview').querySelectorAll('button')].length===0,'ingen knapp som försöker igen med samma felande rad');
+ check([...el('tbImportReview').querySelectorAll('button:not(:disabled)')].length===0,'ingen aktiv knapp som försöker igen med samma felande rad');
 
  /* --- Fler villkor än SortBro har plats med --- */
 const BS=String.fromCharCode(92);
@@ -766,15 +766,17 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check([...el('target').options].filter(o=>o.value).every(o=>o.value.startsWith('second-')),'mappvalet innehåller bara valt kontos mappar');
  check(/björn@example.se/.test(el('targetAccount').selectedOptions[0].textContent),'e-postadress visas tillsammans med kontonamnet');
  check(txt('targetPath').includes('Bokföring › Årsöversikt › Beställningar från leverantörer'),'hela den valda sökvägen visas separat');
- el('targetSearch').value='åRSÖVERSIKT'.normalize('NFD');fire(el('targetSearch'),'input');
- check(el('target').options.length===2&&el('target').value==='second-year','svensk mappsökning hittar kombinerade tecken utan att tappa valt ID');
+ el('targetBrowse').click();
+ el('folderTreeSearch').value='åRSÖVERSIKT'.normalize('NFD');fire(el('folderTreeSearch'),'input');
+ check(!!el('folderTree').querySelector('[data-key="folder:second-year"]')&&!el('folderTree').querySelector('[data-key="folder:second-buy"]')&&el('target').value==='second-year','svensk mappsökning hittar kombinerade tecken utan att tappa valt ID');
  check(w.eval('dirty')===false,'mappsökning ändrar inte regeln eller osparat-läget');
- el('targetSearch').value='finns-inte';fire(el('targetSearch'),'input');
+ el('folderTreeSearch').value='finns-inte';fire(el('folderTreeSearch'),'input');
  check(el('target').value==='second-year','sökfilter får aldrig kasta bort en befintlig målmapp');
- el('targetSearch').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
- check(doc.activeElement===el('target'),'Enter i mappsökning går till mappvalet utan att spara regeln');
+ el('folderTreeSearch').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ check(doc.activeElement===el('folderTree'),'Enter vid tom sökträff går till trädet utan att spara regeln');
+ el('folderTreeCancel').click();
  el('targetAccount').value='demo';fire(el('targetAccount'),'change');
- check(el('target').value===''&&el('targetSearch').value==='','kontobyte tömmer mappval och sökning, utan att välja första mappen');
+ check(el('target').value==='','kontobyte tömmer mappvalet utan att välja första mappen');
  check([...el('target').options].some(o=>o.value==='demo-buy')&&![...el('target').options].some(o=>o.value==='second-buy'),'lika mappnamn i andra konton blandas inte');
  check(w.eval('dirty')===true,'ändrat målkonto gör utkastet osparat');
  w.folderPicker(el('target'),'removed-folder',{reset:true});
@@ -782,8 +784,10 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  w.folderPicker(el('target'),'',{reset:true});
  check(el('target').disabled&&!el('targetAccount').disabled,'mappval väntar på kontoval');
  el('targetAccount').value='second';fire(el('targetAccount'),'change');
- el('targetSearch').value='ej-en-mapp';fire(el('targetSearch'),'input');
- check(el('target').value===''&&/Inga mappar/.test(txt('targetPath')),'tom sökträff får tydlig text och ingen påhittad målmapp');
+ el('targetBrowse').click();
+ el('folderTreeSearch').value='ej-en-mapp';fire(el('folderTreeSearch'),'input');
+ check(el('target').value===''&&/Inga mappar/.test(txt('folderTreeStatus')),'tom sökträff får tydlig text och ingen påhittad målmapp');
+ el('folderTreeCancel').click();
  w.loadRule('picker-rule');
  el('langEn').click();await until(()=>doc.documentElement.lang==='en','mappväljaren byter till engelska');
  check(el('targetAccount').value==='second'&&el('target').value==='second-year','språkbyte bevarar destinationen');
@@ -883,7 +887,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  el('conditions').firstElementChild.querySelector('.remove-condition').click();
  check(visibleJoins().length===1&&el('conditions').firstElementChild.querySelector('.condition-join').hidden,'borttagning av första villkoret lämnar ingen överflödig koppling överst');
  check(!/Wordfence/.test(txt('ruleSummaryBody')),'borttaget villkor försvinner direkt från sammanfattningen');
- const unsafeText='<img src=x onerror=alert(1)>  /* Låt sista klickets löfteskedja ÅÄÖ';
+ const unsafeText='<img src=x onerror=alert(1)> $& ÅÄÖ';
  el('conditions').firstElementChild.children[2].value=unsafeText;fire(el('conditions').firstElementChild.children[2],'input');
  check(txt('ruleSummaryBody').includes(unsafeText)&&!el('ruleSummaryBody').querySelector('img,script'),'villkorsvärden visas som text – HTML och dollaruttryck tolkas inte');
  setCondition(el('conditions').firstElementChild,'size','larger','500');
@@ -927,6 +931,95 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  el('fromSelected').click();await until(()=>/fortnox.se/.test(txt('ruleSummaryBody')),'hämtning av exempelmejl uppdaterar sammanfattningen');
  check(/fortnox.se/.test(txt('ruleSummaryBody')),'programmässigt ifyllt exempelmejl visas utan extra knapptryck');
  w.eval('dirty=false;');
+
+ /* Mappträdet ersätter rullgardinslistan och bekräftar bara uttryckliga val. */
+ w.eval(`folders.push(
+  {id:'tree-parent',accountId:'tree-a',accountName:'Åsas konto',name:'Arkiv',path:'/Arkiv',label:'Åsas konto · Arkiv'},
+  {id:'child/å&42',accountId:'tree-a',accountName:'Åsas konto',parentId:'tree-parent',name:'Årsöversikt',path:'/Arkiv/Årsöversikt',label:'Åsas konto · Arkiv/Årsöversikt'},
+  {id:'tree-nested',accountId:'tree-a',accountName:'Åsas konto',name:'2025',path:'/Räkenskaper/Årsöversikt/2025',label:'Åsas konto · Räkenskaper/Årsöversikt/2025'},
+  {id:'tree-other',accountId:'tree-b',accountName:'Björns konto',name:'Årsöversikt',path:'/Arkiv/Årsöversikt',label:'Björns konto · Arkiv/Årsöversikt'});`);
+ const treeRow=id=>[...el('folderTree').children].find(n=>n.dataset.key==='folder:'+id);
+ const press=(node,key,shiftKey=false)=>node.dispatchEvent(new w.KeyboardEvent('keydown',{key,shiftKey,bubbles:true,cancelable:true}));
+ w.folderPicker(el('target'),'child/å&42');w.eval('dirty=false;');
+ const treeOriginalQuick=el('quickTarget').value,treeOriginalSource=el('source').value;
+ check(el('target').hidden&&!el('target').required&&!!el('targetBrowse'),'rullgardinslistan ersätts av en mappknapp utan dold required-kontroll');
+ el('targetBrowse').click();
+ check(!el('folderTreeModal').hidden&&doc.activeElement===el('folderTreeAccount'),'mappdialogen öppnas med fokus på kontot');
+ check(el('folderTreeAccount').value==='tree-a'&&treeRow('child/å&42')?.getAttribute('aria-selected')==='true','sparat mapp-ID öppnas i rätt konto med föräldrarna utfällda');
+ check(/Åsas konto · Arkiv › Årsöversikt/.test(txt('folderTreePath')),'markerad mapp har hela sin sökväg synlig');
+ check(doc.querySelector('.shell').inert===true,'mappdialogen låser bakgrunden');
+ treeRow('tree-parent').click();
+ check(el('target').value==='child/å&42'&&w.eval('dirty')===false,'markering i trädet ändrar inte det riktiga målvalet eller utkastet');
+ el('folderTreeCancel').click();
+ check(el('target').value==='child/å&42'&&doc.activeElement===el('targetBrowse')&&doc.querySelector('.shell').inert===false,'Avbryt behåller målmappen och lämnar tillbaka fokus');
+ el('targetBrowse').click();
+ el('folderTreeCancel').focus();press(el('folderTreeCancel'),'Tab');
+ check(doc.activeElement===el('folderTreeAccount'),'Tab från dialogens sista knapp går till kontot');
+ press(el('folderTreeAccount'),'Tab',true);
+ check(doc.activeElement===el('folderTreeCancel'),'Shift+Tab från kontot går till sista knappen');
+ el('folderTreeAccount').value='tree-b';fire(el('folderTreeAccount'),'change');
+ check(el('folderTreeChoose').disabled&&el('targetAccount').value==='tree-a','kontobyte i dialogen väljer ingen mapp och ändrar inte huvudregeln');
+ el('folderTreeSearch').value='ÅRSÖVERSIKT'.normalize('NFD');fire(el('folderTreeSearch'),'input');
+ check(!!treeRow('tree-other')&&!treeRow('child/å&42'),'svensk sökning stannar inom valt konto även vid lika mappnamn');
+ treeRow('tree-other').click();
+ check(el('target').value==='child/å&42','även en träff i annat konto väntar på bekräftelse');
+ el('folderTreeChoose').click();
+ check(el('folderTreeModal').hidden&&el('target').value==='tree-other'&&el('targetAccount').value==='tree-b','Välj denna mapp överför rätt verkligt ID och konto');
+ check(el('source').value===treeOriginalSource&&el('quickTarget').value===treeOriginalQuick,'bekräftelsen ändrar inte källkonto eller snabbregelns mål');
+ check(w.eval('dirty')===true&&/Björns konto/.test(txt('ruleSummaryBody')),'bekräftat mål markeras som osparat och syns i sammanfattningen');
+ el('targetBrowse').click();el('folderTreeAccount').value='tree-a';fire(el('folderTreeAccount'),'change');
+ const parentKey=treeRow('tree-parent');
+ check(parentKey.getAttribute('aria-expanded')==='false'&&!treeRow('child/å&42'),'grenen börjar hopfälld i ett nytt konto');
+ parentKey.focus();press(parentKey,'ArrowRight');
+ check(treeRow('tree-parent').getAttribute('aria-expanded')==='true'&&!!treeRow('child/å&42'),'högerpil fäller ut grenen');
+ press(doc.activeElement,'ArrowDown');
+ check(doc.activeElement===treeRow('child/å&42'),'nedåtpil går till undermappen');
+ press(doc.activeElement,'Enter');
+ check(!el('folderTreeChoose').disabled&&el('target').value==='tree-other','Enter markerar endast – inget mål byts utan bekräftelse');
+ press(doc.activeElement,'ArrowLeft');
+ check(doc.activeElement===treeRow('tree-parent'),'vänsterpil går till föräldern från ett löv');
+ press(doc.activeElement,'ArrowLeft');
+ check(!treeRow('child/å&42'),'vänsterpil fäller ihop öppen gren');
+ press(doc.activeElement,'End');check(doc.activeElement===el('folderTree').lastElementChild,'End går till sista synliga raden');
+ press(doc.activeElement,'Home');check(doc.activeElement===el('folderTree').firstElementChild,'Home går till första synliga raden');
+ press(doc.activeElement,'Escape');
+ check(el('folderTreeModal').hidden&&el('target').value==='tree-other','Escape avbryter även efter tangentbordsmarkering');
+ el('targetBrowse').click();el('folderTreeAccount').value='tree-a';fire(el('folderTreeAccount'),'change');
+ const virtual=[...el('folderTree').children].find(n=>n.textContent.includes('Räkenskaper'));
+ virtual.click();
+ check(el('folderTreeChoose').disabled&&!virtual.hasAttribute('aria-selected'),'strukturrader kan fällas ut men får aldrig ett påhittat mål-ID');
+ el('folderTreeSearch').value='RÄKENSKAPER ÅRSÖVERSIKT'.normalize('NFD');fire(el('folderTreeSearch'),'input');
+ check(!!treeRow('tree-nested')&&treeRow('tree-nested').getAttribute('aria-level')==='3','flerordsökning visar träffen med rätt nivå och föräldrar');
+ treeRow('tree-nested').click();
+ check(/Räkenskaper › Årsöversikt › 2025/.test(txt('folderTreePath')),'sökresultatets fulla sökväg kan kontrolleras före val');
+ w.applyLanguage('en');
+ check(txt('folderTreeTitle')==='Choose target folder'&&txt('folderTreeChoose')==='Choose this folder','öppen mappdialog översätts utan att tappa valet');
+ check(treeRow('tree-nested')?.getAttribute('aria-selected')==='true','språkbyte behåller det väntande ID:t');
+ w.applyLanguage('sv');el('folderTreeModal').click();
+ check(el('folderTreeModal').hidden&&el('target').value==='tree-other','bakgrundsklick avbryter utan att ändra målmapp');
+ el('targetBrowse').click();el('folderTreeAccount').value='tree-a';fire(el('folderTreeAccount'),'change');
+ el('folderTreeSearch').value='finns-inte';fire(el('folderTreeSearch'),'input');
+ check(el('folderTree').children.length===0&&/Inga mappar/.test(txt('folderTreeStatus'))&&el('folderTreeChoose').disabled,'noll träffar ger ett begripligt, säkert tomläge');
+ el('folderTreeCancel').click();
+
+ /* Mappträdet kan användas inne i Ny mapp utan att fokus eller bakgrund låses fel. */
+ el('newFolderBtn').click();el('folderParentBrowse').click();
+ check(!el('folderModal').hidden&&!el('folderTreeModal').hidden&&el('folderModal').inert===true,'föräldramapp väljs i ett eget träd ovanpå Ny mapp');
+ check(/överordnad/.test(txt('folderTreeTitle')),'föräldraväljaren har rätt rubrik');
+ press(el('folderTreeAccount'),'Escape');
+ check(el('folderTreeModal').hidden&&!el('folderModal').hidden&&doc.activeElement===el('folderParentBrowse')&&doc.querySelector('.shell').inert===true,'Escape stänger bara trädet och återgår till Ny mapp');
+ el('folderParentBrowse').click();el('folderTreeAccount').value='tree-a';fire(el('folderTreeAccount'),'change');
+ [...el('folderTree').children].find(n=>n.dataset.key==='account-root').click();el('folderTreeChoose').click();
+ check(el('folderParent').value===''&&el('folderParentAccount').value==='tree-a','kontots rot kan väljas uttryckligen som förälder');
+ el('folderCancelBtn').click();
+ check(doc.querySelector('.shell').inert===false&&doc.activeElement===el('newFolderBtn'),'efter båda dialogerna återställs fokus och interaktivitet');
+
+ /* Ett mål som försvunnit under tiden får inte ersättas med första bästa mapp. */
+ el('targetBrowse').click();
+ w.eval("globalThis.removedTreeFolder=folders.find(f=>f.id==='tree-other');folders=folders.filter(f=>f.id!=='tree-other');");
+ el('folderTreeChoose').click();
+ check(!el('folderTreeModal').hidden&&el('folderTreeChoose').disabled&&el('target').value==='tree-other','försvunnen mapp stoppas vid bekräftelsen utan automatisk ersättare');
+ el('folderTreeCancel').click();w.eval('folders.push(removedTreeFolder);delete globalThis.removedTreeFolder;dirty=false;');
 
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
     kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */

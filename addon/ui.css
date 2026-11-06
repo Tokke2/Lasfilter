@@ -2890,3 +2890,29 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .rule-summary-notes p { margin: 6px 0; }
 .rule-summary-notes ol { margin: 8px 0; padding-inline-start: 24px; }
 .rule-summary-note { color: var(--muted); margin: 12px 0 0; }
+
+/* Stor mappdialog: konto först, ett faktiskt ID först efter bekräftelse. */
+.folder-picker-tree .folder-account { grid-column: 1 / -1; }
+.folder-browse { text-align: left; width: 100%; justify-content: flex-start; }
+.folder-tree-modal { z-index: 70; }
+.folder-tree-card { width: min(780px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.folder-tree-card > h2, .folder-tree-card > p { margin: 0; }
+.folder-tree-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.folder-tree-controls .field { margin: 0; min-width: 0; }
+.folder-tree-controls input, .folder-tree-controls select { width: 100%; min-width: 0; }
+.folder-tree { overflow: auto; min-height: 100px; max-height: 42vh; flex: 1 1 320px; border: 1px solid var(--line); border-radius: 8px; background: var(--input); }
+.folder-tree-row { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 2px 6px; padding: 9px 10px 9px calc(6px + var(--tree-depth) * 16px); cursor: pointer; border-bottom: 1px solid var(--line); min-width: 0; }
+.folder-tree-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.folder-tree-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+.folder-tree-name { overflow-wrap: anywhere; }
+.folder-tree-toggle { display: flex; align-items: center; justify-content: center; min-height: 32px; font-size: 1.15rem; }
+.folder-tree-kind, .folder-tree-search-path { grid-column: 2; overflow-wrap: anywhere; font-size: var(--text-small); color: var(--muted); }
+.folder-tree-selection { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--soft); }
+#folderTreePath { margin: 4px 0 0; max-height: 6em; overflow: auto; overflow-wrap: anywhere; }
+#folderTreeKeys, #folderTreeStatus { font-size: var(--text-small); }
+.folder-tree-card .modal-actions { margin-top: 0; }
+:root[data-large-text="true"] .folder-tree-controls { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 700px) { .folder-tree-controls { grid-template-columns: minmax(0, 1fr); } }
+.folder-tree-keys { font-size: var(--text-small); }
+.folder-tree-keys summary { cursor: pointer; color: var(--muted); }
+.folder-tree-keys p { margin: 6px 0 0; }

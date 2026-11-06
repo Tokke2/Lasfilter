@@ -279,6 +279,20 @@ const I18N={
   step3Title:'Vart och när ska mejlen flyttas?',
   targetLabel:'Välj målmapp',
   chooseTarget:'Välj en målmapp…',
+  browseFolders:"Bläddra bland mappar…",
+  folderTreeTitle:"Välj målmapp",
+  folderTreeParentTitle:"Välj överordnad mapp",
+  folderTreeHelp:"Välj konto, fäll ut mapparna och markera ditt mål. Inget ändras förrän du bekräftar.",
+  folderTreeLabel:"Mappar i valt konto",
+  folderTreeChoose:"Välj denna mapp",
+  folderTreePending:"Markerad mapp",
+  folderTreeNoSelection:"Markera en mapp i trädet.",
+  folderTreeCount:"Mappar: {n}",
+  folderTreeKeyHelp:"Tangentbordshjälp",
+  folderTreeNavigation:"Piltangenter bläddrar. Höger/vänster fäller ut/in. Enter eller mellanslag markerar; knappen nedan bekräftar.",
+  folderTreeStructure:"(sökväg – inte valbar)",
+  folderTreeExpand:"Fäll ut {name}",
+  folderTreeCollapse:"Fäll ihop {name}",
   targetAccountLabel:"1. E-postkonto för målmappen",
   targetFolderLabel:"2. Mapp i valt konto",
   targetSearchLabel:"Sök mapp",
@@ -1039,6 +1053,20 @@ const I18N={
   step3Title:'Where and when should emails move?',
   targetLabel:'Target folder',
   chooseTarget:'Select a target folder…',
+  browseFolders:"Browse folders…",
+  folderTreeTitle:"Choose target folder",
+  folderTreeParentTitle:"Choose parent folder",
+  folderTreeHelp:"Choose an account, expand folders and select your destination. Nothing changes until you confirm.",
+  folderTreeLabel:"Folders in selected account",
+  folderTreeChoose:"Choose this folder",
+  folderTreePending:"Selected folder",
+  folderTreeNoSelection:"Select a folder in the tree.",
+  folderTreeCount:"Folders: {n}",
+  folderTreeKeyHelp:"Keyboard help",
+  folderTreeNavigation:"Use arrow keys to navigate. Right/left expand/collapse. Enter or Space selects; the button below confirms.",
+  folderTreeStructure:"(path – not selectable)",
+  folderTreeExpand:"Expand {name}",
+  folderTreeCollapse:"Collapse {name}",
   targetAccountLabel:"1. Destination email account",
   targetFolderLabel:"2. Folder in selected account",
   targetSearchLabel:"Find folder",
@@ -1648,7 +1676,7 @@ function applyLanguage(lang){
  for(const node of document.querySelectorAll('[data-i18n-aria]'))node.setAttribute('aria-label',T(node.dataset.i18nAria));
  for(const node of document.querySelectorAll('[data-i18n-title]'))node.title=T(node.dataset.i18nTitle);
  for(const select of document.querySelectorAll('#folderModal .folder-choice, #tbImportReview .folder-choice'))folderPicker(select,select.value);
- updateReadPolicy();updateMatchHelp();
+ updateReadPolicy();updateMatchHelp();if(folderTreeSession)renderFolderTree();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
  if(state)applySeason(state.prefs);
  repaint();
@@ -1794,7 +1822,7 @@ function renderTbReview(){
   if(importable&&!f.target)select.classList.add('needs-target');
   select.addEventListener('change',()=>{f.target=select.value;if(check.checked&&!select.value){check.checked=false;f.selected=false;}});
   check.addEventListener('change',()=>{
-   if(check.checked&&!select.value){check.checked=false;toast(T('tbImportNeedsTarget'));select.focus();return;}
+   if(check.checked&&!select.value){check.checked=false;toast(T('tbImportNeedsTarget'));focusFolderPicker(select);return;}
    f.selected=check.checked;
   });
   row.append(check,main,select);
@@ -1959,6 +1987,7 @@ function applyTemplate(key){
 /* ===== ＋ Ny mapp ===== */
 let folderReturnFocus=null;
 function closeFolderModal(){
+ if(folderTreeSession?.root)closeFolderTree();
  $('folderModal').hidden=true;document.querySelector('.shell').inert=false;
  if(folderReturnFocus?.isConnected)folderReturnFocus.focus();
  folderReturnFocus=null;
@@ -2401,44 +2430,135 @@ function accounts(){
 function accountOptions(value=''){selectOptions($('source'),accounts(),T('chooseAccount'),value);}
 /* Varje väljare äger sitt konto/sökfält. ID:n för Thunderbird-mappar ändras aldrig.
    En avsiktligt tömd väljare får inte återställas från senast använda målmapp. */
-const folderPickers=new WeakMap();let folderPickerSeq=0;
+const folderPickers=new WeakMap();let folderPickerSeq=0,folderTreeSession=null;
 function folderPicker(select,value='',options={}){
  let p=folderPickers.get(select);
  if(!p){
-  const wrap=el('div','folder-picker'),account=el('select'),search=el('input'),hint=el('p','folder-path');
+  const wrap=el('div','folder-picker folder-picker-tree'),account=el('select'),browse=el('button','button secondary folder-browse'),hint=el('p','folder-path');
   const base=select.id||('folderChoice'+(++folderPickerSeq));
-  select.id=base;account.id=base+'Account';search.id=base+'Search';hint.id=base+'Path';
-  search.type='search';search.maxLength=200;search.autocomplete='off';
-  select.classList.add('folder-choice');select.setAttribute('aria-describedby',hint.id);
-  const field=(control,key,cls)=>{const label=el('label','field '+cls);const title=el('span');title.dataset.i18n=key;label.append(title,control);return label;};
-  select.replaceWith(wrap);
-  wrap.append(field(account,'targetAccountLabel','folder-account'),field(search,'targetSearchLabel','folder-search'),field(select,'targetFolderLabel','folder-select'),hint);
-  p={wrap,account,search,hint,root:false,disabled:false};folderPickers.set(select,p);
-  account.addEventListener('change',()=>{search.value='';folderPicker(select,'',{accountId:account.value});select.dispatchEvent(new Event('change',{bubbles:true}));});
-  search.addEventListener('input',event=>{event.stopPropagation();folderPicker(select,select.value);});
-  search.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();select.focus();}});
+  select.id=base;account.id=base+'Account';browse.id=base+'Browse';hint.id=base+'Path';
+  // Bevara ID/value som datakontroll för befintlig regelkod, aldrig som dold required-kontroll.
+  select.classList.add('folder-choice');select.hidden=true;select.required=false;
+  browse.type='button';browse.setAttribute('aria-haspopup','dialog');browse.setAttribute('aria-controls','folderTreeModal');browse.setAttribute('aria-describedby',hint.id);
+  const field=(control,key,cls)=>{const label=el('label','field '+cls),title=el('span');title.dataset.i18n=key;label.append(title,control);return label;};
+  select.replaceWith(wrap);wrap.append(field(account,'targetAccountLabel','folder-account'),field(browse,'targetFolderLabel','folder-select'),select,hint);
+  p={wrap,account,browse,hint,root:false,disabled:false};folderPickers.set(select,p);
+  account.addEventListener('change',()=>{folderPicker(select,'',{accountId:account.value});select.dispatchEvent(new Event('change',{bubbles:true}));});
+  browse.addEventListener('click',()=>openFolderTree(select));
   select.addEventListener('change',()=>folderPicker(select,select.value));
  }
  Object.assign(p,{root:options.root??p.root,disabled:options.disabled??p.disabled});
  const selected=folders.find(f=>f.id===value),missing=!!value&&!selected;
  const accountId=selected?.accountId??options.accountId??(options.reset?'':p.account.value);
- if(options.reset)p.search.value='';
  selectOptions(p.account,accounts(),T('chooseAccount'),accountId);
- const query=C.norm(p.search.value).trim().split(/\s+/).filter(Boolean);
- const pathOf=f=>(f.path||f.name||f.label||'').split('/').filter(Boolean).join(' › ');
- const all=folders.filter(f=>f.accountId===p.account.value);
- const choices=all.filter(f=>f.id===value||query.every(word=>C.norm((f.path||'')+' '+f.name).includes(word)))
-  .map(f=>({id:f.id,label:pathOf(f)})).sort((a,b)=>a.label.localeCompare(b.label,currentLang==='sv'?'sv':'en',{numeric:true}));
+ const choices=folders.filter(f=>f.accountId===p.account.value).map(f=>({id:f.id,label:folderPath(f)})).sort((a,b)=>a.label.localeCompare(b.label,locale(),{numeric:true}));
  selectOptions(select,choices,!p.account.value?T('targetAccountFirst'):p.root?T('newFolderRoot'):T('chooseTarget'),value);
  if(missing){const o=el('option','',T('targetMissing'));o.value=value;select.append(o);select.value=value;}
- p.account.disabled=p.disabled;p.search.disabled=p.disabled||!p.account.value;select.disabled=p.disabled||!p.account.value;
- p.search.placeholder=T('targetSearchPlaceholder');
+ p.account.disabled=p.disabled;select.disabled=p.disabled||!p.account.value;p.browse.disabled=select.disabled;
+ p.browse.textContent=selected?selected.name+' · '+T('browseFolders'):p.root&&p.account.value?T('newFolderRoot')+' · '+T('browseFolders'):T('browseFolders');
  for(const title of p.wrap.querySelectorAll('[data-i18n]'))title.textContent=T(title.dataset.i18n);
  const accountLabel=accounts().find(a=>a.id===p.account.value)?.label||'';
- p.hint.textContent=missing?T('targetMissing'):selected?T('targetSelected')+': '+accountLabel+' · '+pathOf(selected):!p.account.value?T('targetAccountFirst'):p.root&&!value?accountLabel+' · '+T('newFolderRoot'):!choices.length?T('targetEmpty'):'';
- select.title=selected?accountLabel+' · '+pathOf(selected):'';
+ p.hint.textContent=missing?T('targetMissing'):selected?T('targetSelected')+': '+accountLabel+' · '+folderPath(selected):!p.account.value?T('targetAccountFirst'):p.root?accountLabel+' · '+T('newFolderRoot'):'';
+ p.browse.title=selected?accountLabel+' · '+folderPath(selected):T('browseFolders');
  if(select.closest('#ruleForm'))updateRuleExplanation();
  return p;
+}
+function folderPath(f){return (f.path||f.name||'').split('/').filter(Boolean).join(' › ');}
+function focusFolderPicker(select){const p=folderPickers.get(select);if(p)(p.browse.disabled?p.account:p.browse).focus();}
+function openFolderTree(select){
+ const p=folderPickers.get(select);if(!p||p.disabled||folderTreeSession)return;
+ folderTreeSession={select,opener:p.browse,originValue:select.value,originAccount:p.account.value,ruleId:selectedId,accountId:p.account.value,pending:select.value?'folder:'+select.value:p.root&&p.account.value?'account-root':'',expanded:new Set(),active:'',root:p.root,model:null,rows:[]};
+ $('folderTreeSearch').value='';
+ document.querySelector('.shell').inert=true;$('folderModal').inert=true;
+ $('folderTreeModal').hidden=false;renderFolderTree(true);
+ // Börja vid kontot: flytt mellan konton är tillåtet men kräver ett uttryckligt val.
+ $('folderTreeAccount').focus();
+}
+function closeFolderTree(){
+ const session=folderTreeSession;if(!session)return;
+ folderTreeSession=null;$('folderTreeModal').hidden=true;$('folderModal').inert=false;
+ document.querySelector('.shell').inert=!$('folderModal').hidden;
+ if(session.opener.isConnected&&!session.opener.disabled)session.opener.focus();
+ else if(!$('folderModal').hidden)$('folderName').focus();
+ else document.querySelector('.nav.active')?.focus();
+}
+function renderFolderTree(reveal=false){
+ const s=folderTreeSession;if(!s)return;
+ $('folderTreeTitle').textContent=T(s.root?'folderTreeParentTitle':'folderTreeTitle');
+ const tree=$('folderTree'),query=$('folderTreeSearch').value,hadFocus=tree.contains(document.activeElement);
+ selectOptions($('folderTreeAccount'),accounts(),T('chooseAccount'),s.accountId);
+ if($('folderTreeAccount').value!==s.accountId){s.accountId='';s.pending='';s.active='';}
+ $('folderTreeSearch').disabled=!s.accountId;$('folderTreeSearch').placeholder=T('targetSearchPlaceholder');
+ s.model=LasFolderTree.build(folders,s.accountId,locale());
+ if(s.root&&s.accountId){
+  const root={key:'account-root',id:'',name:T('newFolderRoot'),path:'',parent:null,children:s.model.roots,selectable:true};
+  for(const node of root.children)node.parent=root;
+  s.model.roots=[root];s.model.nodes.set(root.key,root);
+  if(reveal)s.expanded.add(root.key);
+ }
+ if(reveal){let node=s.model.nodes.get(s.pending)?.parent;while(node){s.expanded.add(node.key);node=node.parent;}}
+ s.rows=LasFolderTree.visible(s.model,s.expanded,query);
+ if(!s.rows.some(r=>r.node.key===s.active))s.active=s.rows.find(r=>r.node.key===s.pending)?.node.key||s.rows[0]?.node.key||'';
+ tree.replaceChildren();tree.tabIndex=s.rows.length?-1:0;
+ const sizes=new Map(),positions=new Map();for(const {node} of s.rows)sizes.set(node.parent,(sizes.get(node.parent)||0)+1);
+ for(const {node,depth,open} of s.rows){
+  const row=el('div','folder-tree-row'+(!node.selectable?' folder-tree-structure':''));
+  row.dataset.key=node.key;row.setAttribute('role','treeitem');row.tabIndex=node.key===s.active?0:-1;row.setAttribute('aria-level',String(depth));if(node.selectable)row.setAttribute('aria-selected',String(node.key===s.pending));
+  const position=(positions.get(node.parent)||0)+1;positions.set(node.parent,position);row.setAttribute('aria-posinset',String(position));row.setAttribute('aria-setsize',String(sizes.get(node.parent)));
+  row.style.setProperty('--tree-depth',String(Math.min(depth-1,8)));row.title=node.path||node.name;
+  const toggle=el('span','folder-tree-toggle',node.children.length?(open?'▾':'▸'):'');toggle.setAttribute('aria-hidden','true');
+  if(node.children.length){row.setAttribute('aria-expanded',String(open));toggle.title=explanationText(open?'folderTreeCollapse':'folderTreeExpand',{name:node.name});}
+  const name=el('span','folder-tree-name',node.name);row.append(toggle,name);
+  if(!node.selectable)row.append(el('small','folder-tree-kind',T('folderTreeStructure')));
+  if(query.trim())row.append(el('small','folder-tree-search-path',node.path));
+  row.addEventListener('focus',()=>{s.active=node.key;for(const item of tree.children)item.tabIndex=item===row?0:-1;});
+  row.addEventListener('click',event=>{
+   row.focus();
+   if(event.target===toggle&&node.children.length){toggleFolderTree(node.key);return;}
+   if(node.selectable){s.pending=node.key;renderFolderTree();}
+   else toggleFolderTree(node.key);
+  });
+  row.addEventListener('keydown',event=>folderTreeKey(event,node.key));tree.append(row);
+ }
+ const pending=s.model.nodes.get(s.pending),valid=!!s.accountId&&!!pending?.selectable;
+ $('folderTreeChoose').disabled=!valid;
+ const account=accounts().find(a=>a.id===s.accountId)?.label||'';
+ $('folderTreePath').textContent=valid?account+' · '+(pending.path.split('/').filter(Boolean).join(' › ')||pending.name):T('folderTreeNoSelection');
+ const count=[...s.model.nodes.values()].filter(n=>n.id&&LasFolderTree.matches(n,query)).length;
+ $('folderTreeStatus').textContent=!s.accountId?T('targetAccountFirst'):count?explanationText('folderTreeCount',{n:count}):T('targetEmpty');
+ if(hadFocus)focusTreeRow(s.active);
+ else if(reveal)[...tree.children].find(n=>n.dataset.key===s.pending)?.scrollIntoView({block:'nearest'});
+}
+function focusTreeRow(key){
+ const row=[...$('folderTree').children].find(n=>n.dataset.key===key);
+ if(row){row.focus();row.scrollIntoView({block:'nearest'});}else $('folderTree').focus();
+}
+function toggleFolderTree(key){
+ const s=folderTreeSession;if(!s||$('folderTreeSearch').value.trim())return;
+ s.expanded.has(key)?s.expanded.delete(key):s.expanded.add(key);renderFolderTree();
+}
+function folderTreeKey(event,key){
+ const s=folderTreeSession;if(!s)return;
+ const i=s.rows.findIndex(r=>r.node.key===key),entry=s.rows[i];if(!entry)return;
+ const {node,open}=entry;let next='';
+ if(event.key==='ArrowDown')next=s.rows[Math.min(i+1,s.rows.length-1)]?.node.key;
+ else if(event.key==='ArrowUp')next=s.rows[Math.max(i-1,0)]?.node.key;
+ else if(event.key==='Home')next=s.rows[0]?.node.key;
+ else if(event.key==='End')next=s.rows.at(-1)?.node.key;
+ else if(event.key==='ArrowRight'){if(node.children.length&&!open)toggleFolderTree(key);else if(open)next=s.rows[i+1]?.node.key;}
+ else if(event.key==='ArrowLeft'){if(open&&!$('folderTreeSearch').value.trim())toggleFolderTree(key);else next=node.parent?.key;}
+ else if(event.key==='Enter'||event.key===' '){if(node.selectable){s.pending=key;renderFolderTree();}else toggleFolderTree(key);}
+ else return;
+ event.preventDefault();event.stopPropagation();if(next)focusTreeRow(next);
+}
+function confirmFolderTree(){
+ const s=folderTreeSession;if(!s)return;
+ const node=s.model.nodes.get(s.pending);
+ const valid=node?.selectable&&s.select.isConnected&&s.select.value===s.originValue&&folderPickers.get(s.select)?.account.value===s.originAccount&&(!s.select.closest('#ruleForm')||selectedId===s.ruleId)&&(!s.root||!$('folderModal').hidden)&&accounts().some(a=>a.id===s.accountId)&&(node.key==='account-root'?s.root:folders.some(f=>f.id===node.id&&f.accountId===s.accountId));
+ if(!valid){s.pending='';renderFolderTree();toast(T('targetMissing'),true);return;}
+ const select=s.select,accountId=s.accountId,id=node.id;
+ folderPicker(select,id,{accountId,reset:true});
+ closeFolderTree();select.dispatchEvent(new Event('change',{bubbles:true}));
 }
 function targetOptions(value='',reset=false){
  folderPicker($('target'),value,{reset});
@@ -2853,7 +2973,7 @@ async function fetchSelectedIntoEditor({forceNew=false}={}){
  const row=$('conditions').children[0],field=row.children[0].value;
  row.children[2].value=field==='domain'?m.domain:field==='sender'?m.email:m.subject.slice(0,256);
  if(!$('ruleName').value)$('ruleName').value=(T('defaultRulePrefix')+(m.domain||m.email||T('defaultSenderFallback'))).slice(0,100);
- dirty=true;updateRuleExplanation();$('target').focus();toast(T('toastFromSelected'));
+ dirty=true;updateRuleExplanation();focusFolderPicker($('target'));toast(T('toastFromSelected'));
 }
 handle('fromSelected','click',async()=>fetchSelectedIntoEditor({forceNew:false}));
 if($('newFromSelected'))handle('newFromSelected','click',async()=>fetchSelectedIntoEditor({forceNew:true}));
@@ -2865,7 +2985,7 @@ if($('quickFetchBtn'))handle('quickFetchBtn','click',async()=>{
  if($('quickTarget')&&!$('quickTarget').value){
   folderPicker($('quickTarget'),'',{accountId:m.sourceAccount||''});
  }
- $('quickTarget')?.focus();
+ focusFolderPicker($('quickTarget'));
  toast(T('toastFromSelected'));
 });
 
@@ -2936,7 +3056,7 @@ function renderQuickHints(){
     if($('quickField'))$('quickField').value=kind==='word'?'subject':'domain';
     if($('quickValue'))$('quickValue').value=value;
     updateQuickPreview().catch(()=>{});
-    $('quickTarget')?.focus();
+    focusFolderPicker($('quickTarget'));
    });
    const hide=el('button','quick-chip-hide','✕');hide.type='button';
    hide.title=T('quickChipHide');hide.setAttribute('aria-label',T('quickChipHide'));
@@ -3073,7 +3193,7 @@ async function createQuickRule({runNow=false}={}){
  const rawVal=($('quickValue')?.value||'').trim();
  const targetId=$('quickTarget')?.value||'';
  if(!rawVal){$('quickValue')?.focus();throw new C.RuleError('bad_value');}
- if(!targetId){$('quickTarget')?.focus();throw new C.RuleError('choose_target');}
+ if(!targetId){focusFolderPicker($('quickTarget'));throw new C.RuleError('choose_target');}
  const button=runNow?$('quickAddRunBtn'):$('quickAddBtn');
  if(button)button.disabled=true;
  try{
@@ -3480,13 +3600,28 @@ if($('folderModal')){
  $('folderModal').addEventListener('keydown',e=>{
   if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeFolderModal();return;}
   if(e.key!=='Tab')return;
-  const items=[...$('folderModal').querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')];
+  const items=modalFocusItems($('folderModal'));
   const first=items[0],last=items.at(-1);
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
  });
- document.addEventListener('focusin',e=>{if(!$('folderModal').hidden&&!$('folderModal').contains(e.target))$('folderName').focus();});
+ document.addEventListener('focusin',e=>{if(!folderTreeSession&&!$('folderModal').hidden&&!$('folderModal').contains(e.target))$('folderName').focus();});
 }
+function modalFocusItems(modal){return [...modal.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')].filter(n=>!n.closest('[hidden],[inert]'));}
+handle('folderTreeAccount','change',()=>{const s=folderTreeSession;if(!s)return;s.accountId=$('folderTreeAccount').value;s.pending='';s.active='';s.expanded.clear();$('folderTreeSearch').value='';renderFolderTree(true);});
+handle('folderTreeSearch','input',()=>renderFolderTree());
+handle('folderTreeSearch','keydown',event=>{if(event.key==='Enter'||event.key==='ArrowDown'){event.preventDefault();focusTreeRow(folderTreeSession?.active);}});
+handle('folderTreeChoose','click',confirmFolderTree);
+handle('folderTreeCancel','click',closeFolderTree);
+handle('folderTreeModal','click',event=>{if(event.target===$('folderTreeModal'))closeFolderTree();});
+handle('folderTreeModal','keydown',event=>{
+ if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeFolderTree();return;}
+ if(event.key!=='Tab')return;
+ const items=modalFocusItems($('folderTreeModal')),first=items[0],last=items.at(-1);
+ if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+});
+document.addEventListener('focusin',event=>{if(folderTreeSession&&!$('folderTreeModal').contains(event.target))$('folderTreeAccount').focus();});
 async function setSeasonPref(value){
  if(!SEASON_CHOICES.includes(value))return;
  state.prefs=await rpc('prefs',{prefs:{season:value}});

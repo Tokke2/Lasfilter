@@ -503,6 +503,18 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.20
+
+- **Mappträd i stället för lång rullgardinslista.** Välj e-postkonto och klicka **Bläddra bland mappar…**. En större dialog visar utfällbara mappar och undermappar. Den sparade målmappens föräldrar öppnas så att du kan hitta tillbaka till den.
+- **Sök och kontrollera före val.** Sök i mappnamn och hela sökvägen, med stöd för svenska tecken och flera sökord. Sökningen visar träffarna med deras föräldrar. Under trädet visas hela sökvägen för den markerade mappen.
+- **Bekräfta uttryckligen.** Markering, sökning eller kontobyte inne i dialogen ändrar inte regelutkastet. Först **Välj denna mapp** överför målvalet. **Avbryt**, Escape och klick utanför dialogkortet behåller det tidigare målet. Bekräftelsen sparar inte själva regeln och startar inga flyttar.
+- **Samma väljare i alla målflöden.** Huvudregel, snabbregel, fördelningar och filterimport använder trädet. Även överordnad mapp vid **Ny mapp** kan väljas så; där finns också ett uttryckligt val av kontots rot. Kontot där mappen ska skapas bevaras korrekt när dialogerna öppnas ovanpå varandra.
+- **Tangentbord och tillgänglighet.** Upp/ned, höger/vänster och Home/End navigerar. Enter eller mellanslag markerar, men bekräftelse sker med knappen. Dialogen håller fokus inne och lämnar tillbaka det till rätt öppningsknapp. Svenska/engelska, ljus/mörk vy och stor text stöds.
+
+Mapp-ID:n bevaras även vid flytt mellan konton eller lika mappnamn. Eventuella strukturrader utan en verklig mapp kan fällas ut men aldrig väljas som mål. Saknade mål ersätts inte automatiskt. Inga nya behörigheter, externa tilläggsberoenden eller ändringar av sparade regler och backupfrekvens.
+
+Verifierat med **431 automatiska tester, 386 DOM-kontroller och 24 webbläsarlayouter**, inklusive faktisk tangentbordsnavigation, nästlade dialoger och bekräftelse över kontogränser. Ingen körning i riktig Thunderbird har gjorts här. Installera den nya XPI:n ovanpå den befintliga och öppna SortBro på nytt; avinstallera inte först.
+
 ## Nyheter i 1.0.19
 
 Endast de valda förslagen **1 och 2** från den senaste förslagslistan är genomförda:

@@ -263,7 +263,7 @@
                   <span data-i18n="colValue">Värde</span>
                   <span></span>
                 </div>
-                <div id="conditions"></div>
+                <div id="conditions" role="group" aria-describedby="matchHelp"></div>
                 <button id="addCondition" type="button" class="text-button" data-i18n="addConditionBtn">＋ Lägg till villkor</button>
                 <div class="import-box" id="importBox">
                   <label class="field">
@@ -350,6 +350,11 @@
                 </div>
               </div>
 
+              <section id="ruleSummary" class="rule-summary" aria-labelledby="ruleSummaryTitle">
+                <h3 id="ruleSummaryTitle" data-i18n="ruleSummaryTitle">Så fungerar regeln</h3>
+                <div id="ruleSummaryBody"></div>
+                <p class="rule-summary-note" data-i18n="summaryNote">Sammanfattningen visar fälten i redigeraren. Den sparar eller flyttar ingenting. Regelprioritet och säkerhetskontroller gäller fortfarande.</p>
+              </section>
               <div id="testResult" class="test-result" hidden role="status"></div>
               <div id="diagnosePanel" class="diagnose-panel" hidden role="status" aria-live="polite"></div>
               <div class="form-actions">

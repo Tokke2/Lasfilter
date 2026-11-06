@@ -2863,3 +2863,30 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 :root[data-large-text="true"] .condition-row > input { grid-column: 1 / 3; }
 :root[data-large-text="true"] .condition-row > .remove-condition { grid-column: 3; grid-row: 1; }
 @media (max-width: 900px) { .condition-head { display: none; } }
+
+/* ELLER/OCH utan att ändra villkorsradernas kontrollordning eller tabbordning. */
+#conditions > .condition-row { position: relative; }
+#conditions > .condition-row:not(:first-child) { margin-top: 2.5rem; }
+.condition-join {
+  position: absolute;
+  inset: -2.15rem 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--accent);
+  font-size: var(--text-small);
+  font-weight: 750;
+  line-height: 1.5;
+  letter-spacing: .06em;
+}
+.condition-join[hidden] { display: none; }
+.condition-join::before, .condition-join::after { content: ''; height: 1px; flex: 1; background: var(--line); }
+.rule-summary { margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); min-width: 0; }
+.rule-summary h3 { margin: 0 0 10px; font-size: var(--text-body); }
+.rule-summary p, .rule-summary li { overflow-wrap: anywhere; line-height: var(--reading-leading); }
+.rule-summary-main { margin: 0 0 12px; }
+.summary-join { color: var(--accent); }
+.rule-summary-notes, .rule-summary-note { font-size: var(--text-small); }
+.rule-summary-notes p { margin: 6px 0; }
+.rule-summary-notes ol { margin: 8px 0; padding-inline-start: 24px; }
+.rule-summary-note { color: var(--muted); margin: 12px 0 0; }

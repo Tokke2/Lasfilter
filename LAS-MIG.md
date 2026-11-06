@@ -503,6 +503,19 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.19
+
+Endast de valda förslagen **1 och 2** från den senaste förslagslistan är genomförda:
+
+- **ELLER/OCH mellan villkoren.** Mellan raderna står **ELLER** när minst ett villkor räcker, och **OCH** när alla måste stämma. Ett enda villkor får ingen onödig kopplingsrad. Visningen följer tillägg, borttagning, regelbyte och språkbyte; skärmläsare får kombinationens förklaring via villkorsgruppens beskrivning.
+- **Så fungerar regeln.** Huvudredigeraren har en sammanfattning ovanför kontroll- och sparknapparna: konto, full målsökväg och samtliga villkor med rätt ELLER/OCH. Läsval, olästhantering, årsmappar och ordnade fördelningar redovisas också, liksom avstängd regel, provkörning, paus, testläge och motorfel när de gäller. Saknade värden och mål visas tydligt. Sammanfattningen följer även mallar, exempelmejl och importerade villkor.
+
+Exempel: *Flytta mejl från kontot Exempelkonto till Exempelkonto · Webb om ämnet innehåller ”Wordfence” ELLER ämnet innehåller ”WordPress” ELLER avsändaradressen innehåller ”wordpress@”.*
+
+Detta är en beskrivning av redigerarens fält, inte en provkörning. Den ändrar inte sparade regler, kör inga mejlsökningar och sparar eller flyttar ingenting. Regelprioritet och säkerhetskontroller gäller fortfarande. Förslagen **3–10** är inte genomförda. Inga nya behörigheter, tilläggsberoenden eller ändringar i backupfrekvensen.
+
+Verifierat med **423 automatiska tester och 349 DOM-kontroller**, samt 24 webbläsarlayouter med svenska/engelska, ljus/mörk vy och 12/24 px text vid 600/784/1200 px fönsterbredd. Detta ersätter inte ett körtest i riktig Thunderbird.
+
 ## Nyheter i 1.0.18
 
 - **Nya regler använder ”Minst ett ska stämma” som standard.** Det räcker med något av villkoren, inte alla. Detta gäller både redigeraren och nya regler från snabbflödet eller en inlärd flytt. Steg 2 förklarar nu standardvalet tydligt på svenska och engelska.

@@ -246,6 +246,29 @@ const I18N={
   accountScopeTitle:'Alla mappar i kontot ingår',
   accountScopeBody:'Inkorg, arkiv och vanliga undermappar bevakas automatiskt. Skickat, Utkast, Skräppost och Papperskorg undantas.',
   step2Title:'Vilka liknande mejl?',
+  conditionOr:"ELLER",
+  conditionAnd:"OCH",
+  ruleSummaryTitle:"Så fungerar regeln",
+  summaryMove:"Flytta mejl från kontot {source} till {target} om ",
+  summarySourceMissing:"[välj konto]",
+  summaryTargetMissing:"[välj målmapp]",
+  summaryValueMissing:"[värde saknas]",
+  summarySubject:"ämnet",
+  summarySender:"avsändaradressen",
+  summaryDomain:"avsändardomänen",
+  summaryRecipient:"mottagarfältet",
+  summaryCc:"kopia/hemlig kopia",
+  summarySize:"storleken",
+  summaryDate:"mejlets datum",
+  summaryDays:"dagar",
+  summaryQuoted:"”{value}”",
+  summaryTiming:"Läsval: {mode}.",
+  summaryUnread:"Val för olästa: {action}.",
+  summaryYear:"Årsmappar är på: mejlets år används som undermapp under valt mål.",
+  summaryBranches:"Om grundvillkoren stämmer används den första fördelningen som matchar. Annars används målmappen ovan.",
+  summaryBranch:"Om {condition}, använd {target}.",
+  summaryDisabled:"Regeln är avstängd.",
+  summaryNote:"Sammanfattningen visar fälten i redigeraren. Den sparar eller flyttar ingenting. Regelprioritet och säkerhetskontroller gäller fortfarande.",
   matchAll:'Alla ska stämma',
   matchAny:'Minst ett ska stämma',
   step2Help:'Lägg till upp till 8 villkor, till exempel ämnesord eller avsändare. Standard för nya regler: minst ett villkor ska stämma – inte alla.',
@@ -983,6 +1006,29 @@ const I18N={
   accountScopeTitle:'All folders in the account are included',
   accountScopeBody:'Inbox, archives and normal subfolders are monitored automatically. Sent, Drafts, Junk and Trash are excluded.',
   step2Title:'Which matching emails?',
+  conditionOr:"OR",
+  conditionAnd:"AND",
+  ruleSummaryTitle:"How this rule works",
+  summaryMove:"Move emails from account {source} to {target} if ",
+  summarySourceMissing:"[choose account]",
+  summaryTargetMissing:"[choose target folder]",
+  summaryValueMissing:"[value missing]",
+  summarySubject:"the subject",
+  summarySender:"the sender address",
+  summaryDomain:"the sender domain",
+  summaryRecipient:"the recipient field",
+  summaryCc:"Cc/Bcc",
+  summarySize:"the size",
+  summaryDate:"the email date",
+  summaryDays:"days",
+  summaryQuoted:"“{value}”",
+  summaryTiming:"Read policy: {mode}.",
+  summaryUnread:"Unread handling: {action}.",
+  summaryYear:"Year folders are on: the email’s year is used as a subfolder under the selected destination.",
+  summaryBranches:"When the main conditions match, the first matching branch determines the destination. Otherwise the target folder above is used.",
+  summaryBranch:"If {condition}, use {target}.",
+  summaryDisabled:"This rule is disabled.",
+  summaryNote:"This summary describes the fields in the editor. It does not save or move anything. Rule priority and safety checks still apply.",
   matchAll:'Match all conditions',
   matchAny:'Match any condition',
   step2Help:'Add up to 8 conditions, such as subject words or a sender. New rules match when at least one condition is met – not all of them.',
@@ -1539,6 +1585,7 @@ function updateReadPolicy(){
  }[rf]||['policyDefaultTitle','policyDefaultBody'];
  if($('readPolicyTitle'))$('readPolicyTitle').textContent=T(map[0]);
  if($('readPolicyBody'))$('readPolicyBody').textContent=T(map[1]);
+ updateRuleExplanation();
 }
 
 /* Versionen i sidfoten läses ur manifestet, aldrig ur en textsträng. Då kan den
@@ -1959,7 +2006,7 @@ async function applyPrefill(){
   row.children[2].value=(data.domain||data.email||data.subject||'').slice(0,256);
  }
  if($('ruleName')&&!$('ruleName').value.trim())$('ruleName').value=(T('defaultRulePrefix')+(data.domain||data.email||T('defaultSenderFallback'))).slice(0,100);
- dirty=true;showView('rules');
+ dirty=true;updateRuleExplanation();showView('rules');
  $('ruleName')?.focus();
  toast(T('toastPrefill'));
  return true;
@@ -2084,7 +2131,7 @@ function renderStatus(next){
  updateDonationView();
  if($('learnOn'))$('learnOn').checked=!(state.learn&&state.learn.off);
  renderTrialBar();renderLearnBar();
- renderRules();renderActivity();renderBackups();renderQuickExisting();renderTbAccounts();quickHintsOnce();
+ renderRules();renderActivity();renderBackups();renderQuickExisting();renderTbAccounts();quickHintsOnce();updateRuleExplanation();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
@@ -2390,6 +2437,7 @@ function folderPicker(select,value='',options={}){
  const accountLabel=accounts().find(a=>a.id===p.account.value)?.label||'';
  p.hint.textContent=missing?T('targetMissing'):selected?T('targetSelected')+': '+accountLabel+' · '+pathOf(selected):!p.account.value?T('targetAccountFirst'):p.root&&!value?accountLabel+' · '+T('newFolderRoot'):!choices.length?T('targetEmpty'):'';
  select.title=selected?accountLabel+' · '+pathOf(selected):'';
+ if(select.closest('#ruleForm'))updateRuleExplanation();
  return p;
 }
 function targetOptions(value='',reset=false){
@@ -2400,7 +2448,48 @@ function targetOptions(value='',reset=false){
  }
  for(const select of document.querySelectorAll('#branches .folder-choice'))folderPicker(select,select.value);
 }
-function updateMatchHelp(){if($('matchHelp'))$('matchHelp').textContent=$('match').value==='any'?T('matchAnyHelp'):T('matchAllHelp');}
+function updateMatchHelp(){if($('matchHelp'))$('matchHelp').textContent=$('match').value==='any'?T('matchAnyHelp'):T('matchAllHelp');updateRuleExplanation();}
+/* Läs endast DOM-värden: även ett ofärdigt utkast ska gå att förklara utan
+   validering, nya ID:n, lagring, mejlskanning eller ändrad regelkombination. */
+function explanationText(key,values){return T(key).replace(/\{(\w+)\}/g,(token,name)=>values[name]??token);}
+function summaryCondition(row){
+ const field=row.children[0].value,op=row.children[1].value,value=row.children[2].value.trim();
+ const keys={subject:'summarySubject',sender:'summarySender',domain:'summaryDomain',recipient:'summaryRecipient',cc:'summaryCc',size:'summarySize',date:'summaryDate'};
+ const prefix=T(keys[field])+' '+T(OPERATOR_LABELS[op]).toLocaleLowerCase(locale());
+ if(field==='date'&&(op==='beforeThisYear'||op==='afterThisYear'))return prefix;
+ if(!value)return prefix+' '+T('summaryValueMissing');
+ if(field==='size')return prefix+' '+value+' kB';
+ if(field==='date')return prefix+' '+value+(['older','newer'].includes(op)?' '+T('summaryDays'):'');
+ return prefix+' '+explanationText('summaryQuoted',{value});
+}
+function updateRuleExplanation(){
+ const box=$('ruleSummaryBody');if(!box)return;
+ const rows=[...$('conditions').children],join=T($('match').value==='any'?'conditionOr':'conditionAnd');
+ rows.forEach((row,i)=>{const node=row.querySelector('.condition-join');if(node){node.hidden=i===0;node.textContent=join;}});
+ const source=accounts().find(a=>a.id===$('source').value)?.label||T('summarySourceMissing');
+ const target=id=>id?label(id):T('summaryTargetMissing');
+ const main=el('p','rule-summary-main');
+ main.append(document.createTextNode(explanationText('summaryMove',{source,target:target($('target').value)})));
+ rows.forEach((row,i)=>{if(i){main.append(document.createTextNode(' '),el('strong','summary-join',join),document.createTextNode(' '));}main.append(document.createTextNode(summaryCondition(row)));});
+ if(!rows.length)main.append(document.createTextNode(T('summaryValueMissing')));
+ main.append(document.createTextNode('.'));
+ const notes=el('div','rule-summary-notes');
+ const line=text=>notes.append(el('p','',text));
+ for(const [flag,key] of [[!$('enabled').checked,'summaryDisabled'],[$('ruleTrial')?.checked,'testTrial'],[state?.config.paused,'testPaused'],[state?.config.dryRun,'testDryRun'],[state?.fault,'testStopped']])if(flag)line(T(key));
+ line(explanationText('summaryTiming',{mode:$('ruleReadFilter').selectedOptions[0]?.textContent||''}));
+ line(explanationText('summaryUnread',{action:$('ruleUnreadAction').selectedOptions[0]?.textContent||''}));
+ if($('ruleYearFolders').checked)line(T('summaryYear'));
+ if($('branches').children.length){
+  line(T('summaryBranches'));
+  const list=el('ol');
+  for(const row of $('branches').children)list.append(el('li','',explanationText('summaryBranch',{condition:summaryCondition(row),target:target(row.querySelector('.folder-choice').value)})));
+  notes.append(list);
+ }
+ // Lämna samma DOM orörd vid oförändrad status (skärmläsare och textmarkering).
+ const signature=JSON.stringify([main.textContent,notes.textContent,currentLang]);
+ if(box.dataset.signature===signature)return;
+ box.dataset.signature=signature;box.replaceChildren(main,notes);
+}
 /* Villkorsfält: text, mottagare, storlek i kB och datum (dagar eller årtal). */
 const CONDITION_FIELDS=[['domain','optDomain'],['sender','optSender'],['subject','optSubject'],['recipient','optRecipient'],['cc','optCc'],['size','optSize'],['date','optDate']];
 const OPERATOR_LABELS={equals:'opEquals',contains:'opContains',starts:'opStarts',ends:'opEnds',larger:'opLarger',smaller:'opSmaller',older:'opOlder',newer:'opNewer',before:'opBeforeYear',after:'opAfterYear',beforeThisYear:'opBeforeThisYear',afterThisYear:'opAfterThisYear'};
@@ -2452,8 +2541,8 @@ function addBranchRow(b={condition:{field:'subject',op:'contains',value:''},targ
  selectOptions(target,folders,T('chooseTarget'),b.target);
  field.addEventListener('change',()=>{fillOpSelect(op,field.value,'');syncConditionInput(value,field.value,op.value,'');dirty=true;});
  op.addEventListener('change',()=>{syncConditionInput(value,field.value,op.value,value.value);dirty=true;});
- remove.addEventListener('click',()=>{row.remove();dirty=true;});
- row.append(field,op,value,target,remove);$('branches').append(row);folderPicker(target,b.target);
+ remove.addEventListener('click',()=>{row.remove();dirty=true;updateRuleExplanation();});
+ row.append(field,op,value,target,remove);$('branches').append(row);folderPicker(target,b.target);updateRuleExplanation();
 }
 function addCondition(c={field:'domain',op:'equals',value:''}){
  if($('conditions').children.length>=8){toast(T('maxConditions'));return;}
@@ -2463,8 +2552,9 @@ function addCondition(c={field:'domain',op:'equals',value:''}){
  syncConditionInput(value,c.field,op.value,String(c.value??''));
  field.addEventListener('change',()=>{fillOpSelect(op,field.value,'');syncConditionInput(value,field.value,op.value,'');dirty=true;});
  op.addEventListener('change',()=>{syncConditionInput(value,field.value,op.value,value.value);dirty=true;});
- remove.addEventListener('click',()=>{if($('conditions').children.length===1){toast(T('minConditions'));return;}row.remove();dirty=true;});
- row.append(field,op,value,remove);$('conditions').append(row);
+ remove.addEventListener('click',()=>{if($('conditions').children.length===1){toast(T('minConditions'));return;}row.remove();dirty=true;updateRuleExplanation();});
+ const join=el('span','condition-join');join.setAttribute('aria-hidden','true');
+ row.append(field,op,value,remove,join);$('conditions').append(row);updateRuleExplanation();
 }
 function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',yearFolders:$('ruleYearFolders')?.checked===true,
   trialUntil:$('ruleTrial')?.checked===true?(old?.trialUntil&&old.trialUntil>Date.now()?old.trialUntil:Date.now()+C.LIMITS.trialDays*86400000):0,
@@ -2488,6 +2578,7 @@ function loadRule(id='',presetAccount=''){
  $('testResult').hidden=true;$('delete').disabled=!rule;
  if($('duplicate'))$('duplicate').disabled=!rule&&!$('ruleName').value.trim();
  const i=state.config.rules.findIndex(r=>r.id===selectedId);$('up').disabled=i<=0;$('down').disabled=i<0||i>=state.config.rules.length-1;
+ updateRuleExplanation();
  dirty=false;editRevision=state.config.revision;editToken=currentToken();renderRules();
  rpc('prefs',{prefs:{lastRule:selectedId}}).catch(()=>{});
 }
@@ -2642,10 +2733,11 @@ handle('swishBtnHero','click',showSwishQr);
 handle('swishBtnMain','click',showSwishQr);
 if($('qrModeSwish'))handle('qrModeSwish','click',()=>{qrMode='swish';updateDonationView();});
 if($('qrModeCam'))handle('qrModeCam','click',()=>{qrMode='cam';updateDonationView();});
-$('ruleForm').addEventListener('input',()=>{dirty=true;if($('duplicate'))$('duplicate').disabled=false;});
+$('ruleForm').addEventListener('input',()=>{updateRuleExplanation();dirty=true;if($('duplicate'))$('duplicate').disabled=false;});
 $('ruleForm').addEventListener('change',e=>{
  dirty=true;if($('duplicate'))$('duplicate').disabled=false;
  if(e.target?.id!=='ruleMoveUnread'&&e.target?.id!=='ruleOpenWindow')updateReadPolicy();
+ updateRuleExplanation();
 });
 handle('newRule','click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule('',$('source').value);});
 handle('ruleSearch','input',renderRules);
@@ -2761,7 +2853,7 @@ async function fetchSelectedIntoEditor({forceNew=false}={}){
  const row=$('conditions').children[0],field=row.children[0].value;
  row.children[2].value=field==='domain'?m.domain:field==='sender'?m.email:m.subject.slice(0,256);
  if(!$('ruleName').value)$('ruleName').value=(T('defaultRulePrefix')+(m.domain||m.email||T('defaultSenderFallback'))).slice(0,100);
- dirty=true;$('target').focus();toast(T('toastFromSelected'));
+ dirty=true;updateRuleExplanation();$('target').focus();toast(T('toastFromSelected'));
 }
 handle('fromSelected','click',async()=>fetchSelectedIntoEditor({forceNew:false}));
 if($('newFromSelected'))handle('newFromSelected','click',async()=>fetchSelectedIntoEditor({forceNew:true}));

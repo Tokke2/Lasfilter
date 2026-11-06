@@ -147,7 +147,7 @@ function choiceCondition({field='domain',value=''}={}){
  return clean.includes('@')?{field:'sender',op:'equals',value:clean}:{field:'sender',op:'contains',value:clean};
 }
 /* Samma villkor som ovan, men i en form som match() kan räkna mot skannade mejl. */
-function choiceRule({field='domain',value='',match='all'}={}){
+function choiceRule({field='domain',value='',match='any'}={}){
  return {enabled:true,scope:'folder',source:'',sourceAccount:'',target:'',match:match==='any'?'any':'all',conditions:[choiceCondition({field,value})],branches:[]};
 }
 function ruleFromChoice({id='',name='',field='domain',value='',target='',source='',sourceAccount='',moveUnread=true,openWindow=false}={}){
@@ -155,7 +155,7 @@ function ruleFromChoice({id='',name='',field='domain',value='',target='',source=
  return validateRule({
   id:id||('r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)),
   name:(String(name||'').trim()||clean).slice(0,100),
-  enabled:true,scope:'account',source,sourceAccount,target,match:'all',
+  enabled:true,scope:'account',source,sourceAccount,target,match:'any',
   readFilter:moveUnread===false?'read':'both',
   unreadAction:openWindow===true?'window':'keep',
   conditions:[choiceCondition({field,value:clean})],branches:[]

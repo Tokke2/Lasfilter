@@ -836,6 +836,27 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(el('target').value===mainBeforeFolder,'snabbflödets nya mapp ändrar inte huvudregelns destination');
  w.eval('dirty=false;');
 
+ /* Nya regler använder ELLER; sparade regler behåller uttryckligt OCH. */
+ w.loadRule();
+ check(el('match').value==='any','ny regel börjar med minst ett villkor, inte alla');
+ check(/minst ett villkor ska stämma – inte alla/.test(doc.querySelector('[data-i18n="step2Help"]').textContent),'steg 2 förklarar standardvalet på svenska');
+ el('ruleName').value='Något av villkoren';w.folderPicker(el('target'),'demo-web');
+ const firstCondition=el('conditions').firstElementChild;
+ firstCondition.children[0].value='subject';fire(firstCondition.children[0],'change');firstCondition.children[2].value='Wordfence';
+ el('addCondition').click();el('conditions').lastElementChild.children[2].value='Faktura';
+ check(w.draft().match==='any'&&w.draft().conditions.length===2,'fler villkor behåller ELLER i utkastet');
+ el('langEn').click();await until(()=>doc.documentElement.lang==='en','engelskt standardval');
+ check(el('match').value==='any'&&/at least one condition is met/.test(doc.querySelector('[data-i18n="step2Help"]').textContent),'språkbyte behåller ELLER och förklarar det på engelska');
+ el('test').click();await until(()=>!el('testResult').hidden,'testa ny regel med bara ett matchande villkor');
+ check(el('testResult').querySelectorAll('.condition-pass').length===1&&el('testResult').querySelectorAll('.condition-fail').length===1&&/Conditions match/.test(txt('testResult')),'en enda träff räcker även när det andra villkoret inte stämmer');
+ await w.saveCurrentRule({});
+ const savedAny=w.LasDemo.setState({}).config.rules.find(r=>r.name==='Något av villkoren');
+ check(savedAny?.match==='any','ELLER sparas och finns kvar när regeln öppnas igen');
+ w.loadRule(savedAny.id);check(el('match').value==='any','sparad ELLER-regel återställs som ELLER');
+ w.loadRule('picker-rule');check(el('match').value==='all','befintlig OCH-regel ändras inte av det nya standardvalet');
+ el('langSv').click();await until(()=>doc.documentElement.lang==='sv','svenska efter standardvalstest');
+ w.eval('dirty=false;');
+
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
     kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */
  await sleep(400);

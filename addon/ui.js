@@ -248,7 +248,7 @@ const I18N={
   step2Title:'Vilka liknande mejl?',
   matchAll:'Alla ska stämma',
   matchAny:'Minst ett ska stämma',
-  step2Help:'Avsändaren fylls i automatiskt från exempelmejlet. Du kan lägga till upp till 8 villkor per regel.',
+  step2Help:'Lägg till upp till 8 villkor, till exempel ämnesord eller avsändare. Standard för nya regler: minst ett villkor ska stämma – inte alla.',
   colField:'Fält',
   colOp:'Villkor',
   colValue:'Värde',
@@ -985,7 +985,7 @@ const I18N={
   step2Title:'Which matching emails?',
   matchAll:'Match all conditions',
   matchAny:'Match any condition',
-  step2Help:'The sender is filled in automatically from the sample email. You can add up to 8 conditions per rule.',
+  step2Help:'Add up to 8 conditions, such as subject words or a sender. New rules match when at least one condition is met – not all of them.',
   colField:'Field',
   colOp:'Operator',
   colValue:'Value',
@@ -2475,7 +2475,7 @@ const buildRule=()=>draft();
 function loadRule(id='',presetAccount=''){
  const rule=state.config.rules.find(r=>r.id===id);selectedId=rule?.id||'';
  $('editorTitle').textContent=rule?T('editorEdit'):T('editorNew');$('ruleName').value=rule?.name||'';$('enabled').checked=rule?.enabled??true;
- $('match').value=rule?.match||'all';
+ $('match').value=rule?.match||'any';
  if($('ruleReadFilter'))$('ruleReadFilter').value=rule?.readFilter||'default';
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=rule?.unreadAction||'default';
  if($('ruleYearFolders'))$('ruleYearFolders').checked=rule?.yearFolders===true;

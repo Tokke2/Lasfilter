@@ -381,7 +381,7 @@ App.learnCreate=async key=>{
  const rule=C.validateRule({
   id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
   name:entry.domain,enabled:true,scope:'account',source:entry.source,sourceAccount,target:entry.target,
-  match:'all',readFilter:'default',unreadAction:'default',yearFolders:false,
+  match:'any',readFilter:'default',unreadAction:'default',yearFolders:false,
   conditions:[{field:'domain',op:'equals',value:entry.domain}],branches:[]
  });
  await App.checkRules([rule]);

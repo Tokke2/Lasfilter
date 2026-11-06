@@ -1280,6 +1280,7 @@ test('skapa regel av en inlärd flytt',async()=>{
  assert.equal(out.rule.conditions[0].value,'klarna.se');
  assert.equal(out.rule.target,'fin');
  assert.equal(out.rule.sourceAccount,'a');
+ assert.equal(out.rule.match,'any','nya inlärda regler använder minst ett villkor');
  assert.equal(out.rule.enabled,true);
  assert.equal(app.learned.entries.length,0,'förslaget försvinner när regeln finns');
 });

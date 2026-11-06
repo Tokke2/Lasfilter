@@ -503,6 +503,13 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.18
+
+- **Nya regler använder ”Minst ett ska stämma” som standard.** Det räcker med något av villkoren, inte alla. Detta gäller både redigeraren och nya regler från snabbflödet eller en inlärd flytt. Steg 2 förklarar nu standardvalet tydligt på svenska och engelska.
+- Exempel: ämnet innehåller **Wordfence ELLER WordPress ELLER** avsändaren innehåller **wordpress@**. Även enbart avsändaren räcker då, oavsett ämne. Om inget villkor stämmer matchar inte regeln.
+- **Redan sparade och importerade regler behåller sitt val.** För att ändra en befintlig regel: öppna den, välj **Minst ett ska stämma** i steg 2 och klicka **Spara automatisk flytt**. **Alla ska stämma** finns kvar för regler som uttryckligen behöver kräva flera saker samtidigt.
+- Matchning ändrar inte paus, testläge, säkerhetsbroms eller väntan på läst/lämnat mejl. Övriga flyttkrav gäller fortfarande.
+
 ## Nyheter i 1.0.17
 
 - **E-postkonto först, sedan målmapp.** Samma väljare används i huvudregeln, snabbregeln, fördelningar och filterimporten. Kontonamnet kompletteras med e-postadress när Thunderbird tillhandahåller den. Sök i hela mappsökvägen och läs den valda sökvägen under fältet. Sparade mapp-ID:n och mål i andra konton bevaras. Vid kontobyte måste du själv välja en ny mapp; ingen första mapp gissas fram.

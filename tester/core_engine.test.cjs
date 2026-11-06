@@ -855,7 +855,7 @@ test('ruleFromChoice ger en komplett, giltig regel med förnuftiga standardval',
  assert.deepEqual(C.validateRule(rule),rule,'regeln klarar valideringen');
  assert.equal(rule.enabled,true);
  assert.equal(rule.scope,'account');
- assert.equal(rule.match,'all');
+ assert.equal(rule.match,'any');
  assert.equal(rule.name,'klarna.se','namnet blir valet när inget annat anges');
  assert.equal(rule.readFilter,'both','olästa mejl flyttas direkt som standard');
  assert.equal(rule.unreadAction,'keep');

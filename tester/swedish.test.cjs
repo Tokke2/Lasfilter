@@ -56,3 +56,18 @@ test('felsökningslogg bevarar åäö även om texten kom in i NFD',()=>{
 test('krockkontrollen använder samma Unicode-adress som mejlmatchningen',()=>{
  assert.equal(C.conditionsPossible([{field:'sender',op:'equals',value:'Åsa@räksmörgås.se'},{field:'sender',op:'equals',value:'åsa@xn--rksmrgs-5wao1o.se'}]),true);
 });
+test('nya regler matchar något av Wordfence, WordPress eller wordpress@ – inte alla',()=>{
+ const r=C.ruleFromChoice({id:'wordpress-any',field:'subject',value:'Wordfence',source:'in',sourceAccount:'a',target:'out'});
+ assert.equal(r.match,'any');
+ r.conditions.push({field:'subject',op:'contains',value:'WordPress'},{field:'sender',op:'contains',value:'wordpress@'});
+ for(const [subject,author,expected] of [
+  ['Wordfence activity','other@example.se',true],
+  ['Din webbplats har uppdaterats till WordPress 7.1.4','other@example.se',true],
+  ['Annat ämne','wordpress@limos.se',true],
+  ['Annat ämne','other@example.se',false]
+ ])assert.equal(C.match(r,{subject,author,folder:{id:'in',accountId:'a'}}),expected,subject+' / '+author);
+ assert.equal(C.choiceRule({field:'subject',value:'WordPress'}).match,'any');
+ assert.equal(C.choiceRule({field:'subject',value:'WordPress',match:'all'}).match,'all','uttryckligt OCH bevaras');
+ const saved=C.validateRule({...r,match:'all'});
+ assert.equal(C.validateRule(JSON.parse(JSON.stringify(saved))).match,'all','en befintlig OCH-regel skrivs inte om');
+});

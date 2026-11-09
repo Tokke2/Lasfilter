@@ -1,721 +1,2109 @@
 <!doctype html>
 <html lang="sv">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>SortBro · Thunderbird</title>
-  <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="alternate icon" type="image/png" href="icon-32.png">
-  <link rel="stylesheet" href="ui.css">
-</head>
-<body>
-  <div id="demoBanner" class="demo-banner" data-i18n="demoBanner" hidden>FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.</div>
-  <div id="brakeWarns" class="brake-warns" role="alert" hidden></div>
-  <div id="installWarn" class="install-warn" role="status" hidden>
-    <span class="install-warn-icon" aria-hidden="true">⚠</span>
-    <div class="install-warn-body">
-      <strong id="installWarnTitle"></strong>
-      <span id="installWarnText"></span>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SortBro · Thunderbird</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="alternate icon" type="image/png" href="icon-32.png" />
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="tabbed-workspace">
+    <div id="demoBanner" class="demo-banner" data-i18n="demoBanner" hidden="">
+      FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.
     </div>
-    <button id="installWarnHide" type="button" class="text-button" data-i18n="installWarnHide">Dölj</button>
-  </div>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <img id="brandLogo" src="icon.svg" width="40" height="40" alt="SortBro">
-        <div>
-          <span data-i18n="brandName">SortBro</span>
-          <small data-i18n="brandSub">FÖR THUNDERBIRD</small>
-        </div>
+    <div id="brakeWarns" class="brake-warns" role="alert" hidden=""></div>
+    <div id="installWarn" class="install-warn" role="status" hidden="">
+      <span class="install-warn-icon" aria-hidden="true">⚠</span>
+      <div class="install-warn-body">
+        <strong id="installWarnTitle"></strong>
+        <span id="installWarnText"></span>
       </div>
-      <div class="nav-label" data-i18n="navMenu">MENY</div>
-      <nav aria-label="Huvudmeny" data-i18n-aria="ariaNav">
-        <button aria-label="Start" data-i18n-aria="navRules" data-view="rules" class="nav active"><span>▤</span> <span data-i18n="navRules">Start</span> <b id="navCount">0</b></button>
-        <button aria-label="Vad har hänt?" data-i18n-aria="navActivity" data-view="activity" class="nav"><span>◷</span> <span data-i18n="navActivity">Vad har hänt?</span></button>
-        <button aria-label="Avancerat" data-i18n-aria="navSettings" data-view="settings" class="nav"><span>⚙</span> <span data-i18n="navSettings">Avancerat</span></button>
-        <button aria-label="Hjälp" data-i18n-aria="navHelp" data-view="help" class="nav"><span>?</span> <span data-i18n="navHelp">Hjälp</span></button>
-        <button aria-label="Stöd SortBro" data-i18n-aria="navSupport" data-view="support" class="nav"><span>💚</span> <span data-i18n="navSupport">Stöd SortBro</span></button>
-      </nav>
-      <div class="sidebar-note">
-        <div class="shield">✓</div>
-        <strong data-i18n="sidebarNoteTitle">Du läser i lugn och ro.</strong>
-        <p data-i18n="sidebarNoteBody">Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.</p>
-      </div>
-      <div class="version" data-i18n="versionText">Lokal behandling · v1.0.20 · Inga molntjänster</div>
-    </aside>
-
-    <main>
-      <header class="topbar">
-        <span class="topbar-brand"><img id="topbarLogo" src="icon.svg" width="22" height="22" alt=""><span data-i18n="topbarTitle">THUNDERBIRD / SORTBRO</span></span>
-        <div class="top-actions">
-          <div class="lang-switch" role="group" aria-label="Språk / Language">
-            <button id="langSv" type="button" class="lang-btn active" title="Svenska">SV · Svenska</button>
-            <button id="langEn" type="button" class="lang-btn" title="English">EN · English</button>
-          </div>
-          <button id="themeQuick" class="icon-button" title="Växla ljust/mörkt tema" aria-label="Växla tema" data-i18n-aria="themeQuickTitle">◐</button>
-          <span id="statusPill" class="pill amber">Ansluter…</span>
-        </div>
-      </header>
-
-      <section class="intro hero-card" id="introCard">
-        <div class="hero-copy">
-          <div id="introCopy">
-            <div class="eyebrow" data-i18n="introEyebrow">ENKEL AUTOMATISK SORTERING</div>
-            <h1 data-i18n="introTitle">Flytta mejl automatiskt</h1>
-            <p data-i18n="introSub">Skapa en eller flera regler, välj olästa/lästa och målmapp. Klart.</p>
-            <p class="season-greeting" id="seasonGreeting">Ha en fin höstdag! 🍂</p>
-          </div>
-          <div class="intro-actions">
-            <button id="introToggle" type="button" class="button secondary" aria-expanded="true" aria-controls="introCopy seasonHeroArt setupSteps">Dölj introduktion</button>
-            <button id="pause" class="button secondary">Pausa</button>
-            <button id="mode" class="button primary">Slå på flytt</button>
-            <label class="season-pick">
-              <span data-i18n="seasonLabelShort">Årstid</span>
-              <select id="seasonQuick" aria-label="Årstidstema" data-i18n-aria="seasonLabel">
-                <option value="auto" data-i18n="seasonAuto">Auto</option>
-                <option value="spring">🌸 Vår</option>
-                <option value="summer">☀️ Sommar</option>
-                <option value="autumn">🍂 Höst</option>
-                <option value="winter">❄️ Vinter</option>
-              </select>
-            </label>
-          </div>
-        </div>
-        <div class="hero-art" id="seasonHeroArt" aria-hidden="true"></div>
-      </section>
-
-      <section id="setupSteps" class="setup-steps" aria-label="Kom igång" data-i18n-aria="ariaSetup">
-        <div id="setup1" class="setup-step"><b>1</b><span><strong data-i18n="setup1Title">Välj exempelmejl</strong><small data-i18n="setup1Sub">Markera ett mejl i Thunderbird</small></span></div>
-        <div id="setup2" class="setup-step"><b>2</b><span><strong data-i18n="setup2Title">Spara regeln</strong><small data-i18n="setup2Sub">Välj lästa/olästa och målmapp</small></span></div>
-        <div id="setup3" class="setup-step"><b>3</b><span><strong data-i18n="setup3Title">Slå på flytt</strong><small data-i18n="setup3Sub">Tillägget sköter resten</small></span></div>
-      </section>
-
-      <div id="notice" role="alert" class="notice" hidden></div>
-
-      <section id="runGuide" class="run-guide" aria-live="polite">
-        <div id="runIcon" class="run-icon">✓</div>
-        <div class="run-copy">
-          <span class="run-label" data-i18n="runLabel">FLYTTSTATUS</span>
-          <strong id="runTitle">Kontrollerar tillägget…</strong>
-          <p id="runText">Läser in regler och bevakningsläge.</p>
-          <p class="run-auto" id="autoRunInfo"></p>
-        </div>
-        <div class="run-actions">
-          <button id="clearFault" class="button primary" data-i18n="clearFaultBtn" hidden>Rensa spärr och fortsätt</button>
-          <button id="sweepNow" class="button primary">Kör alla regler nu</button>
-          <button id="showActivity" class="button secondary" data-i18n="showActivityBtn">Visa aktivitet</button>
-        </div>
-      </section>
-
-      <div class="stats">
-        <div class="stat" id="statRulesCard"><span class="stat-icon mint">▤</span><div><strong id="countRules" class="stat-figure">0</strong><span data-i18n="statRules">aktiva regler</span></div></div>
-        <div class="stat" id="statQueueCard"><span class="stat-icon blue">◷</span><div><strong id="countQueue" class="stat-figure">0</strong><span data-i18n="statQueue">väntar på flytt / test</span></div></div>
-        <div class="stat" id="statMovedCard"><span class="stat-icon sand">↗</span><div><strong id="countMoved" class="stat-figure">0</strong><span data-i18n="statMoved">flyttade sedan start</span></div><span id="simulated" class="mini-tag">0 test</span></div>
-        <div class="stat" id="statMatchedCard"><span class="stat-icon blue">✓</span><div><strong id="countMatched" class="stat-figure">0</strong><span data-i18n="statMatched">matchade sedan start</span></div></div>
-      </div>
-
-      <section id="view-rules" class="view">
-        <div class="workspace">
-          <section class="card rules-card">
-            <div class="card-title">
-              <div>
-                <h2 data-i18n="rulesTitle">Dina automatiska flyttar</h2>
-                <p data-i18n="rulesSub">Välj en regel för att redigera. Fler val under ⋯.</p>
-              </div>
-              <div class="rules-header-actions">
-                <button id="newFromSelected" type="button" class="button small primary" data-i18n="newFromSelectedBtn">✉ Ny från markerat mejl</button>
-                <button id="newRule" type="button" class="button small secondary" data-i18n="newRuleBtn">＋ Ny tom regel</button>
-                <button id="newFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
-                <button id="runAllRulesBtn" type="button" class="button small primary" data-i18n="runAllRulesBtn">▶ Kör alla regler nu</button>
-                <button id="whyBtn" type="button" class="button small secondary" data-i18n="whyBtn">🔍 Varför ligger mejlet här?</button>
-              </div>
+      <button
+        id="installWarnHide"
+        type="button"
+        class="text-button"
+        data-i18n="installWarnHide"
+      >
+        Dölj
+      </button>
+    </div>
+    <div class="shell">
+      <main>
+        <header class="topbar">
+          <div class="brand">
+            <img
+              id="brandLogo"
+              src="icon.svg"
+              width="40"
+              height="40"
+              alt="SortBro"
+            />
+            <div>
+              <span data-i18n="brandName">SortBro</span>
+              <small data-i18n="brandSub">FÖR THUNDERBIRD</small>
             </div>
-
-            <!-- Varför ligger det här mejlet här? Ett omvänt uppslag för markerat mejl. -->
-            <div id="whyPanel" class="why-panel" hidden role="status" aria-live="polite"></div>
-
-            <div class="template-bar" id="templateBar" role="group" aria-label="1-klicksmallar" data-i18n-aria="ariaTemplates">
-              <span class="template-label" data-i18n="templateLabel">1-klicksmallar:</span>
-              <button type="button" class="template-btn" data-template="faktura">🧾 <span data-i18n="tplInvoice">Fakturor &amp; Kvitton</span></button>
-              <button type="button" class="template-btn" data-template="order">📦 <span data-i18n="tplOrder">Order &amp; Leverans</span></button>
-              <button type="button" class="template-btn" data-template="nyhetsbrev">📰 <span data-i18n="tplNews">Nyhetsbrev</span></button>
-              <button type="button" class="template-btn" data-template="system">🔔 <span data-i18n="tplSystem">System &amp; Notiser</span></button>
-              <button type="button" class="template-btn" data-template="bokforing">📊 <span data-i18n="tplBookkeeping">Bokföring</span></button>
-              <button type="button" class="template-btn" data-template="aldre90">🗄️ <span data-i18n="tplOlder90">Arkivera äldre mejl</span></button>
+          </div>
+          <div class="top-actions">
+            <div class="lang-switch" role="group" aria-label="Språk / Language">
+              <button
+                id="langSv"
+                type="button"
+                class="lang-btn active"
+                title="Svenska"
+              >
+                SV · Svenska
+              </button>
+              <button
+                id="langEn"
+                type="button"
+                class="lang-btn"
+                title="English"
+              >
+                EN · English
+              </button>
             </div>
+            <button
+              id="themeQuick"
+              class="icon-button"
+              title="Växla ljust/mörkt tema"
+              aria-label="Växla tema"
+              data-i18n-aria="themeQuickTitle"
+            >
+              ◐
+            </button>
+            <span id="statusPill" class="pill amber">Ansluter…</span>
+          </div>
+        </header>
+        <nav
+          aria-label="Huvudmeny"
+          data-i18n-aria="ariaNav"
+          class="app-tabs"
+          role="tablist"
+        >
+          <button
+            aria-label="Regler"
+            data-i18n-aria="navRules"
+            data-view="rules"
+            class="nav active"
+            id="tab-rules"
+            role="tab"
+            aria-controls="view-rules"
+            aria-selected="true"
+            tabindex="0"
+            type="button"
+          >
+            <span aria-hidden="true">▤</span>
+            <span data-i18n="navRules">Regler</span>
+            <b id="navCount">0</b></button
+          ><button
+            class="nav"
+            type="button"
+            data-view="suggestions"
+            data-i18n-aria="navSuggestions"
+            id="tab-suggestions"
+            role="tab"
+            aria-controls="view-suggestions"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            <span aria-hidden="true">✧</span
+            ><span data-i18n="navSuggestions">Föreslagna regler</span>
+          </button>
+          <button
+            aria-label="Aktivitet"
+            data-i18n-aria="navActivity"
+            data-view="activity"
+            class="nav"
+            id="tab-activity"
+            role="tab"
+            aria-controls="view-activity"
+            aria-selected="false"
+            tabindex="-1"
+            type="button"
+          >
+            <span aria-hidden="true">◷</span>
+            <span data-i18n="navActivity">Aktivitet</span>
+          </button>
+          <button
+            aria-label="Inställningar"
+            data-i18n-aria="navSettings"
+            data-view="settings"
+            class="nav"
+            id="tab-settings"
+            role="tab"
+            aria-controls="view-settings"
+            aria-selected="false"
+            tabindex="-1"
+            type="button"
+          >
+            <span aria-hidden="true">⚙</span>
+            <span data-i18n="navSettings">Inställningar</span>
+          </button>
+          <button
+            aria-label="Hjälp"
+            data-i18n-aria="navHelp"
+            data-view="help"
+            class="nav"
+            id="tab-help"
+            role="tab"
+            aria-controls="view-help"
+            aria-selected="false"
+            tabindex="-1"
+            type="button"
+          >
+            <span aria-hidden="true">?</span>
+            <span data-i18n="navHelp">Hjälp</span>
+          </button>
+          <button
+            aria-label="Stöd SortBro"
+            data-i18n-aria="navSupport"
+            data-view="support"
+            class="nav"
+            id="tab-support"
+            role="tab"
+            aria-controls="view-support"
+            aria-selected="false"
+            tabindex="-1"
+            type="button"
+          >
+            <span aria-hidden="true">💚</span>
+            <span data-i18n="navSupport">Stöd SortBro</span>
+          </button>
+        </nav>
 
-            <div id="quickRuleBox" class="quick-rule-box">
+        <div id="notice" role="alert" class="notice" hidden=""></div>
+
+        <section id="runGuide" class="run-guide" aria-live="polite">
+          <div id="runIcon" class="run-icon">✓</div>
+          <div class="run-copy">
+            <span class="run-label" data-i18n="runLabel">FLYTTSTATUS</span>
+            <strong id="runTitle">Kontrollerar tillägget…</strong>
+
+            <details class="status-details">
+              <summary data-i18n="statusDetails">
+                Detaljer om sorteringen
+              </summary>
+              <p id="runText">Läser in regler och bevakningsläge.</p>
+              <p class="run-auto" id="autoRunInfo"></p>
+              <button
+                id="showActivity"
+                class="button secondary"
+                data-i18n="showActivityBtn"
+              >
+                Visa aktivitet
+              </button>
+            </details>
+          </div>
+          <div class="run-actions">
+            <button id="pause" class="button secondary">Pausa</button
+            ><button id="mode" class="button primary">Slå på flytt</button>
+            <button
+              id="clearFault"
+              class="button primary"
+              data-i18n="clearFaultBtn"
+              hidden=""
+            >
+              Rensa spärr och fortsätt
+            </button>
+          </div>
+        </section>
+
+        <section
+          id="view-rules"
+          class="view"
+          role="tabpanel"
+          aria-labelledby="tab-rules"
+        >
+          <header class="view-heading">
+            <h1 data-i18n="rulesPageTitle">Regler</h1>
+            <p data-i18n="rulesPageHelp">
+              Dina sparade regler. Välj en regel för att redigera eller skapa en
+              ny.
+            </p>
+          </header>
+          <div class="workspace">
+            <section class="card rules-card" id="rulesLibrary">
+              <div class="card-title">
+                <div>
+                  <h2 data-i18n="rulesTitle">Sparade regler</h2>
+                  <p data-i18n="rulesSub">
+                    Fler alternativ för varje regel finns under ⋯.
+                  </p>
+                </div>
+                <div class="rules-header-actions">
+                  <button
+                    data-i18n="resumeEditor"
+                    type="button"
+                    id="resumeEditor"
+                    class="button secondary"
+                    hidden=""
+                  >
+                    Fortsätt redigera
+                  </button>
+                  <button
+                    id="newFromSelected"
+                    type="button"
+                    class="button small primary"
+                    data-i18n="newFromSelectedBtn"
+                  >
+                    ✉ Ny från markerat mejl
+                  </button>
+                  <button
+                    id="newRule"
+                    type="button"
+                    class="button small secondary"
+                    data-i18n="newRuleBtn"
+                  >
+                    ＋ Ny tom regel
+                  </button>
+
+                  <button
+                    id="runAllRulesBtn"
+                    type="button"
+                    class="button small primary"
+                    data-i18n="runAllRulesBtn"
+                  >
+                    ▶ Kör alla regler nu
+                  </button>
+                </div>
+              </div>
+
+              <!-- Varför ligger det här mejlet här? Ett omvänt uppslag för markerat mejl. -->
+
+              <label class="search">
+                <span>⌕</span>
+                <input
+                  id="ruleSearch"
+                  type="search"
+                  placeholder="Sök namn, mapp eller villkor…"
+                  aria-label="Sök namn, mapp eller villkor"
+                  data-i18n-aria="ruleSearchPlaceholder"
+                />
+              </label>
+              <!-- Inlärda förslag: bara domän, mapp och antal – inget skapas utan ett klick. -->
+
+              <!-- Provkörda regler som har gått ut: aktivera, förläng eller stäng av. -->
+              <div
+                id="trialBar"
+                class="trial-bar"
+                hidden=""
+                role="status"
+                aria-live="polite"
+              ></div>
+              <div id="ruleList" class="rule-list"></div>
+
+              <details class="rule-library-tools">
+                <summary data-i18n="ruleFilesTitle">
+                  Importera &amp; exportera regler
+                </summary>
+                <div class="card-foot">
+                  <button
+                    id="export"
+                    type="button"
+                    class="button small secondary"
+                    data-i18n="exportBtn"
+                  >
+                    ↓ Exportera regler (.json)
+                  </button>
+                  <label class="button small secondary file-label"
+                    ><span data-i18n="importBtn">↑ Importera (.json)</span
+                    ><input
+                      id="import"
+                      type="file"
+                      accept=".json,application/json"
+                      hidden=""
+                  /></label>
+                  <label class="button small secondary file-label"
+                    ><span data-i18n="importMergeBtn"
+                      >＋ Lägg till från JSON</span
+                    ><input
+                      id="importMerge"
+                      type="file"
+                      accept=".json,application/json"
+                      hidden=""
+                  /></label>
+                </div>
+                <div class="tb-filter-card" id="tbFilterCard">
+                  <div class="tb-filter-head">
+                    <strong data-i18n="tbFilterTitle"
+                      >🔁 Thunderbirds egna filter</strong
+                    >
+                    <span class="tb-filter-actions">
+                      <select
+                        id="tbAccount"
+                        aria-label="Konto"
+                        data-i18n-aria="ariaAccount"
+                      ></select>
+                      <label class="button small secondary file-label"
+                        ><span data-i18n="tbImportBtn"
+                          >⇪ Importera filterfil…</span
+                        ><input
+                          id="tbImportFile"
+                          type="file"
+                          accept=".dat,text/plain"
+                          hidden=""
+                      /></label>
+                      <button
+                        id="tbExportBtn"
+                        type="button"
+                        class="button small secondary"
+                        data-i18n="tbExportBtn"
+                      >
+                        ⇩ Exportera som filterfil
+                      </button>
+                    </span>
+                  </div>
+                  <p class="simple-help" data-i18n="tbFilterHelp">
+                    Läs in dina befintliga filter från msgFilterRules.dat och
+                    gör dem till SortBro-regler – eller skriv ut dina regler som
+                    en filterfil som Thunderbird förstår. Filen ligger i din
+                    profil: Hjälp → Felsökningsinformation → Öppna mappen, sedan
+                    ImapMail/&lt;server&gt;/ eller Mail/Local Folders/.
+                  </p>
+                  <div class="tb-filter-row" id="tbPrefixRow" hidden="">
+                    <input
+                      id="tbUriPrefix"
+                      type="text"
+                      maxlength="240"
+                      placeholder="imap://anvandare%40server.se@imap.server.se/"
+                    />
+                    <span class="muted" data-i18n="tbPrefixHelp"
+                      >Klistra in kontots adress från filterfilen om du vill
+                      kunna exportera tillbaka.</span
+                    >
+                  </div>
+                  <div
+                    id="tbImportReview"
+                    class="tb-filter-review"
+                    hidden=""
+                  ></div>
+                  <div id="tbReport" class="tb-filter-report" hidden=""></div>
+                </div>
+              </details>
+              <p class="priority-note" data-i18n="priorityNote">
+                Första träff gäller. Ändra ordning via ⋯.
+              </p>
+            </section>
+
+            <section class="card editor-card" id="ruleEditor" hidden="">
+              <div class="editor-nav">
+                <button
+                  data-i18n="backToRules"
+                  type="button"
+                  id="backToRules"
+                  class="text-button"
+                >
+                  ← Alla regler</button
+                ><span data-i18n="editorDraftNote"
+                  >Ändringar sparas först när du väljer Spara.</span
+                >
+              </div>
+              <div class="card-title">
+                <div>
+                  <div class="eyebrow" data-i18n="editorEyebrow">
+                    REGELREDIGERING
+                  </div>
+                  <h2 id="editorTitle" tabindex="-1">Ny regel</h2>
+                </div>
+                <label class="toggle-label"
+                  ><input id="enabled" type="checkbox" checked="" />
+                  <span data-i18n="enabledLabel">Aktiv</span></label
+                >
+              </div>
+
+              <form id="ruleForm">
+                <label class="field">
+                  <span data-i18n="ruleNameLabel">Regelnamn</span>
+                  <input
+                    id="ruleName"
+                    maxlength="100"
+                    placeholder="Exempel: Fortnox fakturor"
+                    required=""
+                  />
+                </label>
+
+                <div class="form-section focus-step">
+                  <div class="section-title">
+                    <span class="step">1</span>
+                    <h3 data-i18n="step1Title">Markera ett exempelmejl</h3>
+                  </div>
+                  <p class="simple-help" data-i18n="step1Help">
+                    Gå till Thunderbird, klicka på ett mejl som ska sorteras och
+                    kom tillbaka hit.
+                  </p>
+                  <button
+                    id="fromSelected"
+                    type="button"
+                    class="button primary full"
+                    data-i18n="fromSelectedBtn"
+                  >
+                    ✉ Hämta konto från markerat mejl
+                  </button>
+                  <label class="field compact-field">
+                    <span data-i18n="accountLabel">Konto</span>
+                    <select id="source" required="">
+                      <option value="">Välj ett konto…</option>
+                    </select>
+                  </label>
+                  <div class="account-scope">
+                    <span class="account-check">✓</span>
+                    <span>
+                      <strong data-i18n="accountScopeTitle"
+                        >Alla mappar i kontot ingår</strong
+                      >
+                      <small data-i18n="accountScopeBody"
+                        >Inkorg, arkiv och vanliga undermappar bevakas
+                        automatiskt. Skickat, Utkast, Skräppost och Papperskorg
+                        undantas.</small
+                      >
+                    </span>
+                  </div>
+                </div>
+
+                <div class="form-section">
+                  <div class="section-title">
+                    <span class="step">2</span>
+                    <h3 data-i18n="step2Title">Vilka liknande mejl?</h3>
+                    <select
+                      id="match"
+                      aria-label="Kombinera villkor"
+                      data-i18n-aria="ariaMatch"
+                    >
+                      <option value="any" data-i18n="matchAny">
+                        Minst ett ska stämma
+                      </option>
+                      <option value="all" data-i18n="matchAll">
+                        Alla ska stämma
+                      </option>
+                    </select>
+                  </div>
+                  <p class="simple-help" data-i18n="step2Help">
+                    Lägg till upp till 8 villkor, till exempel ämnesord eller
+                    avsändare. Standard för nya regler: minst ett villkor ska
+                    stämma – inte alla.
+                  </p>
+                  <p id="matchHelp" class="match-help"></p>
+                  <div class="condition-head">
+                    <span data-i18n="colField">Fält</span>
+                    <span data-i18n="colOp">Villkor</span>
+                    <span data-i18n="colValue">Värde</span>
+                    <span></span>
+                  </div>
+                  <div
+                    id="conditions"
+                    role="group"
+                    aria-describedby="matchHelp"
+                  ></div>
+                  <button
+                    id="addCondition"
+                    type="button"
+                    class="text-button"
+                    data-i18n="addConditionBtn"
+                  >
+                    ＋ Lägg till villkor
+                  </button>
+                  <div class="import-box" id="importBox">
+                    <label class="field">
+                      <span data-i18n="importLabel"
+                        >Klistra in domäner eller adresser (en per rad, eller
+                        med komma)</span
+                      >
+                      <textarea
+                        id="importValues"
+                        rows="2"
+                        maxlength="4000"
+                        placeholder="klarna.se
+order@fortnox.se, nyheter@klarna.se"
+                      ></textarea>
+                    </label>
+                    <div class="import-actions">
+                      <button
+                        id="importBtn"
+                        type="button"
+                        class="button small secondary"
+                        data-i18n="importBtn"
+                      >
+                        ＋ Importera till regeln
+                      </button>
+                      <span id="importResult" class="muted" hidden=""></span>
+                    </div>
+                    <p class="simple-help" data-i18n="importHelp">
+                      Varje rad blir ett villkor i den här regeln. Adresser och
+                      domäner blir exakta träffar, andra ord blir "innehåller".
+                      Flera avsändare kopplas ihop med "minst ett av villkoren",
+                      så regeln flyttar mejl från vem som helst av dem.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="form-section">
+                  <div class="section-title">
+                    <span class="step">3</span>
+                    <h3 data-i18n="step3Title">
+                      Vart och när ska mejlen flyttas?
+                    </h3>
+                  </div>
+                  <div class="target-area">
+                    <select id="target" required="">
+                      <option value="">Välj en mapp…</option>
+                    </select>
+                  </div>
+                  <button
+                    id="newFolderBtn"
+                    type="button"
+                    class="button small secondary"
+                    data-i18n="newFolderBtn"
+                  >
+                    ＋ Ny mapp
+                  </button>
+
+                  <div class="archive-box">
+                    <label class="toggle-label">
+                      <input id="ruleYearFolders" type="checkbox" />
+                      <span data-i18n="ruleYearFoldersLabel"
+                        >Valfritt: lägg varje år i en egen årsmapp under
+                        målmappen (t.ex. Arkiv/2025)</span
+                      >
+                    </label>
+                    <p class="muted" data-i18n="yearFoldersNote">
+                      Avstängt som standard – kryssa bara i om du vill ha en
+                      egen mapp per år. Årsmappen skapas automatiskt när den
+                      behövs.
+                    </p>
+                  </div>
+
+                  <div class="unread-toggles">
+                    <strong
+                      class="unread-toggles-title"
+                      data-i18n="unreadChoiceTitle"
+                      >Olästa mejl – välj vad som ska hända</strong
+                    >
+                    <label class="toggle-label">
+                      <input id="ruleMoveUnread" type="checkbox" />
+                      <span data-i18n="ruleMoveUnreadLabel"
+                        >Flytta även olästa mejl direkt (annars väntar de tills
+                        du har läst dem)</span
+                      >
+                    </label>
+                    <label class="toggle-label">
+                      <input id="ruleOpenWindow" type="checkbox" checked="" />
+                      <span data-i18n="ruleOpenWindowLabel"
+                        >Öppna olästa mejl i ett nytt fönster efter
+                        flytten</span
+                      >
+                    </label>
+                  </div>
+                  <p class="simple-help" data-i18n="unreadMoveNote">
+                    Kryssad ruta: olästa mejl som matchar regeln flyttas direkt.
+                    Omarkerad: de ligger kvar och flyttas först när du har läst
+                    dem.
+                  </p>
+                  <p
+                    class="simple-help"
+                    id="unreadChoiceNote"
+                    data-i18n="unreadChoiceNote"
+                  >
+                    Fönstervalet gäller bara när olästa mejl flyttas direkt. Då
+                    öppnas mejlet först när det ligger i målmappen – aldrig som
+                    en tom ruta.
+                  </p>
+
+                  <div class="trial-box">
+                    <label class="toggle-label">
+                      <input id="ruleTrial" type="checkbox" />
+                      <span data-i18n="ruleTrialLabel"
+                        >Provkör i 7 dagar innan regeln flyttar något</span
+                      >
+                    </label>
+                    <p class="muted">
+                      <strong
+                        id="trialLeft"
+                        class="trial-left"
+                        hidden=""
+                      ></strong>
+                      <span data-i18n="trialNote"
+                        >Under provkörningen räknar regeln bara hur många mejl
+                        den skulle flytta. Ingenting flyttas, och regeln
+                        påverkar inte de andra reglerna. Efter sju dagar frågar
+                        SortBro om du vill aktivera den.</span
+                      >
+                    </p>
+                  </div>
+
+                  <details class="advanced-box">
+                    <summary data-i18n="branchSummary">
+                      Avancerat: läsläge &amp; olika mål beroende på ämne
+                    </summary>
+                    <div class="branch-block">
+                      <label class="field">
+                        <span data-i18n="readFilterLabel"
+                          >Flytta olästa / lästa mejl för denna regel</span
+                        >
+                        <select id="ruleReadFilter">
+                          <option value="default" data-i18n="rfDefault">
+                            Enligt standardinställning (lästa + nya i Inkorgen)
+                          </option>
+                          <option value="read" data-i18n="rfRead">
+                            Endast lästa mejl (vänta tills mejlet är läst och
+                            lämnat)
+                          </option>
+                          <option value="both" data-i18n="rfBoth">
+                            Både olästa och lästa mejl (flytta direkt)
+                          </option>
+                          <option value="unread" data-i18n="rfUnread">
+                            Endast olästa mejl (flytta direkt)
+                          </option>
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span data-i18n="unreadActionLabel"
+                          >När olästa mejl flyttas av denna regel</span
+                        >
+                        <select id="ruleUnreadAction">
+                          <option value="default" data-i18n="uaDefault">
+                            Enligt standardinställning (Inställningar)
+                          </option>
+                          <option value="keep" data-i18n="uaKeep">
+                            Behåll som oläst i målmappen (utan popup-fönster)
+                          </option>
+                          <option value="window" data-i18n="uaWindow">
+                            Öppna i nytt fönster och behåll som oläst
+                          </option>
+                          <option value="read" data-i18n="uaRead">
+                            Markera som läst vid flytt
+                          </option>
+                        </select>
+                      </label>
+                      <p class="branch-note" data-i18n="branchNote">
+                        Första fördelningen som matchar styr målmappen. Övriga
+                        mejl går till målmappen ovan.
+                      </p>
+                      <div id="branches"></div>
+                      <button
+                        id="addBranch"
+                        type="button"
+                        class="text-button"
+                        data-i18n="addBranchBtn"
+                      >
+                        ＋ Lägg till fördelning
+                      </button>
+                    </div>
+                  </details>
+
+                  <div class="read-policy">
+                    <span>✓</span>
+                    <div>
+                      <strong id="readPolicyTitle"
+                        >Först läst. Sedan lämnat.</strong
+                      >
+                      <p id="readPolicyBody">
+                        Väntar minst två sekunder utan visning i någon mejlflik
+                        eller något meddelandefönster.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <section
+                  id="ruleSummary"
+                  class="rule-summary"
+                  aria-labelledby="ruleSummaryTitle"
+                >
+                  <h3 id="ruleSummaryTitle" data-i18n="ruleSummaryTitle">
+                    Så fungerar regeln
+                  </h3>
+                  <div id="ruleSummaryBody"></div>
+                  <p class="rule-summary-note" data-i18n="summaryNote">
+                    Sammanfattningen visar fälten i redigeraren. Den sparar
+                    eller flyttar ingenting. Regelprioritet och
+                    säkerhetskontroller gäller fortfarande.
+                  </p>
+                </section>
+                <div
+                  id="testResult"
+                  class="test-result"
+                  hidden=""
+                  role="status"
+                ></div>
+                <div
+                  id="diagnosePanel"
+                  class="diagnose-panel"
+                  hidden=""
+                  role="status"
+                  aria-live="polite"
+                ></div>
+                <div class="form-actions">
+                  <button
+                    id="test"
+                    type="button"
+                    class="button secondary"
+                    data-i18n="testBtn"
+                  >
+                    ▷ Kontrollera
+                  </button>
+                  <button
+                    id="diagnoseBtn"
+                    type="button"
+                    class="button secondary"
+                    data-i18n="diagnoseBtn"
+                  >
+                    🔎 Varför flyttas inte mejlen?
+                  </button>
+                  <button
+                    id="save"
+                    type="submit"
+                    class="button primary"
+                    data-i18n="saveBtn"
+                  >
+                    Spara automatisk flytt
+                  </button>
+                  <button
+                    id="saveAsNew"
+                    type="button"
+                    class="button secondary"
+                    data-i18n="saveAsNewBtn"
+                  >
+                    ＋ Spara som ny regel
+                  </button>
+                  <button
+                    id="saveAndNew"
+                    type="button"
+                    class="button secondary"
+                    data-i18n="saveAndNewBtn"
+                  >
+                    ＋ Spara &amp; ny tom
+                  </button>
+                </div>
+                <div class="editor-footer">
+                  <button
+                    id="up"
+                    type="button"
+                    class="text-button"
+                    data-i18n="upBtn"
+                  >
+                    ↑ Prioritet
+                  </button>
+                  <button
+                    id="down"
+                    type="button"
+                    class="text-button"
+                    data-i18n="downBtn"
+                  >
+                    ↓ Prioritet
+                  </button>
+                  <button
+                    id="duplicate"
+                    type="button"
+                    class="text-button"
+                    data-i18n="duplicateBtn"
+                  >
+                    ⧉ Duplicera regel
+                  </button>
+                  <button
+                    id="exportSingleRule"
+                    type="button"
+                    class="text-button"
+                    data-i18n="exportSingleRuleBtn"
+                  >
+                    ↓ Exportera regel (.json)
+                  </button>
+                  <button
+                    id="delete"
+                    type="button"
+                    class="text-button danger"
+                    data-i18n="deleteBtn"
+                  >
+                    Ta bort regel
+                  </button>
+                </div>
+              </form>
+              <div class="safety-strip editor-safety">
+                <span>ⓘ</span>
+                <p>
+                  <strong data-i18n="safetyTitle"
+                    >Testläge är en trygg start.</strong
+                  >
+                  <span data-i18n="safetyBody"
+                    >Testa dina regler innan du aktiverar riktiga flyttar.
+                    Testknappen flyttar aldrig något.</span
+                  >
+                </p>
+                <button
+                  id="queueSelected"
+                  class="text-button"
+                  data-i18n="queueSelectedBtn"
+                >
+                  Bevaka markerat →
+                </button>
+                <button id="catchUp" class="text-button" data-i18n="catchUpBtn">
+                  Sortera befintliga enligt regeln →
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+        <section
+          class="view"
+          id="view-suggestions"
+          hidden=""
+          role="tabpanel"
+          aria-labelledby="tab-suggestions"
+        >
+          <header class="view-heading">
+            <h1 data-i18n="suggestionsPageTitle">Föreslagna regler</h1>
+            <p data-i18n="suggestionsPageHelp">
+              Utgå från din Inkorg eller dina egna flyttar. Du väljer själv vad
+              som ska bli en regel.
+            </p>
+          </header>
+          <div class="suggestion-layout">
+            <section class="card suggestion-hints">
+              <div class="card-title">
+                <div>
+                  <h2 data-i18n="inboxIdeasTitle">Från din Inkorg</h2>
+                  <p data-i18n="inboxIdeasHelp">
+                    Välj en avsändare eller ett ämnesord att utgå från.
+                  </p>
+                </div>
+                <button
+                  id="quickHintsBtn"
+                  type="button"
+                  class="text-button"
+                  data-i18n="quickHintsScan"
+                >
+                  ↻ Läs Inkorgen igen
+                </button>
+              </div>
+              <div id="quickChips" class="quick-chips"></div>
+            </section>
+            <div id="quickRuleBox" class="quick-rule-box card">
               <div class="quick-rule-head">
-                <strong data-i18n="quickRuleTitle">⚡ Skapa regel på tio sekunder</strong>
+                <strong data-i18n="quickRuleTitle"
+                  >Skapa från ett förslag</strong
+                >
                 <span class="quick-rule-actions">
-                  <button id="quickHintsBtn" type="button" class="text-button" data-i18n="quickHintsScan">↻ Läs Inkorgen igen</button>
-                  <button id="quickFetchBtn" type="button" class="text-button" data-i18n="quickFetchBtn">✉ Hämta från markerat mejl</button>
+                  <button
+                    id="quickFetchBtn"
+                    type="button"
+                    class="text-button"
+                    data-i18n="quickFetchBtn"
+                  >
+                    ✉ Hämta från markerat mejl
+                  </button>
                 </span>
               </div>
-              <p class="simple-help" data-i18n="quickRuleHelp">Klicka på en avsändare eller ett ämnesord – eller skriv själv. SortBro säger till hur många mejl i Inkorgen regeln träffar innan du sparar.</p>
-              <div id="quickChips" class="quick-chips"></div>
+              <p class="simple-help" data-i18n="quickRuleHelp">
+                Klicka på en avsändare eller ett ämnesord – eller skriv själv.
+                SortBro säger till hur många mejl i Inkorgen regeln träffar
+                innan du sparar.
+              </p>
+
               <div class="quick-rule-row">
-                <select id="quickField" aria-label="Fält" data-i18n-aria="ariaField">
-                  <option value="domain" data-i18n="optDomain">Avsändardomän</option>
-                  <option value="sender" data-i18n="optSender">Från (adress)</option>
+                <select
+                  id="quickField"
+                  aria-label="Fält"
+                  data-i18n-aria="ariaField"
+                >
+                  <option value="domain" data-i18n="optDomain">
+                    Avsändardomän
+                  </option>
+                  <option value="sender" data-i18n="optSender">
+                    Från (adress)
+                  </option>
                   <option value="subject" data-i18n="optSubject">Ämne</option>
                 </select>
-                <input id="quickValue" type="text" maxlength="256" placeholder="t.ex. fortnox.se, klarna.se eller Faktura…">
-                <span id="quickCount" class="quick-count" hidden></span>
+                <input
+                  id="quickValue"
+                  type="text"
+                  maxlength="256"
+                  placeholder="t.ex. fortnox.se, klarna.se eller Faktura…"
+                />
+                <span id="quickCount" class="quick-count" hidden=""></span>
               </div>
               <div class="quick-rule-row quick-target-row">
-                <select id="quickTarget" aria-label="Målmapp" data-i18n-aria="ariaTarget"><option value="">Välj målmapp…</option></select>
-                <button id="quickNewFolderBtn" type="button" class="button small secondary" data-i18n="newFolderBtn">＋ Ny mapp</button>
+                <select
+                  id="quickTarget"
+                  aria-label="Målmapp"
+                  data-i18n-aria="ariaTarget"
+                >
+                  <option value="">Välj målmapp…</option>
+                </select>
+                <button
+                  id="quickNewFolderBtn"
+                  type="button"
+                  class="button small secondary"
+                  data-i18n="newFolderBtn"
+                >
+                  ＋ Ny mapp
+                </button>
               </div>
               <div id="quickSentence" class="quick-sentence"></div>
               <div class="quick-rule-row">
-                <select id="quickExisting" aria-label="Befintlig regel" data-i18n-aria="ariaExisting"><option value="">Skapa ny regel…</option></select>
+                <select
+                  id="quickExisting"
+                  aria-label="Befintlig regel"
+                  data-i18n-aria="ariaExisting"
+                >
+                  <option value="">Skapa ny regel…</option>
+                </select>
               </div>
               <div class="quick-rule-row">
-                <button id="quickAddBtn" type="button" class="button small primary" data-i18n="quickAddBtn">＋ Lägg till filter</button>
-                <button id="quickAddRunBtn" type="button" class="button small secondary" data-i18n="quickAddRunBtn">⚡ Lägg till och flytta nu</button>
+                <button
+                  id="quickAddBtn"
+                  type="button"
+                  class="button small primary"
+                  data-i18n="quickAddBtn"
+                >
+                  ＋ Lägg till filter
+                </button>
+                <button
+                  id="quickAddRunBtn"
+                  type="button"
+                  class="button small secondary"
+                  data-i18n="quickAddRunBtn"
+                >
+                  ⚡ Lägg till och flytta nu
+                </button>
               </div>
               <div class="quick-rule-checks">
-                <label class="rule-check-chip"><input id="quickMoveUnread" type="checkbox" checked> <span data-i18n="inlineMoveUnread">Flytta olästa mejl</span></label>
-                <label class="rule-check-chip"><input id="quickOpenWindow" type="checkbox"> <span data-i18n="inlineOpenWindow">Öppna i nytt fönster</span></label>
+                <label class="rule-check-chip"
+                  ><input id="quickMoveUnread" type="checkbox" checked="" />
+                  <span data-i18n="inlineMoveUnread"
+                    >Flytta olästa mejl</span
+                  ></label
+                >
+                <label class="rule-check-chip"
+                  ><input id="quickOpenWindow" type="checkbox" />
+                  <span data-i18n="inlineOpenWindow"
+                    >Öppna i nytt fönster</span
+                  ></label
+                >
               </div>
             </div>
-            <div class="tb-filter-card" id="tbFilterCard">
-              <div class="tb-filter-head">
-                <strong data-i18n="tbFilterTitle">🔁 Thunderbirds egna filter</strong>
-                <span class="tb-filter-actions">
-                  <select id="tbAccount" aria-label="Konto" data-i18n-aria="ariaAccount"></select>
-                  <label class="button small secondary file-label"><span data-i18n="tbImportBtn">⇪ Importera filterfil…</span><input id="tbImportFile" type="file" accept=".dat,text/plain" hidden></label>
-                  <button id="tbExportBtn" type="button" class="button small secondary" data-i18n="tbExportBtn">⇩ Exportera som filterfil</button>
-                </span>
-              </div>
-              <p class="simple-help" data-i18n="tbFilterHelp">Läs in dina befintliga filter från msgFilterRules.dat och gör dem till SortBro-regler – eller skriv ut dina regler som en filterfil som Thunderbird förstår. Filen ligger i din profil: Hjälp → Felsökningsinformation → Öppna mappen, sedan ImapMail/&lt;server&gt;/ eller Mail/Local Folders/.</p>
-              <div class="tb-filter-row" id="tbPrefixRow" hidden>
-                <input id="tbUriPrefix" type="text" maxlength="240" placeholder="imap://anvandare%40server.se@imap.server.se/">
-                <span class="muted" data-i18n="tbPrefixHelp">Klistra in kontots adress från filterfilen om du vill kunna exportera tillbaka.</span>
-              </div>
-              <div id="tbImportReview" class="tb-filter-review" hidden></div>
-              <div id="tbReport" class="tb-filter-report" hidden></div>
+          </div>
+          <details class="card template-library">
+            <summary data-i18n="templateLibraryTitle">
+              Mallar att utgå från
+            </summary>
+            <div
+              class="template-bar"
+              id="templateBar"
+              role="group"
+              aria-label="1-klicksmallar"
+              data-i18n-aria="ariaTemplates"
+            >
+              <span class="template-label" data-i18n="templateLabel"
+                >1-klicksmallar:</span
+              >
+              <button
+                type="button"
+                class="template-btn"
+                data-template="faktura"
+              >
+                🧾 <span data-i18n="tplInvoice">Fakturor &amp; Kvitton</span>
+              </button>
+              <button type="button" class="template-btn" data-template="order">
+                📦 <span data-i18n="tplOrder">Order &amp; Leverans</span>
+              </button>
+              <button
+                type="button"
+                class="template-btn"
+                data-template="nyhetsbrev"
+              >
+                📰 <span data-i18n="tplNews">Nyhetsbrev</span>
+              </button>
+              <button type="button" class="template-btn" data-template="system">
+                🔔 <span data-i18n="tplSystem">System &amp; Notiser</span>
+              </button>
+              <button
+                type="button"
+                class="template-btn"
+                data-template="bokforing"
+              >
+                📊 <span data-i18n="tplBookkeeping">Bokföring</span>
+              </button>
+              <button
+                type="button"
+                class="template-btn"
+                data-template="aldre90"
+              >
+                🗄️ <span data-i18n="tplOlder90">Arkivera äldre mejl</span>
+              </button>
             </div>
-            <label class="search">
-              <span>⌕</span>
-              <input id="ruleSearch" type="search" placeholder="Sök namn, mapp eller villkor…" aria-label="Sök namn, mapp eller villkor" data-i18n-aria="ruleSearchPlaceholder">
-            </label>
-            <!-- Inlärda förslag: bara domän, mapp och antal – inget skapas utan ett klick. -->
-            <div id="learnBar" class="learn-bar" hidden role="status" aria-live="polite"></div>
-            <!-- Provkörda regler som har gått ut: aktivera, förläng eller stäng av. -->
-            <div id="trialBar" class="trial-bar" hidden role="status" aria-live="polite"></div>
-            <div id="ruleList" class="rule-list"></div>
-            <div class="card-foot">
-              <button id="export" type="button" class="button small secondary" data-i18n="exportBtn">↓ Exportera regler (.json)</button>
-              <label class="button small secondary file-label"><span data-i18n="importBtn">↑ Importera (.json)</span><input id="import" type="file" accept=".json,application/json" hidden></label>
-              <label class="button small secondary file-label"><span data-i18n="importMergeBtn">＋ Lägg till från JSON</span><input id="importMerge" type="file" accept=".json,application/json" hidden></label>
-            </div>
-            <p class="priority-note" data-i18n="priorityNote">Första träff gäller. Ändra ordning via ⋯.</p>
+          </details>
+          <section class="card learned-section">
+            <h2 data-i18n="learnedSectionTitle">
+              Förslag från dina egna flyttar
+            </h2>
+            <p id="learnEmpty" class="muted" data-i18n="learnEmpty">
+              Inga inlärda förslag just nu. Nya förslag visas här när SortBro
+              hittar ett mönster.
+            </p>
+            <div
+              id="learnBar"
+              class="learn-bar"
+              hidden=""
+              role="status"
+              aria-live="polite"
+            ></div>
           </section>
+        </section>
 
-          <section class="card editor-card">
+        <section
+          id="view-activity"
+          class="view"
+          hidden=""
+          role="tabpanel"
+          aria-labelledby="tab-activity"
+        >
+          <header class="view-heading">
+            <h1 data-i18n="activityPageTitle">Aktivitet</h1>
+            <p data-i18n="activityPageHelp">
+              Följ sorteringen, kontrollera resultat och felsök på ett ställe.
+            </p>
+          </header>
+          <div class="stats">
+            <div class="stat" id="statRulesCard">
+              <span class="stat-icon mint">▤</span>
+              <div>
+                <strong id="countRules" class="stat-figure">0</strong
+                ><span data-i18n="statRules">aktiva regler</span>
+              </div>
+            </div>
+            <div class="stat" id="statQueueCard">
+              <span class="stat-icon blue">◷</span>
+              <div>
+                <strong id="countQueue" class="stat-figure">0</strong
+                ><span data-i18n="statQueue">väntar på flytt / test</span>
+              </div>
+            </div>
+            <div class="stat" id="statMovedCard">
+              <span class="stat-icon sand">↗</span>
+              <div>
+                <strong id="countMoved" class="stat-figure">0</strong
+                ><span data-i18n="statMoved">flyttade sedan start</span>
+              </div>
+              <span id="simulated" class="mini-tag">0 test</span>
+            </div>
+            <div class="stat" id="statMatchedCard">
+              <span class="stat-icon blue">✓</span>
+              <div>
+                <strong id="countMatched" class="stat-figure">0</strong
+                ><span data-i18n="statMatched">matchade sedan start</span>
+              </div>
+            </div>
+          </div>
+          <section class="card activity-tools">
             <div class="card-title">
               <div>
-                <div class="eyebrow" data-i18n="editorEyebrow">REGELREDIGERING</div>
-                <h2 id="editorTitle">Ny regel</h2>
+                <h2 data-i18n="activityToolsTitle">
+                  Kontroller &amp; felsökning
+                </h2>
+                <p data-i18n="activityToolsHelp">
+                  Kör en kontroll eller undersök det markerade mejlet.
+                </p>
               </div>
-              <label class="toggle-label"><input id="enabled" type="checkbox" checked> <span data-i18n="enabledLabel">Aktiv</span></label>
             </div>
-
-            <form id="ruleForm">
-              <label class="field">
-                <span data-i18n="ruleNameLabel">Regelnamn</span>
-                <input id="ruleName" maxlength="100" placeholder="Exempel: Fortnox fakturor" required>
-              </label>
-
-              <div class="form-section focus-step">
-                <div class="section-title"><span class="step">1</span><h3 data-i18n="step1Title">Markera ett exempelmejl</h3></div>
-                <p class="simple-help" data-i18n="step1Help">Gå till Thunderbird, klicka på ett mejl som ska sorteras och kom tillbaka hit.</p>
-                <button id="fromSelected" type="button" class="button primary full" data-i18n="fromSelectedBtn">✉ Hämta konto från markerat mejl</button>
-                <label class="field compact-field">
-                  <span data-i18n="accountLabel">Konto</span>
-                  <select id="source" required><option value="">Välj ett konto…</option></select>
-                </label>
-                <div class="account-scope">
-                  <span class="account-check">✓</span>
-                  <span>
-                    <strong data-i18n="accountScopeTitle">Alla mappar i kontot ingår</strong>
-                    <small data-i18n="accountScopeBody">Inkorg, arkiv och vanliga undermappar bevakas automatiskt. Skickat, Utkast, Skräppost och Papperskorg undantas.</small>
-                  </span>
-                </div>
-              </div>
-
-              <div class="form-section">
-                <div class="section-title">
-                  <span class="step">2</span>
-                  <h3 data-i18n="step2Title">Vilka liknande mejl?</h3>
-                  <select id="match" aria-label="Kombinera villkor" data-i18n-aria="ariaMatch">
-                    <option value="any" data-i18n="matchAny">Minst ett ska stämma</option>
-                    <option value="all" data-i18n="matchAll">Alla ska stämma</option>
-                  </select>
-                </div>
-                <p class="simple-help" data-i18n="step2Help">Lägg till upp till 8 villkor, till exempel ämnesord eller avsändare. Standard för nya regler: minst ett villkor ska stämma – inte alla.</p>
-                <p id="matchHelp" class="match-help"></p>
-                <div class="condition-head">
-                  <span data-i18n="colField">Fält</span>
-                  <span data-i18n="colOp">Villkor</span>
-                  <span data-i18n="colValue">Värde</span>
-                  <span></span>
-                </div>
-                <div id="conditions" role="group" aria-describedby="matchHelp"></div>
-                <button id="addCondition" type="button" class="text-button" data-i18n="addConditionBtn">＋ Lägg till villkor</button>
-                <div class="import-box" id="importBox">
-                  <label class="field">
-                    <span data-i18n="importLabel">Klistra in domäner eller adresser (en per rad, eller med komma)</span>
-                    <textarea id="importValues" rows="2" maxlength="4000" placeholder="klarna.se&#10;order@fortnox.se, nyheter@klarna.se"></textarea>
-                  </label>
-                  <div class="import-actions">
-                    <button id="importBtn" type="button" class="button small secondary" data-i18n="importBtn">＋ Importera till regeln</button>
-                    <span id="importResult" class="muted" hidden></span>
-                  </div>
-                  <p class="simple-help" data-i18n="importHelp">Varje rad blir ett villkor i den här regeln. Adresser och domäner blir exakta träffar, andra ord blir "innehåller". Flera avsändare kopplas ihop med "minst ett av villkoren", så regeln flyttar mejl från vem som helst av dem.</p>
-                </div>
-              </div>
-
-              <div class="form-section">
-                <div class="section-title"><span class="step">3</span><h3 data-i18n="step3Title">Vart och när ska mejlen flyttas?</h3></div>
-                <div class="target-area">
-                  <select id="target" required><option value="">Välj en mapp…</option></select>
-                </div>
-
-                <div class="archive-box">
-                  <label class="toggle-label">
-                    <input id="ruleYearFolders" type="checkbox">
-                    <span data-i18n="ruleYearFoldersLabel">Valfritt: lägg varje år i en egen årsmapp under målmappen (t.ex. Arkiv/2025)</span>
-                  </label>
-                  <p class="muted" data-i18n="yearFoldersNote">Avstängt som standard – kryssa bara i om du vill ha en egen mapp per år. Årsmappen skapas automatiskt när den behövs.</p>
-                </div>
-
-                <div class="unread-toggles">
-                  <strong class="unread-toggles-title" data-i18n="unreadChoiceTitle">Olästa mejl – välj vad som ska hända</strong>
-                  <label class="toggle-label">
-                    <input id="ruleMoveUnread" type="checkbox">
-                    <span data-i18n="ruleMoveUnreadLabel">Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)</span>
-                  </label>
-                  <label class="toggle-label">
-                    <input id="ruleOpenWindow" type="checkbox" checked>
-                    <span data-i18n="ruleOpenWindowLabel">Öppna olästa mejl i ett nytt fönster efter flytten</span>
-                  </label>
-                </div>
-                <p class="simple-help" data-i18n="unreadMoveNote">Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.</p>
-                <p class="simple-help" id="unreadChoiceNote" data-i18n="unreadChoiceNote">Fönstervalet gäller bara när olästa mejl flyttas direkt. Då öppnas mejlet först när det ligger i målmappen – aldrig som en tom ruta.</p>
-
-                <div class="trial-box">
-                  <label class="toggle-label">
-                    <input id="ruleTrial" type="checkbox">
-                    <span data-i18n="ruleTrialLabel">Provkör i 7 dagar innan regeln flyttar något</span>
-                  </label>
-                  <p class="muted"><strong id="trialLeft" class="trial-left" hidden></strong> <span data-i18n="trialNote">Under provkörningen räknar regeln bara hur många mejl den skulle flytta. Ingenting flyttas, och regeln påverkar inte de andra reglerna. Efter sju dagar frågar SortBro om du vill aktivera den.</span></p>
-                </div>
-
-                <details class="advanced-box">
-                  <summary data-i18n="branchSummary">Avancerat: läsläge & olika mål beroende på ämne</summary>
-                  <div class="branch-block">
-                    <label class="field">
-                      <span data-i18n="readFilterLabel">Flytta olästa / lästa mejl för denna regel</span>
-                      <select id="ruleReadFilter">
-                        <option value="default" data-i18n="rfDefault">Enligt standardinställning (lästa + nya i Inkorgen)</option>
-                        <option value="read" data-i18n="rfRead">Endast lästa mejl (vänta tills mejlet är läst och lämnat)</option>
-                        <option value="both" data-i18n="rfBoth">Både olästa och lästa mejl (flytta direkt)</option>
-                        <option value="unread" data-i18n="rfUnread">Endast olästa mejl (flytta direkt)</option>
-                      </select>
-                    </label>
-                    <label class="field">
-                      <span data-i18n="unreadActionLabel">När olästa mejl flyttas av denna regel</span>
-                      <select id="ruleUnreadAction">
-                        <option value="default" data-i18n="uaDefault">Enligt standardinställning (Avancerat)</option>
-                        <option value="keep" data-i18n="uaKeep">Behåll som oläst i målmappen (utan popup-fönster)</option>
-                        <option value="window" data-i18n="uaWindow">Öppna i nytt fönster och behåll som oläst</option>
-                        <option value="read" data-i18n="uaRead">Markera som läst vid flytt</option>
-                      </select>
-                    </label>
-                    <p class="branch-note" data-i18n="branchNote">Första fördelningen som matchar styr målmappen. Övriga mejl går till målmappen ovan.</p>
-                    <div id="branches"></div>
-                    <button id="addBranch" type="button" class="text-button" data-i18n="addBranchBtn">＋ Lägg till fördelning</button>
-                  </div>
-                </details>
-
-                <div class="read-policy">
-                  <span>✓</span>
-                  <div>
-                    <strong id="readPolicyTitle">Först läst. Sedan lämnat.</strong>
-                    <p id="readPolicyBody">Väntar minst två sekunder utan visning i någon mejlflik eller något meddelandefönster.</p>
-                  </div>
-                </div>
-              </div>
-
-              <section id="ruleSummary" class="rule-summary" aria-labelledby="ruleSummaryTitle">
-                <h3 id="ruleSummaryTitle" data-i18n="ruleSummaryTitle">Så fungerar regeln</h3>
-                <div id="ruleSummaryBody"></div>
-                <p class="rule-summary-note" data-i18n="summaryNote">Sammanfattningen visar fälten i redigeraren. Den sparar eller flyttar ingenting. Regelprioritet och säkerhetskontroller gäller fortfarande.</p>
-              </section>
-              <div id="testResult" class="test-result" hidden role="status"></div>
-              <div id="diagnosePanel" class="diagnose-panel" hidden role="status" aria-live="polite"></div>
-              <div class="form-actions">
-                <button id="test" type="button" class="button secondary" data-i18n="testBtn">▷ Kontrollera</button>
-                <button id="diagnoseBtn" type="button" class="button secondary" data-i18n="diagnoseBtn">🔎 Varför flyttas inte mejlen?</button>
-                <button id="save" type="submit" class="button primary" data-i18n="saveBtn">Spara automatisk flytt</button>
-                <button id="saveAsNew" type="button" class="button secondary" data-i18n="saveAsNewBtn">＋ Spara som ny regel</button>
-                <button id="saveAndNew" type="button" class="button secondary" data-i18n="saveAndNewBtn">＋ Spara & ny tom</button>
-              </div>
-              <div class="editor-footer">
-                <button id="up" type="button" class="text-button" data-i18n="upBtn">↑ Prioritet</button>
-                <button id="down" type="button" class="text-button" data-i18n="downBtn">↓ Prioritet</button>
-                <button id="duplicate" type="button" class="text-button" data-i18n="duplicateBtn">⧉ Duplicera regel</button>
-                <button id="exportSingleRule" type="button" class="text-button" data-i18n="exportSingleRuleBtn">↓ Exportera regel (.json)</button>
-                <button id="delete" type="button" class="text-button danger" data-i18n="deleteBtn">Ta bort regel</button>
-              </div>
-            </form>
+            <div class="activity-tool-actions">
+              <button id="sweepNow" class="button primary">
+                Kör alla regler nu</button
+              ><button
+                id="whyBtn"
+                type="button"
+                class="button small secondary"
+                data-i18n="whyBtn"
+              >
+                🔍 Varför ligger mejlet här?
+              </button>
+            </div>
+            <div
+              id="whyPanel"
+              class="why-panel"
+              hidden=""
+              role="status"
+              aria-live="polite"
+            ></div>
           </section>
-        </div>
+          <div class="card">
+            <div class="card-title">
+              <div>
+                <h2 data-i18n="activityTitle">Teknisk aktivitet</h2>
+                <p data-i18n="activitySub">
+                  Inga ämnesrader, avsändaradresser eller mejltexter sparas här.
+                </p>
+              </div>
+              <button
+                id="exportErrorLog"
+                class="button secondary"
+                data-i18n="exportErrorLogBtn"
+              >
+                Spara samlad fellogg
+              </button>
+              <button
+                id="exportLog"
+                class="button secondary"
+                data-i18n="exportLogBtn"
+              >
+                Exportera logg
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="thTime">Tid</th>
+                    <th data-i18n="thEvent">Händelse</th>
+                    <th data-i18n="thLevel">Nivå</th>
+                    <th data-i18n="thCount">Antal</th>
+                  </tr>
+                </thead>
+                <tbody id="logRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
 
-        <div class="safety-strip">
-          <span>ⓘ</span>
-          <p><strong data-i18n="safetyTitle">Testläge är en trygg start.</strong> <span data-i18n="safetyBody">Testa dina regler innan du aktiverar riktiga flyttar. Testknappen flyttar aldrig något.</span></p>
-          <button id="queueSelected" class="text-button" data-i18n="queueSelectedBtn">Bevaka markerat →</button>
-          <button id="catchUp" class="text-button" data-i18n="catchUpBtn">Sortera befintliga enligt regeln →</button>
-        </div>
-      </section>
+        <section
+          id="view-settings"
+          class="view"
+          hidden=""
+          role="tabpanel"
+          aria-labelledby="tab-settings"
+        >
+          <header class="view-heading">
+            <h1 data-i18n="settingsPageTitle">Inställningar</h1>
+            <p data-i18n="settingsPageHelp">
+              Öppna den grupp du vill ändra. Inställningar sparas direkt.
+            </p>
+          </header>
+          <div class="settings-grid">
+            <details
+              class="card settings-card settings-section"
+              id="appearanceSettings"
+              open=""
+            >
+              <summary>
+                <h2 data-i18n="appearanceSection">Utseende &amp; läsbarhet</h2>
+              </summary>
+              <div class="settings-body">
+                <label class="field">
+                  <span data-i18n="langLabel">Språk / Language</span>
+                  <select id="lang">
+                    <option value="sv">Svenska</option>
+                    <option value="en">English</option>
+                  </select> </label
+                ><label class="field">
+                  <span data-i18n="themeLabel">Tema</span>
+                  <select id="theme">
+                    <option value="system" data-i18n="themeSystem">
+                      Följ systemet
+                    </option>
+                    <option value="light" data-i18n="themeLight">Ljust</option>
+                    <option value="dark" data-i18n="themeDark">Mörkt</option>
+                  </select> </label
+                ><label class="field">
+                  <span data-i18n="seasonLabel">Årstidstema</span>
+                  <select id="season">
+                    <option value="auto" data-i18n="seasonAuto">
+                      Auto · följer kalendern
+                    </option>
+                    <option value="spring" data-i18n="seasonSpring">
+                      🌸 Vår
+                    </option>
+                    <option value="summer" data-i18n="seasonSummer">
+                      ☀️ Sommar
+                    </option>
+                    <option value="autumn" data-i18n="seasonAutumn">
+                      🍂 Höst
+                    </option>
+                    <option value="winter" data-i18n="seasonWinter">
+                      ❄️ Vinter
+                    </option>
+                  </select> </label
+                ><label class="field">
+                  <span data-i18n="fontSizeLabel">Textstorlek</span>
+                  <select id="fontSize">
+                    <option>12</option>
+                    <option>13</option>
+                    <option>14</option>
+                    <option>15</option>
+                    <option>16</option>
+                    <option>17</option>
+                    <option>18</option>
+                    <option>19</option>
+                    <option>20</option>
+                    <option>21</option>
+                    <option>22</option>
+                    <option>23</option>
+                    <option>24</option>
+                  </select> </label
+                ><label class="field"
+                  ><span data-i18n="densityLabel">Layout</span
+                  ><select id="density">
+                    <option value="comfortable" data-i18n="densityComfortable">
+                      Luftig
+                    </option>
+                    <option value="compact" data-i18n="densityCompact">
+                      Kompakt
+                    </option>
+                  </select></label
+                ><label class="field"
+                  ><span data-i18n="lineSpacingLabel">Radavstånd i lästext</span
+                  ><select id="lineSpacing">
+                    <option value="normal" data-i18n="lineSpacingNormal">
+                      Normalt
+                    </option>
+                    <option value="roomy" data-i18n="lineSpacingRoomy">
+                      Extra luftigt
+                    </option>
+                  </select></label
+                >
+                <p class="muted" data-i18n="appearanceNote">
+                  Layout ändrar avstånd, inte textstorlek. Radavstånd gäller
+                  förklaringar och detaljer.
+                </p>
+                <p class="muted" data-i18n="seasonNote">
+                  Årstiden färgar gränssnittet, hälsningen och SortBro-ikonen i
+                  verktygsfältet – i både ljust och mörkt läge.
+                </p>
+              </div>
+            </details>
+            <details
+              class="card settings-card settings-section"
+              id="sortingSettings"
+            >
+              <summary>
+                <h2 data-i18n="sortingSection">Sortering &amp; säkerhet</h2>
+              </summary>
+              <div class="settings-body">
+                <label class="field">
+                  <span data-i18n="moveModeLabel"
+                    >Standardläge för regler (när regeln står på Standard)</span
+                  >
+                  <select id="moveMode">
+                    <option value="read" data-i18n="moveModeRead">
+                      Flytta när läst och lämnat
+                    </option>
+                    <option value="direct" data-i18n="moveModeDirect">
+                      Flytta direkt, även olästa
+                    </option>
+                  </select> </label
+                ><label class="toggle-label">
+                  <input id="openWindow" type="checkbox" checked="" />
+                  <span data-i18n="openWindowLabel"
+                    >Öppna flyttade olästa mejl i ett eget fönster som
+                    standard</span
+                  >
+                </label>
+                <p class="muted" data-i18n="unreadNote">
+                  Du kan även styra direkt på varje filter om olästa mejl ska
+                  flyttas och om de ska öppnas i nytt fönster.
+                </p>
+                <label class="toggle-label">
+                  <input id="hourly" type="checkbox" />
+                  <span data-i18n="hourlyLabel"
+                    >Kör alla regler automatiskt (rekommenderas)</span
+                  > </label
+                ><label class="field">
+                  <span data-i18n="sweepMinutesLabel"
+                    >Hur ofta alla regler körs (minuter, steg om 15 – 60 = en
+                    gång i timmen)</span
+                  >
+                  <input
+                    id="sweepMinutes"
+                    type="number"
+                    min="15"
+                    max="1440"
+                    step="15"
+                    value="60"
+                  /> </label
+                ><label class="toggle-label">
+                  <input id="newInboxDirect" type="checkbox" checked="" />
+                  <span data-i18n="newInboxDirectLabel"
+                    >Flytta nya matchande mejl direkt när de kommer till
+                    Inkorgen</span
+                  > </label
+                ><label class="toggle-label">
+                  <input id="learnOn" type="checkbox" checked="" />
+                  <span data-i18n="learnOnLabel"
+                    >Lär av mina egna flyttar och föreslå regler</span
+                  >
+                </label>
+                <p class="muted" data-i18n="learnOnNote">
+                  Flyttar du själv tre mejl från samma avsändare till samma mapp
+                  föreslår SortBro en regel. Bara domän, mapp och antal sparas,
+                  i högst sju dagar – aldrig ämne, namn eller mejltext.
+                </p>
+                <label class="toggle-label">
+                  <input id="brake" type="checkbox" checked="" />
+                  <span data-i18n="brakeLabel"
+                    >Säkerhetsbroms: stanna en regel som plötsligt matchar
+                    onormalt många mejl</span
+                  >
+                </label>
+                <p class="muted" data-i18n="brakeNote">
+                  Om en regel vill flytta tio gånger fler mejl än vanligt – och
+                  minst 50 – stoppas den innan något flyttas. Du får då välja:
+                  flytta ändå eller stäng av regeln. Nya regler har gränsen 50
+                  mejl per svep.
+                </p>
+                <p class="muted" data-i18n="shortcutsNote">
+                  Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns.
+                  Ctrl+Shift+L kör ett svep direkt.
+                </p>
+                <button
+                  id="refreshFolders"
+                  class="button secondary"
+                  data-i18n="refreshFoldersBtn"
+                >
+                  Uppdatera mapplistan
+                </button>
+                <p class="muted" data-i18n="windowNote">
+                  Thunderbird hanterar fönstrets storlek och placering.
+                  Tillägget minns språk, tema, textstorlek och senast valda
+                  regel.
+                </p>
+              </div>
+            </details>
+            <details
+              class="card settings-card settings-section"
+              id="storageSettings"
+            >
+              <summary>
+                <h2 data-i18n="storageSection">
+                  Loggar &amp; automatiska säkerhetskopior
+                </h2>
+              </summary>
+              <div class="settings-body">
+                <label class="toggle-label">
+                  <input id="verbose" type="checkbox" />
+                  <span data-i18n="verboseLabel"
+                    >Visa detaljerad felsökning i Aktivitet</span
+                  >
+                </label>
+                <p class="muted storage-note" data-i18n="storageNote">
+                  Allt SortBro skapar hamnar i undermappar till appmappen
+                  Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper
+                  (säkerhetskopiorna), Regler (dina exporter) och Filterfiler
+                  (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.
+                </p>
+                <label class="toggle-label">
+                  <input id="fileLog" type="checkbox" checked="" />
+                  <span data-i18n="fileLogLabel"
+                    >Skriv teknisk logg automatiskt till Hämtade
+                    filer/Lasfilter/logs/lasfilter-logg.txt</span
+                  >
+                </label>
+                <p class="muted" data-i18n="fileLogNote">
+                  Skriver även sortbro-fellogg.txt i samma mapp: en samlad
+                  fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen
+                  mejltext sparas. Du kan också spara felloggen under Aktivitet.
+                </p>
+                <label class="toggle-label">
+                  <input id="autoBackup" type="checkbox" checked="" />
+                  <span data-i18n="autoBackupLabel"
+                    >Backa upp reglerna automatiskt till Hämtade
+                    filer/Lasfilter/Regelbackuper/</span
+                  >
+                </label>
+                <p class="muted" data-i18n="autoBackupNote">
+                  Kopian ligger utanför Thunderbirds profil, så den finns kvar
+                  även om tillägget tas bort eller stängs av. Filen
+                  sortbro-regler-backup.json är alltid den senaste, och en
+                  daterad veckokopia sparas automatiskt en gång i veckan – de
+                  senaste 12 veckorna behålls. Knappen nedan skriver båda
+                  direkt, när du vill. Under Regler importerar du filen och får
+                  tillbaka reglerna.
+                </p>
+                <div class="backup-actions">
+                  <button
+                    id="backupNow"
+                    type="button"
+                    class="button small secondary"
+                    data-i18n="backupNowBtn"
+                  >
+                    ⇩ Backa upp reglerna nu
+                  </button>
+                  <span id="backupInfo" class="muted"></span>
+                </div>
+                <p class="muted" id="backupStatus"></p>
+              </div>
+            </details>
 
-      <section id="view-activity" class="view" hidden>
-        <div class="card">
-          <div class="card-title">
+            <details class="card settings-card settings-section">
+              <summary><h2 data-i18n="cacheTitle">Cache</h2></summary>
+              <div class="settings-body">
+                <p data-i18n="cacheSub">
+                  SortBro minns varje mapps meddelandetal så att ett svep kan
+                  hoppa över mappar som inte ändrats. Det gör svepen snabba.
+                  Cachen töms automatiskt en gång i dygnet, så att den aldrig
+                  kan visa en gammal bild av inkorgen.
+                </p>
+                <label class="toggle-label">
+                  <input id="autoClear" type="checkbox" checked="" />
+                  <span data-i18n="autoClearLabel"
+                    >Rensa cachen automatiskt en gång per dygn</span
+                  >
+                </label>
+                <div class="cache-actions">
+                  <button
+                    id="clearCacheNow"
+                    type="button"
+                    class="button secondary"
+                    data-i18n="clearCacheBtn"
+                  >
+                    Rensa cachen nu
+                  </button>
+                  <span id="cacheStatus" class="muted"></span>
+                </div>
+                <p class="muted" data-i18n="cacheNote">
+                  Att rensa cachen flyttar inga mejl och ändrar inga regler.
+                  Nästa svep läser bara om mapparnas storlek, vilket tar några
+                  sekunder extra en gång.
+                </p>
+              </div>
+            </details>
+
+            <details class="card settings-card settings-section">
+              <summary>
+                <h2 data-i18n="backupsTitle">Regelkopior &amp; säkerhet</h2>
+              </summary>
+              <div class="settings-body">
+                <p data-i18n="jsonBackupSub">
+                  Exportera dina regler till en JSON-fil eller importera regler
+                  från en JSON-fil (ersätt alla eller lägg till).
+                </p>
+                <div class="json-backup-actions">
+                  <button
+                    id="exportSettings"
+                    type="button"
+                    class="button small secondary"
+                    data-i18n="exportBtn"
+                  >
+                    ↓ Exportera regler (.json)
+                  </button>
+                  <label class="button small secondary file-label"
+                    ><span data-i18n="importBtn">↑ Importera (.json)</span
+                    ><input
+                      id="importSettings"
+                      type="file"
+                      accept=".json,application/json"
+                      hidden=""
+                  /></label>
+                  <label class="button small secondary file-label"
+                    ><span data-i18n="importMergeBtn"
+                      >＋ Lägg till från JSON</span
+                    ><input
+                      id="importMergeSettings"
+                      type="file"
+                      accept=".json,application/json"
+                      hidden=""
+                  /></label>
+                </div>
+                <hr />
+                <p data-i18n="backupsSub">
+                  De fem senaste regelversionerna sparas automatiskt.
+                  Återställning startar pausad i testläge.
+                </p>
+                <div id="backupList"></div>
+                <hr />
+                <p id="blockedInfo">Inga osäkra flyttförsök.</p>
+                <button
+                  id="clearBlocked"
+                  class="button secondary"
+                  data-i18n="clearBlockedBtn"
+                >
+                  Rensa spärrar efter egen kontroll
+                </button>
+                <p class="muted" data-i18n="clearBlockedNote">
+                  Detta ångrar ingen flytt och startar inget nytt försök.
+                  Kontrollera mapparna i Thunderbird först.
+                </p>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section
+          id="view-help"
+          class="view"
+          hidden=""
+          role="tabpanel"
+          aria-labelledby="tab-help"
+        >
+          <header class="view-heading">
+            <h1 data-i18n="helpPageTitle">Hjälp</h1>
+            <p data-i18n="helpPageHelp">
+              Kom igång och förstå hur SortBro flyttar dina mejl.
+            </p>
+          </header>
+          <section class="intro hero-card" id="introCard">
+            <div class="hero-copy">
+              <div id="introCopy">
+                <div class="eyebrow" data-i18n="introEyebrow">
+                  ENKEL AUTOMATISK SORTERING
+                </div>
+                <h2 data-i18n="introTitle">Flytta mejl automatiskt</h2>
+                <p data-i18n="introSub">
+                  Skapa en eller flera regler, välj olästa/lästa och målmapp.
+                  Klart.
+                </p>
+                <p class="season-greeting" id="seasonGreeting">
+                  Ha en fin höstdag! 🍂
+                </p>
+              </div>
+              <div class="intro-actions">
+                <button
+                  id="introToggle"
+                  type="button"
+                  class="button secondary"
+                  aria-expanded="true"
+                  aria-controls="introCopy seasonHeroArt setupSteps"
+                >
+                  Dölj introduktion
+                </button>
+
+                <label class="season-pick">
+                  <span data-i18n="seasonLabelShort">Årstid</span>
+                  <select
+                    id="seasonQuick"
+                    aria-label="Årstidstema"
+                    data-i18n-aria="seasonLabel"
+                  >
+                    <option value="auto" data-i18n="seasonAuto">Auto</option>
+                    <option value="spring">🌸 Vår</option>
+                    <option value="summer">☀️ Sommar</option>
+                    <option value="autumn">🍂 Höst</option>
+                    <option value="winter">❄️ Vinter</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="hero-art" id="seasonHeroArt" aria-hidden="true"></div>
+          </section>
+          <section
+            id="setupSteps"
+            class="setup-steps"
+            aria-label="Kom igång"
+            data-i18n-aria="ariaSetup"
+          >
+            <div id="setup1" class="setup-step">
+              <b>1</b
+              ><span
+                ><strong data-i18n="setup1Title">Välj exempelmejl</strong
+                ><small data-i18n="setup1Sub"
+                  >Markera ett mejl i Thunderbird</small
+                ></span
+              >
+            </div>
+            <div id="setup2" class="setup-step">
+              <b>2</b
+              ><span
+                ><strong data-i18n="setup2Title">Spara regeln</strong
+                ><small data-i18n="setup2Sub"
+                  >Välj lästa/olästa och målmapp</small
+                ></span
+              >
+            </div>
+            <div id="setup3" class="setup-step">
+              <b>3</b
+              ><span
+                ><strong data-i18n="setup3Title">Slå på flytt</strong
+                ><small data-i18n="setup3Sub"
+                  >Tillägget sköter resten</small
+                ></span
+              >
+            </div>
+          </section>
+          <div class="card help-card">
+            <h2 data-i18n="helpTitle">En lugnare inkorg, på dina villkor</h2>
+            <ol>
+              <li data-i18n="helpStep1">
+                Välj kontot som ska bevakas, ett eller flera villkor,
+                läst/oläst-läge och en målmapp. Du kan skapa hur många regler du
+                vill.
+              </li>
+              <li data-i18n="helpStep2">
+                Använd Hämta konto från markerat mejl för att välja rätt konto
+                och avsändare automatiskt. Markera exakt ett mejl i Thunderbird
+                först.
+              </li>
+              <li data-i18n="helpStep3">
+                Kontrollera-knappen testar den redigerade regeln (även osparade
+                ändringar) utan att flytta mejlet.
+              </li>
+              <li data-i18n="helpStep4">
+                Direkt på varje aktivt filter kan du kryssa i om filtret ska
+                flytta olästa mejl och om de ska öppnas i ett nytt fönster.
+              </li>
+              <li data-i18n="helpStep5">
+                Använd Spara &amp; ny regel eller Duplicera regel för att snabbt
+                bygga upp flera regler för olika avsändare, domäner eller ämnen.
+              </li>
+            </ol>
+            <h3 data-i18n="helpImportantTitle">Det här är viktigt</h3>
+            <p data-i18n="helpP1">
+              ”Läst” är Thunderbirds läst-markering. När en regel väntar på
+              läsning flyttas mejlet först när det är läst och inte längre visas
+              i någon öppen mejlflik eller något meddelandefönster.
+            </p>
+            <p data-i18n="helpP2">
+              Med Kör kontroll nu eller ▶-knappen på en regel skannas kontots
+              mappar (utom regelns målmappar) efter matchande mejl enligt
+              regelns inställning för olästa/lästa.
+            </p>
+            <p data-i18n="helpP3">
+              En regel kan även ha underfördelningar (Avancerat: olika mål
+              beroende på ämne), t.ex. domän fortnox.se som grundvillkor och
+              sedan Ämne innehåller Faktura → Fakturor och Ämne innehåller Order
+              → Order.
+            </p>
+            <p data-i18n="helpP4">
+              Tillägget ändrar aldrig Thunderbirds inbyggda filterfiler
+              (msgFilterRules.dat) och använder inga molntjänster.
+            </p>
+            <p data-i18n="helpP5">
+              Nya versioner hämtas av Thunderbird själv – den letar vid start
+              och sedan en gång i dygnet. Tillägget kan inte installera sig
+              självt, men filen Uppdatera-SortBro.bat gör samma sak med ett
+              dubbelklick om du inte vill vänta.
+            </p>
+          </div>
+        </section>
+
+        <section
+          id="view-support"
+          class="view"
+          hidden=""
+          role="tabpanel"
+          aria-labelledby="tab-support"
+        >
+          <header class="view-heading">
+            <h1 data-i18n="supportPageTitle">Stöd SortBro</h1>
+            <p data-i18n="supportPageHelp">
+              Frivilligt stöd till fortsatt utveckling. Alla funktioner är
+              alltid fria.
+            </p>
+          </header>
+          <div class="support-hero">
+            <img
+              id="supportLogo"
+              src="icon.svg"
+              class="support-logo"
+              width="76"
+              height="76"
+              alt="SortBro"
+            />
             <div>
-              <h2 data-i18n="activityTitle">Teknisk aktivitet</h2>
-              <p data-i18n="activitySub">Inga ämnesrader, avsändaradresser eller mejltexter sparas här.</p>
+              <span class="support-eyebrow" data-i18n="supEyebrow"
+                >💚 100 % GRATIS • LOKALT I THUNDERBIRD • ÖPPEN KÄLLKOD</span
+              >
             </div>
-            <button id="exportErrorLog" class="button secondary" data-i18n="exportErrorLogBtn">Spara samlad fellogg</button>
-            <button id="exportLog" class="button secondary" data-i18n="exportLogBtn">Exportera logg</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th data-i18n="thTime">Tid</th>
-                  <th data-i18n="thEvent">Händelse</th>
-                  <th data-i18n="thLevel">Nivå</th>
-                  <th data-i18n="thCount">Antal</th>
-                </tr>
-              </thead>
-              <tbody id="logRows"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section id="view-settings" class="view" hidden>
-        <div class="settings-grid">
-          <div class="card settings-card">
-            <h2 data-i18n="settingsTitle">Utseende & grundläge</h2>
-            <label class="field">
-              <span data-i18n="langLabel">Språk / Language</span>
-              <select id="lang">
-                <option value="sv">Svenska</option>
-                <option value="en">English</option>
-              </select>
-            </label>
-            <label class="field">
-              <span data-i18n="themeLabel">Tema</span>
-              <select id="theme">
-                <option value="system" data-i18n="themeSystem">Följ systemet</option>
-                <option value="light" data-i18n="themeLight">Ljust</option>
-                <option value="dark" data-i18n="themeDark">Mörkt</option>
-              </select>
-            </label>
-            <label class="field">
-              <span data-i18n="seasonLabel">Årstidstema</span>
-              <select id="season">
-                <option value="auto" data-i18n="seasonAuto">Auto · följer kalendern</option>
-                <option value="spring" data-i18n="seasonSpring">🌸 Vår</option>
-                <option value="summer" data-i18n="seasonSummer">☀️ Sommar</option>
-                <option value="autumn" data-i18n="seasonAutumn">🍂 Höst</option>
-                <option value="winter" data-i18n="seasonWinter">❄️ Vinter</option>
-              </select>
-            </label>
-            <label class="field">
-              <span data-i18n="fontSizeLabel">Textstorlek</span>
-              <select id="fontSize"><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option></select>
-            </label>
-            <label class="field"><span data-i18n="densityLabel">Layout</span><select id="density"><option value="comfortable" data-i18n="densityComfortable">Luftig</option><option value="compact" data-i18n="densityCompact">Kompakt</option></select></label>
-            <label class="field"><span data-i18n="lineSpacingLabel">Radavstånd i lästext</span><select id="lineSpacing"><option value="normal" data-i18n="lineSpacingNormal">Normalt</option><option value="roomy" data-i18n="lineSpacingRoomy">Extra luftigt</option></select></label>
-            <p class="muted" data-i18n="appearanceNote">Layout ändrar avstånd, inte textstorlek. Radavstånd gäller förklaringar och detaljer.</p>
-            <p class="muted" data-i18n="seasonNote">Årstiden färgar gränssnittet, hälsningen och SortBro-ikonen i verktygsfältet – i både ljust och mörkt läge.</p>
-            <label class="field">
-              <span data-i18n="moveModeLabel">Standardläge för regler (när regeln står på Standard)</span>
-              <select id="moveMode">
-                <option value="read" data-i18n="moveModeRead">Flytta när läst och lämnat</option>
-                <option value="direct" data-i18n="moveModeDirect">Flytta direkt, även olästa</option>
-              </select>
-            </label>
-            <label class="toggle-label">
-              <input id="openWindow" type="checkbox" checked>
-              <span data-i18n="openWindowLabel">Öppna flyttade olästa mejl i ett eget fönster som standard</span>
-            </label>
-            <p class="muted" data-i18n="unreadNote">Du kan även styra direkt på varje filter om olästa mejl ska flyttas och om de ska öppnas i nytt fönster.</p>
-            <label class="toggle-label">
-              <input id="hourly" type="checkbox">
-              <span data-i18n="hourlyLabel">Kör alla regler automatiskt (rekommenderas)</span>
-            </label>
-            <label class="field">
-              <span data-i18n="sweepMinutesLabel">Hur ofta alla regler körs (minuter, steg om 15 – 60 = en gång i timmen)</span>
-              <input id="sweepMinutes" type="number" min="15" max="1440" step="15" value="60">
-            </label>
-            <label class="toggle-label">
-              <input id="newInboxDirect" type="checkbox" checked>
-              <span data-i18n="newInboxDirectLabel">Flytta nya matchande mejl direkt när de kommer till Inkorgen</span>
-            </label>
-            <label class="toggle-label">
-              <input id="verbose" type="checkbox">
-              <span data-i18n="verboseLabel">Visa detaljerad felsökning i Aktivitet</span>
-            </label>
-            <p class="muted storage-note" data-i18n="storageNote">Allt SortBro skapar hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.</p>
-            <label class="toggle-label">
-              <input id="fileLog" type="checkbox" checked>
-              <span data-i18n="fileLogLabel">Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/logs/lasfilter-logg.txt</span>
-            </label>
-            <p class="muted" data-i18n="fileLogNote">Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.</p>
-            <label class="toggle-label">
-              <input id="autoBackup" type="checkbox" checked>
-              <span data-i18n="autoBackupLabel">Backa upp reglerna automatiskt till Hämtade filer/Lasfilter/Regelbackuper/</span>
-            </label>
-            <label class="toggle-label">
-              <input id="learnOn" type="checkbox" checked>
-              <span data-i18n="learnOnLabel">Lär av mina egna flyttar och föreslå regler</span>
-            </label>
-            <p class="muted" data-i18n="learnOnNote">Flyttar du själv tre mejl från samma avsändare till samma mapp föreslår SortBro en regel. Bara domän, mapp och antal sparas, i högst sju dagar – aldrig ämne, namn eller mejltext.</p>
-            <p class="muted" data-i18n="autoBackupNote">Kopian ligger utanför Thunderbirds profil, så den finns kvar även om tillägget tas bort eller stängs av. Filen sortbro-regler-backup.json är alltid den senaste, och en daterad veckokopia sparas automatiskt en gång i veckan – de senaste 12 veckorna behålls. Knappen nedan skriver båda direkt, när du vill. Under Regler importerar du filen och får tillbaka reglerna.</p>
-            <label class="toggle-label">
-              <input id="brake" type="checkbox" checked>
-              <span data-i18n="brakeLabel">Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl</span>
-            </label>
-            <p class="muted" data-i18n="brakeNote">Om en regel vill flytta tio gånger fler mejl än vanligt – och minst 50 – stoppas den innan något flyttas. Du får då välja: flytta ändå eller stäng av regeln. Nya regler har gränsen 50 mejl per svep.</p>
-            <div class="backup-actions">
-              <button id="backupNow" type="button" class="button small secondary" data-i18n="backupNowBtn">⇩ Backa upp reglerna nu</button>
-              <span id="backupInfo" class="muted"></span>
+            <h2 data-i18n="supHeroTitle">
+              Stöd SortBro – för en lugnare inkorg i Thunderbird
+            </h2>
+            <p data-i18n="supHeroSub">
+              SortBro är helt gratis, reklamfritt och körs 100 % lokalt i din
+              dator utan molntjänster. Din gåva stöttar fortsatt utveckling,
+              stöd för nya Thunderbird-versioner och nya smarta
+              filterfunktioner. Inget låses upp – alla funktioner är alltid fria
+              för alla.
+            </p>
+            <div class="support-hstats">
+              <span class="support-hstat" id="supStatRules"
+                >▤ 0 aktiva regler</span
+              >
+              <span class="support-hstat" id="supStatMoved"
+                >↗ 0 flyttade mejl</span
+              >
+              <span class="support-hstat" data-i18n="supStatLocal"
+                >🔒 100 % lokal behandling</span
+              >
+              <span class="support-hstat" data-i18n="supStatFree"
+                >💚 100 % gratis – alltid</span
+              >
             </div>
-            <p class="muted" id="backupStatus"></p>
-            <p class="muted" data-i18n="shortcutsNote">Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns. Ctrl+Shift+L kör ett svep direkt.</p>
-
-            <button id="refreshFolders" class="button secondary" data-i18n="refreshFoldersBtn">Uppdatera mapplistan</button>
-            <p class="muted" data-i18n="windowNote">Thunderbird hanterar fönstrets storlek och placering. Tillägget minns språk, tema, textstorlek och senast valda regel.</p>
-          </div>
-
-          <div class="card settings-card">
-            <h2 data-i18n="cacheTitle">Cache</h2>
-            <p data-i18n="cacheSub">SortBro minns varje mapps meddelandetal så att ett svep kan hoppa över mappar som inte ändrats. Det gör svepen snabba. Cachen töms automatiskt en gång i dygnet, så att den aldrig kan visa en gammal bild av inkorgen.</p>
-            <label class="toggle-label">
-              <input id="autoClear" type="checkbox" checked>
-              <span data-i18n="autoClearLabel">Rensa cachen automatiskt en gång per dygn</span>
-            </label>
-            <div class="cache-actions">
-              <button id="clearCacheNow" type="button" class="button secondary" data-i18n="clearCacheBtn">Rensa cachen nu</button>
-              <span id="cacheStatus" class="muted"></span>
+            <div class="support-ctas">
+              <button
+                type="button"
+                class="btn-donate btn-swish"
+                id="swishBtnHero"
+                data-i18n="supSwishQuick"
+              >
+                💚 Swish (QR)
+              </button>
+              <a
+                class="btn-donate btn-paypal"
+                id="paypalBtnHero"
+                href="https://paypal.me/Rickard3dPrint/50SEK"
+                target="_blank"
+                rel="noopener"
+                >💙 PayPal</a
+              >
+              <a
+                class="btn-donate btn-kofi"
+                href="https://ko-fi.com/tokke2"
+                target="_blank"
+                rel="noopener"
+                >☕ Ko-fi</a
+              >
+              <a
+                class="btn-donate btn-gh"
+                href="https://github.com/Tokke2/Lasfilter"
+                target="_blank"
+                rel="noopener"
+                data-i18n="supGithubBtn"
+                >⭐ GitHub</a
+              >
             </div>
-            <p class="muted" data-i18n="cacheNote">Att rensa cachen flyttar inga mejl och ändrar inga regler. Nästa svep läser bara om mapparnas storlek, vilket tar några sekunder extra en gång.</p>
           </div>
 
-          <div class="card settings-card">
-            <h2 data-i18n="backupsTitle">Regelkopior & säkerhet</h2>
-            <p data-i18n="jsonBackupSub">Exportera dina regler till en JSON-fil eller importera regler från en JSON-fil (ersätt alla eller lägg till).</p>
-            <div class="json-backup-actions">
-              <button id="exportSettings" type="button" class="button small secondary" data-i18n="exportBtn">↓ Exportera regler (.json)</button>
-              <label class="button small secondary file-label"><span data-i18n="importBtn">↑ Importera (.json)</span><input id="importSettings" type="file" accept=".json,application/json" hidden></label>
-              <label class="button small secondary file-label"><span data-i18n="importMergeBtn">＋ Lägg till från JSON</span><input id="importMergeSettings" type="file" accept=".json,application/json" hidden></label>
+          <div class="card support-card" style="--tc: #27ae60">
+            <p class="support-kicker" data-i18n="supPickKicker">
+              Valfritt belopp – inga nivåer, inga krav
+            </p>
+            <h2 data-i18n="supPickTitle">Välj belopp eller skriv ett eget</h2>
+            <p class="muted" data-i18n="supPickSub">
+              Beloppet följer med till Swish-QR och PayPal (och kan alltid
+              ändras i Swish-appen). Varje krona gör direkt skillnad.
+            </p>
+            <div class="beloppsrad" id="beloppsrad">
+              <button type="button" class="bchip" data-kr="25">25 kr</button>
+              <button type="button" class="bchip vald" data-kr="50">
+                50 kr
+              </button>
+              <button type="button" class="bchip" data-kr="100">100 kr</button>
+              <button type="button" class="bchip" data-kr="200">200 kr</button>
+              <label class="eget-belopp">
+                <input
+                  id="donateCustomKr"
+                  type="number"
+                  min="1"
+                  max="99999"
+                  inputmode="numeric"
+                  placeholder="Eget…"
+                />
+                <b>kr</b>
+              </label>
             </div>
-            <hr>
-            <p data-i18n="backupsSub">De fem senaste regelversionerna sparas automatiskt. Återställning startar pausad i testläge.</p>
-            <div id="backupList"></div>
-            <hr>
-            <p id="blockedInfo">Inga osäkra flyttförsök.</p>
-            <button id="clearBlocked" class="button secondary" data-i18n="clearBlockedBtn">Rensa spärrar efter egen kontroll</button>
-            <p class="muted" data-i18n="clearBlockedNote">Detta ångrar ingen flytt och startar inget nytt försök. Kontrollera mapparna i Thunderbird först.</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="view-help" class="view" hidden>
-        <div class="card help-card">
-          <h2 data-i18n="helpTitle">En lugnare inkorg, på dina villkor</h2>
-          <ol>
-            <li data-i18n="helpStep1">Välj kontot som ska bevakas, ett eller flera villkor, läst/oläst-läge och en målmapp. Du kan skapa hur många regler du vill.</li>
-            <li data-i18n="helpStep2">Använd Hämta konto från markerat mejl för att välja rätt konto och avsändare automatiskt. Markera exakt ett mejl i Thunderbird först.</li>
-            <li data-i18n="helpStep3">Kontrollera-knappen testar den redigerade regeln (även osparade ändringar) utan att flytta mejlet.</li>
-            <li data-i18n="helpStep4">Direkt på varje aktivt filter kan du kryssa i om filtret ska flytta olästa mejl och om de ska öppnas i ett nytt fönster.</li>
-            <li data-i18n="helpStep5">Använd Spara & ny regel eller Duplicera regel för att snabbt bygga upp flera regler för olika avsändare, domäner eller ämnen.</li>
-          </ol>
-          <h3 data-i18n="helpImportantTitle">Det här är viktigt</h3>
-          <p data-i18n="helpP1">”Läst” är Thunderbirds läst-markering. När en regel väntar på läsning flyttas mejlet först när det är läst och inte längre visas i någon öppen mejlflik eller något meddelandefönster.</p>
-          <p data-i18n="helpP2">Med Kör kontroll nu eller ▶-knappen på en regel skannas kontots mappar (utom regelns målmappar) efter matchande mejl enligt regelns inställning för olästa/lästa.</p>
-          <p data-i18n="helpP3">En regel kan även ha underfördelningar (Avancerat: olika mål beroende på ämne), t.ex. domän fortnox.se som grundvillkor och sedan Ämne innehåller Faktura → Fakturor och Ämne innehåller Order → Order.</p>
-          <p data-i18n="helpP4">Tillägget ändrar aldrig Thunderbirds inbyggda filterfiler (msgFilterRules.dat) och använder inga molntjänster.</p>
-          <p data-i18n="helpP5">Nya versioner hämtas av Thunderbird själv – den letar vid start och sedan en gång i dygnet. Tillägget kan inte installera sig självt, men filen Uppdatera-SortBro.bat gör samma sak med ett dubbelklick om du inte vill vänta.</p>
-        </div>
-      </section>
-
-      <section id="view-support" class="view" hidden>
-        <div class="support-hero">
-          <img id="supportLogo" src="icon.svg" class="support-logo" width="76" height="76" alt="SortBro">
-          <div><span class="support-eyebrow" data-i18n="supEyebrow">💚 100 % GRATIS • LOKALT I THUNDERBIRD • ÖPPEN KÄLLKOD</span></div>
-          <h2 data-i18n="supHeroTitle">Stöd SortBro – för en lugnare inkorg i Thunderbird</h2>
-          <p data-i18n="supHeroSub">SortBro är helt gratis, reklamfritt och körs 100 % lokalt i din dator utan molntjänster. Din gåva stöttar fortsatt utveckling, stöd för nya Thunderbird-versioner och nya smarta filterfunktioner. Inget låses upp – alla funktioner är alltid fria för alla.</p>
-          <div class="support-hstats">
-            <span class="support-hstat" id="supStatRules">▤ 0 aktiva regler</span>
-            <span class="support-hstat" id="supStatMoved">↗ 0 flyttade mejl</span>
-            <span class="support-hstat" data-i18n="supStatLocal">🔒 100 % lokal behandling</span>
-            <span class="support-hstat" data-i18n="supStatFree">💚 100 % gratis – alltid</span>
-          </div>
-          <div class="support-ctas">
-            <button type="button" class="btn-donate btn-swish" id="swishBtnHero" data-i18n="supSwishQuick">💚 Swish (QR)</button>
-            <a class="btn-donate btn-paypal" id="paypalBtnHero" href="https://paypal.me/Rickard3dPrint/50SEK" target="_blank" rel="noopener">💙 PayPal</a>
-            <a class="btn-donate btn-kofi" href="https://ko-fi.com/tokke2" target="_blank" rel="noopener">☕ Ko-fi</a>
-            <a class="btn-donate btn-gh" href="https://github.com/Tokke2/Lasfilter" target="_blank" rel="noopener" data-i18n="supGithubBtn">⭐ GitHub</a>
-          </div>
-        </div>
-
-        <div class="card support-card" style="--tc:#27ae60">
-          <p class="support-kicker" data-i18n="supPickKicker">Valfritt belopp – inga nivåer, inga krav</p>
-          <h2 data-i18n="supPickTitle">Välj belopp eller skriv ett eget</h2>
-          <p class="muted" data-i18n="supPickSub">Beloppet följer med till Swish-QR och PayPal (och kan alltid ändras i Swish-appen). Varje krona gör direkt skillnad.</p>
-          <div class="beloppsrad" id="beloppsrad">
-            <button type="button" class="bchip" data-kr="25">25 kr</button>
-            <button type="button" class="bchip vald" data-kr="50">50 kr</button>
-            <button type="button" class="bchip" data-kr="100">100 kr</button>
-            <button type="button" class="bchip" data-kr="200">200 kr</button>
-            <label class="eget-belopp">
-              <input id="donateCustomKr" type="number" min="1" max="99999" inputmode="numeric" placeholder="Eget…">
-              <b>kr</b>
-            </label>
-          </div>
-          <div id="donateAmountInfo" class="belopp-info">Valt: 50 kr – tack för att du stöttar SortBro! 💚</div>
-          <div class="support-ctas" style="justify-content:flex-start">
-            <button type="button" class="btn-donate btn-swish" id="swishBtnMain" data-i18n="supSwishMain">💚 Visa Swish-QR för beloppet</button>
-            <a class="btn-donate btn-paypal" id="paypalBtnMain" href="https://paypal.me/Rickard3dPrint/50SEK" target="_blank" rel="noopener" data-i18n="supPaypalMain">💙 PayPal – valt belopp</a>
-            <a class="btn-donate btn-kofi" href="https://ko-fi.com/tokke2" target="_blank" rel="noopener" data-i18n="supKofiMain">☕ Ko-fi – engångs / månadsvis</a>
-          </div>
-          <div id="qrbox" class="qrbox" hidden>
-            <p style="font-weight:800;color:var(--accent);margin:0 0 8px" data-i18n="supQrTitle">💚 Skanna med Swish-appen på mobilen</p>
-            <div style="display:inline-flex;gap:6px;margin-bottom:10px">
-              <button type="button" id="qrModeSwish" class="chip active" data-i18n="supQrModeSwish">Swish-appen (Standard)</button>
-              <button type="button" id="qrModeCam" class="chip" data-i18n="supQrModeCam">Vanlig mobilkamera</button>
+            <div id="donateAmountInfo" class="belopp-info">
+              Valt: 50 kr – tack för att du stöttar SortBro! 💚
             </div>
-            <div id="qrSvgWrap"></div>
-            <p class="muted" style="margin:8px 0 0" id="supQrSubText" data-i18n="supQrSub">Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (SortBro) är förifyllda och kan ändras fritt.</p>
+            <div class="support-ctas" style="justify-content: flex-start">
+              <button
+                type="button"
+                class="btn-donate btn-swish"
+                id="swishBtnMain"
+                data-i18n="supSwishMain"
+              >
+                💚 Visa Swish-QR för beloppet
+              </button>
+              <a
+                class="btn-donate btn-paypal"
+                id="paypalBtnMain"
+                href="https://paypal.me/Rickard3dPrint/50SEK"
+                target="_blank"
+                rel="noopener"
+                data-i18n="supPaypalMain"
+                >💙 PayPal – valt belopp</a
+              >
+              <a
+                class="btn-donate btn-kofi"
+                href="https://ko-fi.com/tokke2"
+                target="_blank"
+                rel="noopener"
+                data-i18n="supKofiMain"
+                >☕ Ko-fi – engångs / månadsvis</a
+              >
+            </div>
+            <div id="qrbox" class="qrbox" hidden="">
+              <p
+                style="font-weight: 800; color: var(--accent); margin: 0 0 8px"
+                data-i18n="supQrTitle"
+              >
+                💚 Skanna med Swish-appen på mobilen
+              </p>
+              <div style="display: inline-flex; gap: 6px; margin-bottom: 10px">
+                <button
+                  type="button"
+                  id="qrModeSwish"
+                  class="chip active"
+                  data-i18n="supQrModeSwish"
+                >
+                  Swish-appen (Standard)
+                </button>
+                <button
+                  type="button"
+                  id="qrModeCam"
+                  class="chip"
+                  data-i18n="supQrModeCam"
+                >
+                  Vanlig mobilkamera
+                </button>
+              </div>
+              <div id="qrSvgWrap"></div>
+              <p
+                class="muted"
+                style="margin: 8px 0 0"
+                id="supQrSubText"
+                data-i18n="supQrSub"
+              >
+                Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande
+                (SortBro) är förifyllda och kan ändras fritt.
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div class="card support-card" style="--tc:#175c53">
-          <p class="support-kicker" data-i18n="supWhyKicker">Varför ditt stöd gör skillnad</p>
-          <h2 data-i18n="supWhyTitle">Du stöttar en oberoende svensk utvecklare – inte ett bolag 🛠️</h2>
-          <p class="muted" data-i18n="supWhySub">SortBro byggdes för att lösa ett verkligt problem i Thunderbird: att kunna läsa sina mejl i lugn och ro innan de sorteras bort, eller styra per filter vilka olästa och lästa mejl som ska flyttas. Ditt stöd håller tillägget uppdaterat och reklamfritt.</p>
-          <div class="impact-grid">
-            <div class="impact-item">
-              <div class="impact-ico">📬</div>
-              <div>
-                <h4 data-i18n="supImp1Title">Thunderbird-kompatibilitet</h4>
-                <p data-i18n="supImp1Body">Löpande uppdateringar och IMAP-tester när Thunderbird släpper nya versioner.</p>
+          <div class="card support-card" style="--tc: #175c53">
+            <p class="support-kicker" data-i18n="supWhyKicker">
+              Varför ditt stöd gör skillnad
+            </p>
+            <h2 data-i18n="supWhyTitle">
+              Du stöttar en oberoende svensk utvecklare – inte ett bolag 🛠️
+            </h2>
+            <p class="muted" data-i18n="supWhySub">
+              SortBro byggdes för att lösa ett verkligt problem i Thunderbird:
+              att kunna läsa sina mejl i lugn och ro innan de sorteras bort,
+              eller styra per filter vilka olästa och lästa mejl som ska
+              flyttas. Ditt stöd håller tillägget uppdaterat och reklamfritt.
+            </p>
+            <div class="impact-grid">
+              <div class="impact-item">
+                <div class="impact-ico">📬</div>
+                <div>
+                  <h4 data-i18n="supImp1Title">Thunderbird-kompatibilitet</h4>
+                  <p data-i18n="supImp1Body">
+                    Löpande uppdateringar och IMAP-tester när Thunderbird
+                    släpper nya versioner.
+                  </p>
+                </div>
+              </div>
+              <div class="impact-item">
+                <div class="impact-ico">⚡</div>
+                <div>
+                  <h4 data-i18n="supImp2Title">Nya smarta filterfunktioner</h4>
+                  <p data-i18n="supImp2Body">
+                    Utveckling av nya regelvillkor, fönsterhantering och
+                    förenklingar efter användarönskemål.
+                  </p>
+                </div>
+              </div>
+              <div class="impact-item">
+                <div class="impact-ico">🔒</div>
+                <div>
+                  <h4 data-i18n="supImp3Title">100 % privat &amp; lokalt</h4>
+                  <p data-i18n="supImp3Body">
+                    Inga molntjänster, ingen spårning och inga låsta
+                    betalversioner – någonsin.
+                  </p>
+                </div>
               </div>
             </div>
-            <div class="impact-item">
-              <div class="impact-ico">⚡</div>
-              <div>
-                <h4 data-i18n="supImp2Title">Nya smarta filterfunktioner</h4>
-                <p data-i18n="supImp2Body">Utveckling av nya regelvillkor, fönsterhantering och förenklingar efter användarönskemål.</p>
-              </div>
-            </div>
-            <div class="impact-item">
-              <div class="impact-ico">🔒</div>
-              <div>
-                <h4 data-i18n="supImp3Title">100 % privat & lokalt</h4>
-                <p data-i18n="supImp3Body">Inga molntjänster, ingen spårning och inga låsta betalversioner – någonsin.</p>
-              </div>
+            <div class="trust-pills">
+              <span data-i18n="supTrust1"
+                >🔒 Swish, PayPal &amp; Ko-fi – tryggt &amp; krypterat</span
+              >
+              <span data-i18n="supTrust2"
+                >🕊️ Ingen spårning i tillägget (connect-src 'none')</span
+              >
+              <span data-i18n="supTrust3">🇸🇪 Svensk öppen källkod</span>
             </div>
           </div>
-          <div class="trust-pills">
-            <span data-i18n="supTrust1">🔒 Swish, PayPal & Ko-fi – tryggt & krypterat</span>
-            <span data-i18n="supTrust2">🕊️ Ingen spårning i tillägget (connect-src 'none')</span>
-            <span data-i18n="supTrust3">🇸🇪 Svensk öppen källkod</span>
+
+          <div class="card support-card support-faq" style="--tc: #8e44ad">
+            <p class="support-kicker" data-i18n="supFaqKicker">
+              Vanliga frågor – lugnt &amp; tryggt
+            </p>
+            <details open="">
+              <summary data-i18n="supFaq1Q">
+                💚 Hur fungerar Swish-QR-koden här i Thunderbird?
+              </summary>
+              <p data-i18n="supFaq1A">
+                QR-koden skapas 100 % lokalt direkt i tillägget utan att
+                kontakta någon extern server. Öppna Swish-appen på din mobil,
+                välj Skanna och rikta kameran mot koden så fylls mottagare, valt
+                belopp och meddelandet "SortBro" i automatiskt.
+              </p>
+            </details>
+            <details>
+              <summary data-i18n="supFaq2Q">
+                🔒 Läser eller skickar SortBro några betal- eller mejluppgifter?
+              </summary>
+              <p data-i18n="supFaq2A">
+                Aldrig. SortBro har en strikt säkerhetspolicy (connect-src
+                'none') som blockerar all nätverkstrafik från tillägget.
+                Betalning sker helt i din egen Swish-app eller i webbläsaren via
+                PayPal/Ko-fi.
+              </p>
+            </details>
+            <details>
+              <summary data-i18n="supFaq3Q">
+                🎁 Låser en donation upp några extra funktioner?
+              </summary>
+              <p data-i18n="supFaq3A">
+                Nej – alla funktioner i SortBro är 100 % gratis för alla,
+                alltid. En gåva är helt frivillig och ett varmt tack som gör det
+                möjligt att fortsätta utveckla och underhålla tillägget.
+              </p>
+            </details>
           </div>
-        </div>
+        </section>
 
-        <div class="card support-card support-faq" style="--tc:#8e44ad">
-          <p class="support-kicker" data-i18n="supFaqKicker">Vanliga frågor – lugnt & tryggt</p>
-          <details open>
-            <summary data-i18n="supFaq1Q">💚 Hur fungerar Swish-QR-koden här i Thunderbird?</summary>
-            <p data-i18n="supFaq1A">QR-koden skapas 100 % lokalt direkt i tillägget utan att kontakta någon extern server. Öppna Swish-appen på din mobil, välj Skanna och rikta kameran mot koden så fylls mottagare, valt belopp och meddelandet "SortBro" i automatiskt.</p>
-          </details>
-          <details>
-            <summary data-i18n="supFaq2Q">🔒 Läser eller skickar SortBro några betal- eller mejluppgifter?</summary>
-            <p data-i18n="supFaq2A">Aldrig. SortBro har en strikt säkerhetspolicy (connect-src 'none') som blockerar all nätverkstrafik från tillägget. Betalning sker helt i din egen Swish-app eller i webbläsaren via PayPal/Ko-fi.</p>
-          </details>
-          <details>
-            <summary data-i18n="supFaq3Q">🎁 Låser en donation upp några extra funktioner?</summary>
-            <p data-i18n="supFaq3A">Nej – alla funktioner i SortBro är 100 % gratis för alla, alltid. En gåva är helt frivillig och ett varmt tack som gör det möjligt att fortsätta utveckla och underhålla tillägget.</p>
-          </details>
-        </div>
-      </section>
-
-      <footer>
-        <span id="lastCheck">Bevakningen startar med Thunderbird.</span>
-        <span>
-          <button id="footerSupportBtn" type="button" class="text-button" style="padding:0;margin-right:10px" data-i18n="footerSupportLink">💚 Stöd SortBro</button>
-          <span data-i18n="footerRight">SortBro · Inga ändringar i msgFilterRules.dat</span>
-          <br><span id="copyright">© Rickard Längkvist</span>
-        </span>
-      </footer>
-    </main>
-  </div>
-  <div id="toast" class="toast" role="status" hidden></div>
-
-  <div id="folderModal" class="modal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
-      <div class="eyebrow" data-i18n="newFolderEyebrow">NY MAPP I THUNDERBIRD</div>
-      <h2 id="folderModalTitle" data-i18n="newFolderTitle">Skapa en ny målmapp</h2>
-      <p class="muted" data-i18n="newFolderHelp">Mappen skapas direkt i ditt konto. Välj namn och var den ska ligga.</p>
-      <div class="field">
-        <span data-i18n="newFolderParentLabel">Placera i</span>
-        <select id="folderParent"><option value="">Kontots rotmapp</option></select>
-      </div>
-      <label class="field">
-        <span data-i18n="newFolderNameLabel">Mappnamn</span>
-        <input id="folderName" maxlength="64" placeholder="t.ex. Fakturor 2026">
-      </label>
-      <div class="modal-actions">
-        <button id="folderCreateBtn" type="button" class="button primary" data-i18n="newFolderCreate">＋ Skapa mapp</button>
-        <button id="folderCancelBtn" type="button" class="button secondary" data-i18n="cancelBtn">Avbryt</button>
-      </div>
-      <p class="muted" data-i18n="newFolderNote">SortBro rör inga andra mappar och raderar aldrig något.</p>
+        <footer>
+          <span id="lastCheck">Bevakningen startar med Thunderbird.</span>
+          <span>
+            <button
+              id="footerSupportBtn"
+              type="button"
+              class="text-button"
+              style="padding: 0; margin-right: 10px"
+              data-i18n="footerSupportLink"
+            >
+              💚 Stöd SortBro
+            </button>
+            <span data-i18n="footerRight"
+              >SortBro · Inga ändringar i msgFilterRules.dat</span
+            >
+            <br /><span id="copyright">© Rickard Längkvist</span>
+          </span>
+          <div class="footer-version" data-i18n="versionText">
+            Lokal behandling · v1.0.20 · Inga molntjänster
+          </div>
+        </footer>
+      </main>
     </div>
-  </div>
+    <div id="toast" class="toast" role="status" hidden=""></div>
 
-  <div id="folderTreeModal" class="modal folder-tree-modal" hidden>
-    <div class="modal-card folder-tree-card" role="dialog" aria-modal="true" aria-labelledby="folderTreeTitle" aria-describedby="folderTreeHelp">
-      <h2 id="folderTreeTitle" data-i18n="folderTreeTitle">Välj målmapp</h2>
-      <p id="folderTreeHelp" class="muted" data-i18n="folderTreeHelp">Välj konto, fäll ut mapparna och markera ditt mål. Inget ändras förrän du bekräftar.</p>
-      <div class="folder-tree-controls">
-        <label class="field"><span data-i18n="targetAccountLabel">1. E-postkonto för målmappen</span><select id="folderTreeAccount"></select></label>
-        <label class="field"><span data-i18n="targetSearchLabel">Sök mapp</span><input id="folderTreeSearch" type="search" maxlength="200" autocomplete="off"></label>
-      </div>
-      <p id="folderTreeStatus" class="muted" role="status"></p>
-      <div id="folderTree" class="folder-tree" role="tree" tabindex="0" aria-label="Mappar i valt konto" data-i18n-aria="folderTreeLabel" aria-describedby="folderTreeKeys"></div>
-      <details class="folder-tree-keys"><summary data-i18n="folderTreeKeyHelp">Tangentbordshjälp</summary><p id="folderTreeKeys" class="muted" data-i18n="folderTreeNavigation">Piltangenter bläddrar. Höger/vänster fäller ut/in. Enter eller mellanslag markerar; knappen nedan bekräftar.</p></details>
-      <div class="folder-tree-selection"><strong data-i18n="folderTreePending">Markerad mapp</strong><p id="folderTreePath" tabindex="0"></p></div>
-      <div class="modal-actions">
-        <button id="folderTreeChoose" type="button" class="button primary" disabled data-i18n="folderTreeChoose">Välj denna mapp</button>
-        <button id="folderTreeCancel" type="button" class="button secondary" data-i18n="cancelBtn">Avbryt</button>
+    <div id="folderModal" class="modal" hidden="">
+      <div
+        class="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="folderModalTitle"
+      >
+        <div class="eyebrow" data-i18n="newFolderEyebrow">
+          NY MAPP I THUNDERBIRD
+        </div>
+        <h2 id="folderModalTitle" data-i18n="newFolderTitle">
+          Skapa en ny målmapp
+        </h2>
+        <p class="muted" data-i18n="newFolderHelp">
+          Mappen skapas direkt i ditt konto. Välj namn och var den ska ligga.
+        </p>
+        <div class="field">
+          <span data-i18n="newFolderParentLabel">Placera i</span>
+          <select id="folderParent">
+            <option value="">Kontots rotmapp</option>
+          </select>
+        </div>
+        <label class="field">
+          <span data-i18n="newFolderNameLabel">Mappnamn</span>
+          <input
+            id="folderName"
+            maxlength="64"
+            placeholder="t.ex. Fakturor 2026"
+          />
+        </label>
+        <div class="modal-actions">
+          <button
+            id="folderCreateBtn"
+            type="button"
+            class="button primary"
+            data-i18n="newFolderCreate"
+          >
+            ＋ Skapa mapp
+          </button>
+          <button
+            id="folderCancelBtn"
+            type="button"
+            class="button secondary"
+            data-i18n="cancelBtn"
+          >
+            Avbryt
+          </button>
+        </div>
+        <p class="muted" data-i18n="newFolderNote">
+          SortBro rör inga andra mappar och raderar aldrig något.
+        </p>
       </div>
     </div>
-  </div>
 
-  <script src="core.js"></script>
-  <script src="filters.js"></script>
-  <script src="demo.js"></script>
-  <script src="folder-tree.js"></script>
-  <script src="ui.js"></script>
-</body>
+    <div id="folderTreeModal" class="modal folder-tree-modal" hidden="">
+      <div
+        class="modal-card folder-tree-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="folderTreeTitle"
+        aria-describedby="folderTreeHelp"
+      >
+        <h2 id="folderTreeTitle" data-i18n="folderTreeTitle">Välj målmapp</h2>
+        <p id="folderTreeHelp" class="muted" data-i18n="folderTreeHelp">
+          Välj konto, fäll ut mapparna och markera ditt mål. Inget ändras förrän
+          du bekräftar.
+        </p>
+        <div class="folder-tree-controls">
+          <label class="field"
+            ><span data-i18n="targetAccountLabel"
+              >1. E-postkonto för målmappen</span
+            ><select id="folderTreeAccount"></select
+          ></label>
+          <label class="field"
+            ><span data-i18n="targetSearchLabel">Sök mapp</span
+            ><input
+              id="folderTreeSearch"
+              type="search"
+              maxlength="200"
+              autocomplete="off"
+          /></label>
+        </div>
+        <p id="folderTreeStatus" class="muted" role="status"></p>
+        <div
+          id="folderTree"
+          class="folder-tree"
+          role="tree"
+          tabindex="0"
+          aria-label="Mappar i valt konto"
+          data-i18n-aria="folderTreeLabel"
+          aria-describedby="folderTreeKeys"
+        ></div>
+        <details class="folder-tree-keys">
+          <summary data-i18n="folderTreeKeyHelp">Tangentbordshjälp</summary>
+          <p id="folderTreeKeys" class="muted" data-i18n="folderTreeNavigation">
+            Piltangenter bläddrar. Höger/vänster fäller ut/in. Enter eller
+            mellanslag markerar; knappen nedan bekräftar.
+          </p>
+        </details>
+        <div class="folder-tree-selection">
+          <strong data-i18n="folderTreePending">Markerad mapp</strong>
+          <p id="folderTreePath" tabindex="0"></p>
+        </div>
+        <div class="modal-actions">
+          <button
+            id="folderTreeChoose"
+            type="button"
+            class="button primary"
+            disabled=""
+            data-i18n="folderTreeChoose"
+          >
+            Välj denna mapp
+          </button>
+          <button
+            id="folderTreeCancel"
+            type="button"
+            class="button secondary"
+            data-i18n="cancelBtn"
+          >
+            Avbryt
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="core.js"></script>
+    <script src="filters.js"></script>
+    <script src="demo.js"></script>
+    <script src="folder-tree.js"></script>
+    <script src="ui.js"></script>
+  </body>
 </html>

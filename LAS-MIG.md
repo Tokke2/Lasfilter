@@ -25,7 +25,7 @@ Inga filer installeras någon annanstans, och inga externa program krävs.
 ## Din första regel
 
 1. Öppna en mejlflik och markera ett befintligt mejl där, exempelvis en faktura.
-2. I Läsfilter: **Hämta från markerat meddelande** fyller källmapp och första villkoret.
+2. Öppna **Regler → Ny från markerat mejl** för att fylla konto och första villkoret. Editorn visas i stället för regellistan.
 3. Välj målmapp, lägg till fler villkor vid behov (OCH/ELLER) och **Spara regel**.
 4. **Testa markerat** visar om villkoren matchar och varför en flytt eventuellt inte sker nu. Testet flyttar aldrig något.
 5. När du är nöjd: skicka eller ta emot ett nytt mejl, läs det, gå vidare till nästa. I testläge simuleras bevakningen och räknas som prov.
@@ -35,16 +35,16 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 
 ## Snabbare vägar till en färdig regel
 
-- **⚡ Skapa regel på tio sekunder (snabbregeln):** den enklaste vägen till en färdig regel, ovanför regellistan.
+- **Föreslagna regler → Skapa från ett förslag (snabbregeln):** Inkorgens ledtrådar och snabbskapandet har en egen flik.
   - **Klickbara förslag:** SortBro läser Inkorgen en gång och visar *Avsändare i Inkorgen* och *Ord i ämnesrader* med antal mejl. Ett klick fyller fälten – du behöver aldrig kunna en exakt adress. Återkommande avsändare och ord som redan har en regel föreslås aldrig.
   - **Fler förslag när du vill:** de åtta vanligaste avsändarna och de sex vanligaste ämnesorden visas direkt; resten ligger bakom **＋ visa fler**. Varje förslag bär en ledtråd – *"Vanligaste adressen: order@klarna.se · Senaste ämnet: Order bekräftad"* – och ett **✕** döljer ett förslag du inte vill se. *Visa dolda förslag igen* tar tillbaka dem.
   - **Live-räkning som säger sanningen:** så snart fältet har ett värde står det i klartext hur många mejl regeln flyttar **just nu** – *"3 mejl i Exempelkonto matchar just nu"*. Siffran gäller bara **kontot målmappen ligger i**, precis som regeln själv, och den räknar bara mejl som faktiskt flyttas: är några olästa och kryssrutan *Flytta olästa mejl* är av står det *"2 av 3 flyttas nu – 1 olästa väntar på att läsas"* i stället för ett löfte som inte hålls. Är Inkorgen större än de 400 senaste mejlen som läses står det också, i stället för att låtsas att siffran är hela Inkorgen. Ingenting sparas förrän du klickar.
   - **Räkningen är omedelbar:** Inkorgen läses en gång och återanvänds i två minuter, så siffran kommer direkt när du skriver. **↻ Läs Inkorgen igen** läser om allt, och efter en flyttning räknas det från början igen.
   - **Klarspråk i stället för villkor:** raden under målmappen skriver ut exakt vad regeln gör: *"Flytta mejl från klarna.se till Fakturor"*. Skriver du ett löst ord (t.ex. `klarna`) blir villkoret *avsändaren innehåller klarna*; skriver du en full domän (`klarna.se`) eller adress (`order@klarna.se`) blir det en exakt träff. Ämnesord blir alltid *innehåller*.
-  - **Ett klick till färdig regel:** **＋ Skapa regel** sparar regeln (och visar den i editorn), **⚡ Lägg till och flytta nu** sparar och kör den direkt mot Inkorgen.
+  - **Ett klick till färdig regel:** **＋ Skapa regel** sparar regeln i Regler utan att lämna förslagsfliken, **⚡ Lägg till och flytta nu** sparar och kör den direkt mot Inkorgen.
   - **＋ Ny mapp** föreslår ett mappnamn ur det du skrev: `klarna.se` → *Klarna*, `wordpress@limoeurope.com` → *Limoeurope*.
   - Kryssrutorna *Flytta olästa mejl* (förkryssad) och *Öppna i nytt fönster* styr regeln direkt; årsmappar förblir avstängda som standard. Kryssar du ur *Flytta olästa mejl* ändras siffran direkt, så du ser vad som händer innan du sparar.
-  - **Snabbregeln minns:** målmappen du använde sist är förvald nästa gång du öppnar Regler, och **Esc** tömmer fältet när du ångrar dig.
+  - **Snabbregeln minns:** målmappen du använde sist är förvald nästa gång du använder Föreslagna regler, och **Esc** tömmer fältet när du ångrar dig.
   - Allt sker lokalt: förslagen bygger bara på avsändare, ämnesrader och antal – ingen mejltext lämnar datorn, och ingenting skapas utan ditt klick.
 - **＋ Importera domäner/adresser till en befintlig regel:** i regelredigeringen, under villkoren, finns en ruta där du klistrar in en eller flera domäner/adresser – en per rad, med komma, semikolon eller mellanslag. Varje rad blir ett **villkor i just den regeln**, utan att de gamla villkoren rörs.
   - Adress (`order@klarna.se`) och domän (`klarna.se`) blir **exakta träffar**; ett löst ord blir *avsändaren innehåller*. Klamrar och `mailto:` städas bort automatiskt.
@@ -58,7 +58,7 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 
 ## Thunderbirds egna filter – läs in dem och skriv ut dina egna
 
-Du som redan har fyrtio filter behöver inte skriva om dem. I **Regler**-vyn finns kortet **🔁 Thunderbirds egna filter**:
+Du som redan har fyrtio filter behöver inte skriva om dem. Under **Regler → Importera & exportera regler** finns kortet **🔁 Thunderbirds egna filter**:
 
 - **⇪ Importera filterfil…** läser din `msgFilterRules.dat` och visar varje filter som en rad: namn, de villkor som gick att översätta, en rullista för målmappen och en kryssruta. **Ingenting skapas förrän du trycker på knappen**, och knappen räknar bara de rader som har en målmapp. Filen hittar du via *Hjälp → Felsökningsinformation → Öppna mappen* och sedan `ImapMail/<server>/` eller `Mail/Local Folders/`.
 - **⤓ Exportera som filterfil** skriver dina SortBro-regler som en `msgFilterRules.dat` i samma format som Thunderbird 140 använder (version 9). Filen laddas ner till Hämtade filer – du lägger själv in den i profilmappen medan Thunderbird är stängt. **Ta en kopia av den gamla filen först.** Tillägget rör aldrig profilen själv.
@@ -134,7 +134,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 ### Loggen: tyst när inget är fel, läsbar när något är det
 
 - **Pausad eller stoppad bevakning larmar inte.** Automatiska svep (timintervallet och svepet vid start) hoppar över i tysthet när bevakningen är pausad eller stoppad – du får ingen "Tekniskt fel"-rad för att du själv har tryckt Pausa. Är motorn stoppad av ett fel skrivs **en** tydlig notis i stället för en rad per försök.
-- **Starten tar igen det som missades.** SortBro sveper **alltid en gång när Thunderbird startar**, när bevakningen är på och det finns aktiva regler – även om timersvepet är avstängt. Var det senaste svepet mer än ett intervall sedan (datorn har varit avstängd, locket stängt, Thunderbird stängt över natten) sker det **direkt**, efter mindre än en sekund, i stället för att vänta en hel timme. Tiden för senaste svepet sparas i Thunderbirds lagring, så starten vet hur länge sedan det var även efter en omstart; sveprutan under **Flyttstatus** visar därför rätt nästa tid direkt. Raden `svepet ar forsenat sedan forra gangen - tar igen det direkt vid start` skrivs i loggen när det händer.
+- **Starten tar igen det som missades.** SortBro sveper **alltid en gång när Thunderbird startar**, när bevakningen är på och det finns aktiva regler – även om timersvepet är avstängt. Var det senaste svepet mer än ett intervall sedan (datorn har varit avstängd, locket stängt, Thunderbird stängt över natten) sker det **direkt**, efter mindre än en sekund, i stället för att vänta en hel timme. Tiden för senaste svepet sparas i Thunderbirds lagring, så starten vet hur länge sedan det var även efter en omstart; sveprutan under **Flyttstatus → Detaljer om sorteringen** visar därför rätt nästa tid direkt. Raden `svepet ar forsenat sedan forra gangen - tar igen det direkt vid start` skrivs i loggen när det händer.
 - **Ett svep som väntar för länge tas igen.** SortBro kontrollerar klockan varannan sekund. Upptäcker den ett glapp på över två minuter – datorn har sovit – och svepet samtidigt är försenat, körs det direkt i stället för att vänta på nästa intervall. Det är samma logik som vid start, bara utan omstart.
 - **Övergående startfel försöks om i tysthet.** Direkt efter att Thunderbird har startat kan kontona svara "inte redo" ännu. Vid en start görs två tysta försök: efter 10 sekunder och efter ytterligare en minut. Under drift räcker ett försök efter 15 sekunder. Först därefter, om det fortfarande misslyckas, skrivs: *Tekniskt fel – Automatiskt svep misslyckades (sweep_error) – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i.*
 - **Svepraden i loggen säger varför inget flyttas.** Varje svep skriver `skannade=… matchade=… i_mal=… klara=… koade=…`: `matchade` är mejl som träffades av regeln, `i_mal` sådana som redan låg i målmappen/sin årsmapp och `klara` sådana som redan var hanterade. Är `matchade=0` finns det helt enkelt inget som matchar regeln.
@@ -142,7 +142,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 
 ### Automatiskt varje timme – med bevakning kvar
 
-**Kör alla regler automatiskt (rekommenderas)** under **Inställningar → Avancerat** kör samma svep automatiskt med valfritt intervall (steg om 15 minuter, standard **60 minuter = en gång i timmen**). Detta är *utöver* den händelsestyrda bevakningen: nya mejl som kommer in till Inkorgen hanteras direkt när de anländer, och olästa mejl som du just har läst flyttas så snart de har lämnat visningen. Intervallsvepet fångar upp allt övrigt – till exempel mejl som legat i andra mappar, mejl som blev lästa i ett annat program och regler som följer kalendern vid årsskiftet. Statusraden under **Flyttstatus** visar när nästa automatiska körning sker och att inkommande mejl bevakas hela tiden.
+**Kör alla regler automatiskt (rekommenderas)** under **Inställningar → Sortering & säkerhet** kör samma svep automatiskt med valfritt intervall (steg om 15 minuter, standard **60 minuter = en gång i timmen**). Detta är *utöver* den händelsestyrda bevakningen: nya mejl som kommer in till Inkorgen hanteras direkt när de anländer, och olästa mejl som du just har läst flyttas så snart de har lämnat visningen. Intervallsvepet fångar upp allt övrigt – till exempel mejl som legat i andra mappar, mejl som blev lästa i ett annat program och regler som följer kalendern vid årsskiftet. Statusraden under **Flyttstatus → Detaljer om sorteringen** visar när nästa automatiska körning sker och att inkommande mejl bevakas hela tiden.
 
 ## Design, språk och årstider
 
@@ -167,7 +167,7 @@ Ett enda stavfel i en regel kan flytta tusentals mejl. Säkerhetsbromsen finns f
 - Den stoppade regeln **sveps inte** och tar inte heller **inkommande mejl** förrän du har svarat. Andra regler fortsätter som vanligt.
 - Nya regler har ingen historik. Deras gräns är därför 50 mejl i första svepet – det är precis då ett stavfel brukar upptäckas.
 - Antalet räknar bara mejl som **faktiskt skulle flyttas**: sådant som redan ligger i målmappen kostar ingenting.
-- Bromsen stängs av under **Inställningar → Avancerat**. Stängs den av släpps också alla stoppade regler direkt. Kvittot säger rakt ut vad som då kan hända: *"En felaktig regel kan då flytta hela inkorgen utan att fråga."*
+- Bromsen stängs av under **Inställningar → Sortering & säkerhet**. Stängs den av släpps också alla stoppade regler direkt. Kvittot säger rakt ut vad som då kan hända: *"En felaktig regel kan då flytta hela inkorgen utan att fråga."*
 - Stoppet skrivs i loggen som händelsen **Säkerhetsbromsen stoppade en regel**, med regelns namn, antalet, gränsen och hur många väntande jobb som släpptes.
 
 ## "Varför ligger det här mejlet här?"
@@ -282,7 +282,7 @@ Dina regler är det enda som inte går att återskapa. Därför skriver SortBro 
 - **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-backup.json`** – den senaste uppsättningen.
 - **`Hämtade filer/Lasfilter/Regelbackuper/sortbro-regler-ÅÅÅÅ-MM-DD.json`** – en daterad **veckokopia**, en per vecka (ISO-vecka, måndag–söndag). De senaste **12 veckorna** behålls; äldre veckofiler städas bort automatiskt (bara SortBros egna daterade filer i den egna undermappen – din manuella export och loggfilen rörs aldrig).
 
-**Båda filerna skrivs en gång i veckan**, när veckan byts. Tidigare skrevs den senaste filen om vid varje regeländring; det gjorde ett skrivsteg av varje sparning utan att skydda något extra, för en kopia som skrivs tjugo gånger i timmen är ingen kopia. Vill du ha en färsk fil direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Avancerat**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
+**Båda filerna skrivs en gång i veckan**, när veckan byts. Tidigare skrevs den senaste filen om vid varje regeländring; det gjorde ett skrivsteg av varje sparning utan att skydda något extra, för en kopia som skrivs tjugo gånger i timmen är ingen kopia. Vill du ha en färsk fil direkt finns knappen **⇩ Backa upp reglerna nu** under **Inställningar → Loggar & automatiska säkerhetskopior**, tillsammans med kryssrutan **Backa upp reglerna automatiskt** (på som standard).
 
 Veckan som senast fick en kopia sparas i Thunderbirds lagring, så en omstart mitt i veckan inte skriver en extra kopia. **Har Thunderbird stått öppen i veckor utan omstart skrivs kopian ändå** – pulsen frågar en gång i minuten om veckan bytts. Ett misslyckat försök (full skiva, nekad skrivning) görs om, men högst en gång i timmen.
 
@@ -298,7 +298,7 @@ SortBro skriver aldrig något löst i Hämtade filer och aldrig utanför appmapp
 
 | Mapp | Innehåll | Skapas av |
 | --- | --- | --- |
-| `Hämtade filer/Lasfilter/logs/` | `lasfilter-logg.txt` – den tekniska loggen, `sortbro-fellogg.txt` – den samlade felloggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Avancerat, och *Exportera logg* under Aktivitet |
+| `Hämtade filer/Lasfilter/logs/` | `lasfilter-logg.txt` – den tekniska loggen, `sortbro-fellogg.txt` – den samlade felloggen, och `sortbro-tekniklogg-ÅÅÅÅ-MM-DD.json` när du trycker *Exportera logg* | loggrutan under Inställningar → Loggar & automatiska säkerhetskopior, och *Exportera logg* under Aktivitet |
 | `Hämtade filer/Lasfilter/Regelbackuper/` | `sortbro-regler-backup.json` + en daterad veckokopia | automatisk säkerhetskopia en gång per vecka, eller *⇩ Backa upp reglerna nu* |
 | `Hämtade filer/Lasfilter/Regler/` | `sortbro-regler-ÅÅÅÅ-MM-DD.json` (alla regler) och `sortbro-regel-<namn>.json` (en regel) | *Exportera* i Regler |
 | `Hämtade filer/Lasfilter/Filterfiler/` | `msgFilterRules.dat` – filterfilen du själv kopierar in i profilen | *Skriv ut dina regler som filterfil* i Regler |
@@ -313,7 +313,7 @@ Börja i **`Hämtade filer/Lasfilter/logs/sortbro-fellogg.txt`**. Filen samlar S
 
 - **Senaste felet först**, med UTC-tid, händelse, antal och tillgänglig detalj/felkod. Huvudet anger SortBro-version, Thunderbird-version och installationstyp för **aktuell session**, inte versionen vid varje historiskt fel.
 - **Högst 5 000 felposter från de senaste 30 dagarna**, sparade separat i tillägget och återlästa vid omstart. En livlig vanlig logg tränger därför inte undan felhistoriken. Äldre internlogg migreras första gången; redan bortgallrade händelser kan inte återskapas.
-- **Automatiskt** tillsammans med den tekniska filloggen, via den befintliga rutan under **Inställningar → Avancerat**. Stänger du av rutan skrivs ingen av filerna automatiskt. En oförändrad fellogg skrivs inte om efter varje lyckad flytt.
+- **Automatiskt** tillsammans med den tekniska filloggen, via den befintliga rutan under **Inställningar → Loggar & automatiska säkerhetskopior**. Stänger du av rutan skrivs ingen av filerna automatiskt. En oförändrad fellogg skrivs inte om efter varje lyckad flytt.
 - **Manuellt:** välj **Aktivitet → Spara samlad fellogg**. Det fungerar även när automatisk filloggning är av. Samma filnamn används, så du slipper många lösa rapporter.
 - Misslyckas ett filanrop sparas en felkod internt, utan att det startar en oändlig skrivloop. Nästa vanliga logghändelse ger ett nytt försök. Om disken inte går att skriva till kan förstås inte heller felloggen sparas där.
 
@@ -502,6 +502,19 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.21
+
+- **Sex tydligt namngivna flikar:** Regler, Föreslagna regler, Aktivitet, Inställningar, Hjälp och Stöd SortBro. Sidomenyn med små ikoner är ersatt av en flikrad över hela arbetsytan. Piltangenter och Home/End byter flik; vid mycket stor text kan flikraden rullas i sidled utan att hela sidan blir bredare.
+- **Regler visar först bara listan.** Öppna en regel eller välj Ny tom regel / Ny från markerat mejl för att visa editorn. **Alla regler** och **Fortsätt redigera** växlar utan att spara eller kasta utkastet. Import/export och Thunderbirds filter ligger samlat i en utfällbar del under listan.
+- **Föreslagna regler har egen plats.** Inkorgschips, Läs Inkorgen igen, snabbregeln, mallar och inlärda förslag finns kvar. Ett förslag skapar aldrig en regel utan ditt val. Om en åtgärd skulle ersätta ett osparat editorutkast frågar SortBro först, även när utkastet finns i en annan flik.
+- **Lugnare layout på alla flikar.** Aktivitet samlar statistik, kökontroll, felsökning och logg. Inställningar är indelade i fem utfällbara grupper. Introduktion och kom-igång-steg ligger under Hjälp; Stöd har samma lugnare kortstil som resten.
+- **Tydligare typografi.** Lokal Segoe UI Variable / Segoe UI / systemfont, tydligare rubriker, jämnare mellanrum och bredare arbetsyta. Textstorlek 12–24 px, kompakt/luftig layout, radavstånd, årstidstema och svenska/engelska finns kvar. Inga typsnitt hämtas från nätet.
+- **Säkerheten är kvar i blickfånget.** Flyttstatus, paus och test-/flyttläge är åtkomliga i varje flik. Fel och säkerhetsbromsens varningar ligger utanför flikarna och döljs inte när du navigerar. Längre statusförklaringar finns under Detaljer om sorteringen.
+
+Detta är en omorganisation av gränssnittet, inte en ändring av reglernas matchning, mapp-ID:n, flyttmotor eller veckobackup. Osparade utkast bevaras när du byter flik i det öppna fönstret; detta är **inte** återställning av osparade utkast efter stängning eller omstart.
+
+Verifierat med **431 automatiska tester, 430 DOM-kontroller och 24 webbläsarlayouter**, med alla sex flikar samt editorn i varje layout (600, 840 och 1280 px; 12, 14, 20 och 24 px text; ljust/mörkt, SV/EN och båda tätheterna). Dessutom provat faktisk tangentbordsnavigation, utkast vid språkbyte, avbrutna förslagsåtgärder, mappdialog och synliga felkontroller. Ingen körning i riktig Thunderbird eller Windows har gjorts här. Installera XPI:n ovanpå den befintliga; avinstallera inte först.
 
 ## Nyheter i 1.0.20
 

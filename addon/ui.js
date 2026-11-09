@@ -45,9 +45,39 @@ const I18N={
   brandName:'SortBro',
   brandSub:'FÖR THUNDERBIRD',
   navMenu:'MENY',
-  navRules:'Start',
-  navActivity:'Vad har hänt?',
-  navSettings:'Avancerat',
+  navSuggestions:"Föreslagna regler",
+  rulesPageTitle:"Regler",
+  ruleEditorPageHelp:"Välj konto, villkor och målmapp för regeln.",
+  rulesPageHelp:"Dina sparade regler. Välj en regel för att redigera eller skapa en ny.",
+  suggestionsPageTitle:"Föreslagna regler",
+  suggestionsPageHelp:"Utgå från din Inkorg eller dina egna flyttar. Du väljer själv vad som ska bli en regel.",
+  activityPageTitle:"Aktivitet",
+  activityPageHelp:"Följ sorteringen, kontrollera resultat och felsök på ett ställe.",
+  settingsPageTitle:"Inställningar",
+  settingsPageHelp:"Öppna den grupp du vill ändra. Inställningar sparas direkt.",
+  helpPageTitle:"Hjälp",
+  helpPageHelp:"Kom igång och förstå hur SortBro flyttar dina mejl.",
+  supportPageTitle:"Stöd SortBro",
+  supportPageHelp:"Frivilligt stöd till fortsatt utveckling. Alla funktioner är alltid fria.",
+  statusDetails:"Detaljer om sorteringen",
+  inboxIdeasTitle:"Från din Inkorg",
+  inboxIdeasHelp:"Välj en avsändare eller ett ämnesord att utgå från.",
+  templateLibraryTitle:"Mallar att utgå från",
+  learnedSectionTitle:"Förslag från dina egna flyttar",
+  learnEmpty:"Inga inlärda förslag just nu. Nya förslag visas här när SortBro hittar ett mönster.",
+  learnEmptyOff:"Inlärningen är avstängd. Du kan slå på den under Inställningar → Sortering & säkerhet.",
+  resumeEditor:"Fortsätt redigera",
+  backToRules:"← Alla regler",
+  editorDraftNote:"Ändringar sparas först när du väljer Spara.",
+  ruleFilesTitle:"Importera & exportera regler",
+  activityToolsTitle:"Kontroller & felsökning",
+  activityToolsHelp:"Kör en kontroll eller undersök det markerade mejlet.",
+  appearanceSection:"Utseende & läsbarhet",
+  sortingSection:"Sortering & säkerhet",
+  storageSection:"Loggar & automatiska säkerhetskopior",
+  navRules:'Regler',
+  navActivity:'Aktivitet',
+  navSettings:'Inställningar',
   navHelp:'Hjälp',
   navSupport:'Stöd SortBro',
   footerSupportLink:'💚 Stöd SortBro',
@@ -109,8 +139,8 @@ const I18N={
   statQueue:'väntar på flytt / test',
   statMoved:'flyttade sedan start',
   statMatched:'matchade sedan start',
-  rulesTitle:'Dina automatiska flyttar',
-  rulesSub:'Välj en regel för att redigera. Fler val under ⋯.',
+  rulesTitle:'Sparade regler',
+  rulesSub:'Fler alternativ för varje regel finns under ⋯.',
   ruleMenuLabel:"Åtgärder för {name}",
   ruleDetails:"Detaljer & inställningar",
   ruleEdit:"Redigera",
@@ -133,7 +163,7 @@ const I18N={
   ruleTargetMore:"+ {n} alternativa mål",
   newFromSelectedBtn:'✉ Ny från markerat mejl',
   newRuleBtn:'＋ Ny tom regel',
-  quickRuleTitle:'⚡ Skapa regel på tio sekunder',
+  quickRuleTitle:'Skapa från ett förslag',
   quickRuleHelp:'Klicka på en avsändare eller ett ämnesord – eller skriv själv. SortBro säger till hur många mejl i Inkorgen regeln träffar innan du sparar.',
   quickHintsScan:'↻ Läs Inkorgen igen',
   quickHintsSenders:'Avsändare i Inkorgen',
@@ -347,7 +377,7 @@ const I18N={
   rfBoth:'Både olästa och lästa mejl (flytta direkt)',
   rfUnread:'Endast olästa mejl (flytta direkt)',
   unreadActionLabel:'När olästa mejl flyttas av denna regel',
-  uaDefault:'Enligt standardinställning (Avancerat)',
+  uaDefault:'Enligt standardinställning (Inställningar)',
   uaKeep:'Behåll som oläst i målmappen (utan popup-fönster)',
   uaWindow:'Öppna i nytt fönster och behåll som oläst',
   uaRead:'Markera som läst vid flytt',
@@ -652,7 +682,7 @@ const I18N={
   runAllBusy:'En körning pågår redan – vänta några sekunder och tryck igen.',
   runAllWaited:'En körning pågick redan, så siffrorna gäller hela körningen.',
   autoRunOn:'Automatiskt: {n} regler körs var {min}:e minut, nästa gång {time}. Inkommande mejl bevakas hela tiden.',
-  autoRunOff:'Automatisk körning är av – slå på den under Avancerat. Inkommande mejl bevakas ändå hela tiden.',
+  autoRunOff:'Automatisk körning är av – slå på den under Inställningar → Sortering & säkerhet. Inkommande mejl bevakas ändå hela tiden.',
   diagnoseBtn:'🔎 Varför flyttas inte mejlen?',
   diagnoseTitle:'Varför flyttas inte mejlen?',
   diagnoseRunning:'Undersöker kontots mappar – inget flyttas…',
@@ -750,7 +780,7 @@ const I18N={
    already_read:'Meddelandet är redan läst och regeln gäller endast olästa mejl.',
    no_match:'Ingen aktiv regel matchar det markerade meddelandet.',
    operation_running:'En flytt pågår. Vänta tills Thunderbird har svarat.',
-   uncertain_move:'Ett flyttförsök fick osäkert svar. Klicka på "Rensa spärr och fortsätt" (eller under Avancerat) för att återuppta bevakningen.',
+   uncertain_move:'Ett flyttförsök fick osäkert svar. Klicka på "Rensa spärr och fortsätt" (eller under Inställningar) för att återuppta bevakningen.',
    storage_error:'Inställningarna kunde inte sparas. Motorn är stoppad i denna session.',
    invalid_storage:'Lagrade inställningar kunde inte läsas. Bevakningen är stoppad.',
    display_error:'Visningsstatus kunde inte läsas säkert. Bevakningen är stoppad.',
@@ -819,9 +849,39 @@ const I18N={
   brandName:'SortBro',
   brandSub:'FOR THUNDERBIRD',
   navMenu:'MENU',
+  navSuggestions:"Suggested rules",
+  rulesPageTitle:"Rules",
+  ruleEditorPageHelp:"Choose the account, conditions and destination for the rule.",
+  rulesPageHelp:"Your saved rules. Choose one to edit or create a new rule.",
+  suggestionsPageTitle:"Suggested rules",
+  suggestionsPageHelp:"Start from your Inbox or your own moves. You decide which suggestions become rules.",
+  activityPageTitle:"Activity",
+  activityPageHelp:"Follow sorting, check results and troubleshoot in one place.",
+  settingsPageTitle:"Settings",
+  settingsPageHelp:"Open the group you want to change. Settings are saved immediately.",
+  helpPageTitle:"Help",
+  helpPageHelp:"Get started and understand how SortBro moves your emails.",
+  supportPageTitle:"Support SortBro",
+  supportPageHelp:"Optional support for continued development. All features remain free.",
+  statusDetails:"Sorting details",
+  inboxIdeasTitle:"From your Inbox",
+  inboxIdeasHelp:"Choose a sender or a subject word as your starting point.",
+  templateLibraryTitle:"Templates to start from",
+  learnedSectionTitle:"Suggestions from your own moves",
+  learnEmpty:"No learned suggestions yet. New suggestions appear here when SortBro finds a pattern.",
+  learnEmptyOff:"Learning is off. Enable it under Settings → Sorting & safety.",
+  resumeEditor:"Continue editing",
+  backToRules:"← All rules",
+  editorDraftNote:"Changes are saved only when you choose Save.",
+  ruleFilesTitle:"Import & export rules",
+  activityToolsTitle:"Checks & troubleshooting",
+  activityToolsHelp:"Run a check or investigate the selected email.",
+  appearanceSection:"Appearance & readability",
+  sortingSection:"Sorting & safety",
+  storageSection:"Logs & automatic backups",
   navRules:'Rules',
-  navActivity:'Activity Log',
-  navSettings:'Advanced',
+  navActivity:'Activity',
+  navSettings:'Settings',
   navHelp:'Help',
   navSupport:'Support SortBro',
   footerSupportLink:'💚 Support SortBro',
@@ -883,8 +943,8 @@ const I18N={
   statQueue:'queued for move / test',
   statMoved:'moved since start',
   statMatched:'matched since start',
-  rulesTitle:'Your automatic rules',
-  rulesSub:'Select a rule to edit. More actions under ⋯.',
+  rulesTitle:'Saved rules',
+  rulesSub:'More actions for each rule are available under ⋯.',
   ruleMenuLabel:"Actions for {name}",
   ruleDetails:"Details & settings",
   ruleEdit:"Edit",
@@ -907,7 +967,7 @@ const I18N={
   ruleTargetMore:"+ {n} alternative targets",
   newFromSelectedBtn:'✉ New from selected email',
   newRuleBtn:'＋ New blank rule',
-  quickRuleTitle:'⚡ Create a rule in ten seconds',
+  quickRuleTitle:'Create from a suggestion',
   quickRuleHelp:'Click a sender or a subject word – or type it yourself. SortBro tells you how many Inbox emails the rule hits before you save.',
   quickHintsScan:'↻ Read the Inbox again',
   quickHintsSenders:'Senders in the Inbox',
@@ -1121,7 +1181,7 @@ const I18N={
   rfBoth:'Both unread and read emails (move immediately)',
   rfUnread:'Unread emails only (move immediately)',
   unreadActionLabel:'When unread emails are moved by this rule',
-  uaDefault:'Use global default (Advanced)',
+  uaDefault:'Use global default (Settings)',
   uaKeep:'Keep unread in target folder (no popup window)',
   uaWindow:'Open in new window and keep unread',
   uaRead:'Mark as read when moved',
@@ -1426,7 +1486,7 @@ const I18N={
   runAllBusy:'A run is already in progress – wait a few seconds and try again.',
   runAllWaited:'A run was already in progress, so the figures cover the whole run.',
   autoRunOn:'Automatic: {n} rules run every {min} minutes, next at {time}. Incoming mail is monitored continuously.',
-  autoRunOff:'Automatic runs are off – enable them under Advanced. Incoming mail is still monitored continuously.',
+  autoRunOff:'Automatic runs are off – enable them under Settings → Sorting & safety. Incoming mail is still monitored continuously.',
   diagnoseBtn:'🔎 Why are the emails not moving?',
   diagnoseTitle:'Why are the emails not moving?',
   diagnoseRunning:'Examining the account folders – nothing is moved…',
@@ -1524,7 +1584,7 @@ const I18N={
    already_read:'The message is already read and this rule only moves unread mail.',
    no_match:'No active rule matches the selected message.',
    operation_running:'A move is currently in progress. Wait for Thunderbird to finish.',
-   uncertain_move:'A move attempt returned an uncertain status. Click "Clear lock & resume" (or under Advanced) to resume monitoring.',
+   uncertain_move:'A move attempt returned an uncertain status. Click "Clear lock & resume" (or under Settings) to resume monitoring.',
    storage_error:'Settings could not be saved. Engine is stopped for this session.',
    invalid_storage:'Stored settings could not be read. Monitoring is stopped.',
    display_error:'Message display state could not be verified safely. Monitoring is stopped.',
@@ -1751,7 +1811,7 @@ function applySeason(prefs){
  root.dataset.seasonMode=SEASON_CHOICES.includes(prefs?.season)?prefs.season:'auto';
  if($('seasonHeroArt'))$('seasonHeroArt').innerHTML=seasonArt(season);
  if($('seasonGreeting'))$('seasonGreeting').textContent=T(SEASON_KEY_NAMES[season]||'seasonGreetingAutumn');
- const logos=[['brandLogo','64'],['topbarLogo','32'],['supportLogo','128']];
+ const logos=[['brandLogo','64'],['supportLogo','128']];
  for(const [id,size] of logos){
   const img=$(id);if(!img)continue;
   img.src='season-'+season+'-'+size+'.png';
@@ -1979,7 +2039,7 @@ function applyTemplate(key){
  if($('target'))targetOptions(auto?.id||$('target').value||'');
  if($('delete'))$('delete').disabled=true;
  if($('editorTitle'))$('editorTitle').textContent=T('editorNew');
- updateReadPolicy();updateMatchHelp();dirty=true;showView('rules');renderRules();
+ updateReadPolicy();updateMatchHelp();dirty=true;openRuleEditor();renderRules();
  $('ruleForm')?.scrollIntoView({behavior:'smooth',block:'center'});
  toast(T('tplApplied')+(auto?'':' '+T('tplTargetHint')));
 }
@@ -2216,6 +2276,7 @@ function renderLearnBar(){
  if(unchanged('learn',JSON.stringify([state.learn||null,currentLang,folders.length])))return;
  const list=(state.learn&&!state.learn.off)?state.learn.suggestions||[]:[];
  bar.replaceChildren();bar.hidden=!list.length;
+ if($('learnEmpty')){$('learnEmpty').hidden=!!list.length;$('learnEmpty').textContent=T(state.learn?.off?'learnEmptyOff':'learnEmpty');}
  if(!list.length)return;
  const head=el('div','learn-head');
  head.append(el('strong','',T('learnTitle')));
@@ -2232,12 +2293,13 @@ function renderLearnBar(){
   const actions=el('div','bar-actions');
   const create=el('button','button small primary',T('learnCreate'));create.type='button';
   create.addEventListener('click',async()=>{
+   if(dirty&&!confirm(T('confirmDiscardEditor')))return;
    create.disabled=true;
    try{
     const r=await rpc('learnCreate',{key:s.key});
     renderStatus(r.snapshot);
     toast(T(r.existing?'learnExisting':'learnCreated'));
-    if(!r.existing)loadRule(r.ruleId);
+    if(!r.existing){dirty=false;loadRule(r.ruleId,'',{openEditor:false});}
    }catch(err){create.disabled=false;alertError(err);}
   });
   const snooze=el('button','button small secondary',T('learnSnooze'));snooze.type='button';
@@ -2281,7 +2343,7 @@ async function moveRulePriority(ruleId,step){
  const question=T('priorityConfirm').replace(/\{(name|other|from|to)\}/g,(_,key)=>values[key]);
  if(!confirm(question))return;
  [rules[i],rules[j]]=[rules[j],rules[i]];
- renderStatus(await rpc('saveRules',{rules,revision}));loadRule(ruleId);
+ renderStatus(await rpc('saveRules',{rules,revision}));loadRule(ruleId,'',{openEditor:rulePanel==='editor'});
  const row=[...document.querySelectorAll('.rule-row')].find(r=>r.dataset.ruleId===ruleId);row?.querySelector('.rule-menu-toggle')?.focus();
  toast(T('priorityChanged').replace('{name}',name).replace('{n}',String(j+1)));
 }
@@ -2305,7 +2367,7 @@ function paintRules(){
   check.addEventListener('change',async()=>{try{
    if(dirty&&!confirm(T('confirmDiscardEditor'))){check.checked=!check.checked;return;}
    const rules=state.config.rules.map(r=>r.id===rule.id?{...r,enabled:check.checked}:r);
-   const next=await rpc('saveRules',{rules,revision:state.config.revision});dirty=false;renderStatus(next);loadRule(rule.id);
+   const next=await rpc('saveRules',{rules,revision:state.config.revision});dirty=false;renderStatus(next);loadRule(rule.id,'',{openEditor:rulePanel==='editor'});
   }catch(e){check.checked=!check.checked;alertError(e);}});
   const main=el('div','rule-main');
   const btn=el('button','rule-open');btn.type='button';btn.append(el('strong','',rule.name));
@@ -2345,7 +2407,7 @@ function paintRules(){
     const nextRf=moveUnreadChk.checked?'both':'read';
     const rules=state.config.rules.map(r=>r.id===rule.id?{...r,readFilter:nextRf}:r);
     const next=await rpc('saveRules',{rules,revision:state.config.revision});
-    dirty=false;renderStatus(next);if(selectedId===rule.id)loadRule(rule.id);
+    dirty=false;renderStatus(next);if(selectedId===rule.id)loadRule(rule.id,'',{openEditor:rulePanel==='editor'});
     toast(T('toastRuleSaved'));
    }catch(err){moveUnreadChk.checked=!moveUnreadChk.checked;alertError(err);}
   });
@@ -2356,7 +2418,7 @@ function paintRules(){
     const nextUa=openWinChk.checked?'window':'keep';
     const rules=state.config.rules.map(r=>r.id===rule.id?{...r,unreadAction:nextUa}:r);
     const next=await rpc('saveRules',{rules,revision:state.config.revision});
-    dirty=false;renderStatus(next);if(selectedId===rule.id)loadRule(rule.id);
+    dirty=false;renderStatus(next);if(selectedId===rule.id)loadRule(rule.id,'',{openEditor:rulePanel==='editor'});
     toast(T('toastRuleSaved'));
    }catch(err){openWinChk.checked=!openWinChk.checked;alertError(err);}
   });
@@ -2404,7 +2466,7 @@ function paintRules(){
    if(dirty&&!confirm(T('confirmDiscardEditor')))return;
    if(!confirm(T('ruleDeleteNamed').replace('{name}',rule.name)))return;
    const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==rule.id),revision:state.config.revision});
-   dirty=false;renderStatus(next);loadRule(selectedId===rule.id?'':selectedId);
+   dirty=false;renderStatus(next);loadRule(selectedId===rule.id?'':selectedId,'',{openEditor:false});setRulePanel('list');
   });
   panel.append(quick,details);row.append(check,main,menu,panel);list.append(row);
   const clash=conflictMap.get(rule.id);
@@ -2682,7 +2744,7 @@ function draft(){const accountId=$('source').value,old=state.config.rules.find(r
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.querySelector('.folder-choice').value}))});}
 /* Enkel regel-export använder samma validerade utkast som sparningen. */
 const buildRule=()=>draft();
-function loadRule(id='',presetAccount=''){
+function loadRule(id='',presetAccount='',{openEditor=true}={}){
  const rule=state.config.rules.find(r=>r.id===id);selectedId=rule?.id||'';
  $('editorTitle').textContent=rule?T('editorEdit'):T('editorNew');$('ruleName').value=rule?.name||'';$('enabled').checked=rule?.enabled??true;
  $('match').value=rule?.match||'any';
@@ -2701,6 +2763,7 @@ function loadRule(id='',presetAccount=''){
  updateRuleExplanation();
  dirty=false;editRevision=state.config.revision;editToken=currentToken();renderRules();
  rpc('prefs',{prefs:{lastRule:selectedId}}).catch(()=>{});
+ if(openEditor)openRuleEditor();
 }
 const logKey=log=>log.time+'|'+log.event+'|'+(log.data?.count||0)+'|'+(log.data?.detail||'');
 function logRow(log){
@@ -2757,7 +2820,36 @@ async function download(data,filename,mime='application/json',strict=false){
   }
  }finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
 }
-function showView(view){activeView=view;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));}
+let rulePanel='list',editorVisited=false;
+function showView(view){
+ if(!$('view-'+view))return;
+ const changed=activeView!==view;activeView=view;
+ document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);
+ document.querySelectorAll('.nav').forEach(n=>{const active=n.dataset.view===view;n.classList.toggle('active',active);n.setAttribute('aria-selected',String(active));n.tabIndex=active?0:-1;});
+ if(changed){closeRuleMenus();document.documentElement.scrollTop=0;}
+}
+function setRulePanel(panel){
+ rulePanel=panel==='editor'?'editor':'list';
+ if(rulePanel==='editor')editorVisited=true;
+ $('rulesLibrary').hidden=rulePanel==='editor';$('ruleEditor').hidden=rulePanel!=='editor';
+ $('resumeEditor').hidden=!editorVisited;
+ const help=$('view-rules').querySelector('.view-heading p');
+ help.dataset.i18n=rulePanel==='editor'?'ruleEditorPageHelp':'rulesPageHelp';help.textContent=T(help.dataset.i18n);
+}
+function openRuleEditor(){
+ const opening=$('ruleEditor').hidden||$('view-rules').hidden;
+ setRulePanel('editor');showView('rules');
+ if(opening)$('ruleName').focus();
+}
+handle('backToRules','click',()=>{setRulePanel('list');$('resumeEditor').focus();});
+handle('resumeEditor','click',()=>{openRuleEditor();$('ruleName').focus();});
+for(const tab of document.querySelectorAll('.app-tabs [role="tab"]'))tab.addEventListener('keydown',event=>{
+ const tabs=[...document.querySelectorAll('.app-tabs [role="tab"]')],i=tabs.indexOf(tab);let next;
+ if(event.key==='ArrowRight')next=tabs[(i+1)%tabs.length];
+ else if(event.key==='ArrowLeft')next=tabs[(i+tabs.length-1)%tabs.length];
+ else if(event.key==='Home')next=tabs[0];else if(event.key==='End')next=tabs.at(-1);else return;
+ event.preventDefault();showView(next.dataset.view);next.focus();
+});
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
 handle('footerSupportBtn','click',()=>showView('support'));
 
@@ -3164,6 +3256,7 @@ function renderQuickExisting(){
 }
 /* Lägger det man valt in i en regel som redan finns i stället för att skapa en ny. */
 async function addToExistingRule(ruleId,{runNow=false}={}){
+ if(dirty&&!confirm(T('confirmDiscardEditor')))return null;
  const rawVal=($('quickValue')?.value||'').trim();
  const rule=state.config.rules.find(r=>r.id===ruleId);
  if(!rule)throw new C.RuleError('bad_id');
@@ -3174,7 +3267,7 @@ async function addToExistingRule(ruleId,{runNow=false}={}){
  if(button)button.disabled=true;
  try{
   const res=await rpc('importConditions',{ruleId,text:rawVal,revision:state.config.revision});
-  dirty=false;renderStatus(res.snapshot);loadRule(ruleId);
+  dirty=false;renderStatus(res.snapshot);loadRule(ruleId,'',{openEditor:false});
   if($('quickValue'))$('quickValue').value='';
   await updateQuickPreview();
   quickHints=null;await loadQuickHints(true);
@@ -3189,6 +3282,7 @@ async function addToExistingRule(ruleId,{runNow=false}={}){
  }
 }
 async function createQuickRule({runNow=false}={}){
+ if(dirty&&!confirm(T('confirmDiscardEditor')))return;
  const field=$('quickField')?.value||'domain';
  const rawVal=($('quickValue')?.value||'').trim();
  const targetId=$('quickTarget')?.value||'';
@@ -3200,7 +3294,7 @@ async function createQuickRule({runNow=false}={}){
   const res=await rpc('quickRule',{field,value:rawVal,target:targetId,sourceAccount:$('source')?.value||'',
    moveUnread:$('quickMoveUnread')?.checked!==false,openWindow:$('quickOpenWindow')?.checked===true,revision:state.config.revision});
   rememberQuickTarget(targetId);
-  dirty=false;renderStatus(res.snapshot);loadRule(res.ruleId);
+  dirty=false;renderStatus(res.snapshot);loadRule(res.ruleId,'',{openEditor:false});
   if($('quickValue'))$('quickValue').value='';
   quickHints=null;
   await updateQuickPreview();
@@ -3251,7 +3345,7 @@ handle('test','click',async()=>{
  for(const [flag,key] of [[result.paused,'testPaused'],[result.dryRun,'testDryRun'],[result.trial,'testTrial'],[result.fault,'testStopped']])if(flag)box.append(el('p','test-block',T(key)));
 
 });
-handle('delete','click',async()=>{if(!selectedId||!confirm(T('confirmDelete')))return;const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==selectedId),revision:editRevision});dirty=false;renderStatus(next);loadRule();});
+handle('delete','click',async()=>{if(!selectedId||!confirm(T('confirmDelete')))return;const next=await rpc('saveRules',{rules:state.config.rules.filter(r=>r.id!==selectedId),revision:editRevision});dirty=false;renderStatus(next);loadRule('','',{openEditor:false});setRulePanel('list');});
 for(const [id,step] of [['up',-1],['down',1]])handle(id,'click',()=>moveRulePriority(selectedId,step));
 handle('pause','click',async()=>{renderStatus(await rpc('setMode',{revision:state.config.revision,paused:!state.config.paused,dryRun:state.config.dryRun}));});
 handle('mode','click',async()=>{
@@ -3650,6 +3744,6 @@ if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
 (async()=>{
  applyVersionLabel();
  if($('installWarnHide'))handle('installWarnHide','click',()=>{installWarnDismissed=true;if($('installWarn'))$('installWarn').hidden=true;});
-try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'');await applyPrefill();}
+try{if(DEMO)$('demoBanner').hidden=false;folders=await rpc('folders');renderStatus(await rpc('status'));loadRule(state.prefs.lastRule||state.config.rules[0]?.id||'','',{openEditor:false});await applyPrefill();}
  catch(e){$('statusPill').textContent=T('pillDisconnected');$('notice').hidden=false;$('notice').textContent=Terr(e.code);$('notice').className='notice error';}
 })();

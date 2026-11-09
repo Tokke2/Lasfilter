@@ -65,6 +65,60 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>rows()>0,'gränssnittet laddas med demon');
  check(true,'gränssnittet laddas utan skriptfel');
 
+ /* --- En uppgift per flik; navigering får aldrig spara eller kasta utkast. --- */
+ check(!el('rulesLibrary').hidden&&el('ruleEditor').hidden,'starten visar bara regellistan, inte en tom editor');
+ check(doc.querySelectorAll('.app-tabs [role="tab"]').length===6,'sex namngivna flikar i stället för en ikonmeny');
+ check(el('quickRuleBox').closest('.view')===el('view-suggestions')&&el('quickChips').closest('.view')===el('view-suggestions'),'snabbregel och Inkorgschips hör bara till Föreslagna regler');
+ check(el('learnBar').closest('.view')===el('view-suggestions')&&el('templateBar').closest('.view')===el('view-suggestions'),'inlärda förslag och mallar har samma egna flik');
+ check(el('quickHintsBtn')?.closest('.view')===el('view-suggestions'),'Läs Inkorgen igen finns kvar som riktig knapp');
+ check(el('countMoved').closest('.view')===el('view-activity')&&el('whyBtn').closest('.view')===el('view-activity'),'statistik och felsökning finns i Aktivitet');
+ check(el('introCard').closest('.view')===el('view-help')&&el('setupSteps').closest('.view')===el('view-help'),'introduktion och kom-igång-steg visas bara i Hjälp');
+ check(doc.querySelectorAll('.settings-section').length===5&&doc.querySelectorAll('.settings-section[open]').length===1,'Inställningar börjar med fem grupper och bara Utseende öppet');
+ const navigationConfig=JSON.stringify(w.LasDemo.setState({}).config),navigationRule=w.LasDemo.setState({}).config.rules[0].id;
+ doc.querySelector('.rule-open').click();
+ check(el('rulesLibrary').hidden&&!el('ruleEditor').hidden,'redigering ersätter listan i stället för att trängas bredvid');
+ el('ruleName').value='Osparat flikutkast åäö';fire(el('ruleName'),'input');
+ const navigationCondition=el('conditions').firstElementChild;
+ const navigationDraft=w.eval('JSON.stringify(draft())');
+ for(const view of ['suggestions','activity','settings','help','support','rules']){
+  el('tab-'+view).click();
+  check(!el('view-'+view).hidden&&[...doc.querySelectorAll('.view')].filter(n=>!n.hidden).length===1,'endast rätt panel syns: '+view);
+  check(el('tab-'+view).getAttribute('aria-selected')==='true'&&doc.querySelectorAll('.app-tabs [aria-selected="true"]').length===1,'entydigt vald flik: '+view);
+  check(!el('pause').closest('[hidden]')&&!el('mode').closest('[hidden]')&&!el('runTitle').closest('[hidden]'),'paus, flyttläge och status tillgängliga i '+view);
+ }
+ check(w.eval('JSON.stringify(draft())')===navigationDraft&&w.eval('dirty'),'alla flikbyten bevarar osparat utkast');
+ check(el('conditions').firstElementChild===navigationCondition,'flikbyte bygger inte om villkorsraderna');
+ el('backToRules').click();check(!el('rulesLibrary').hidden&&el('ruleEditor').hidden&&!el('resumeEditor').hidden,'Alla regler visar listan med Fortsätt redigera');
+ check(doc.activeElement===el('resumeEditor'),'fokus hamnar på en synlig kontroll efter Tillbaka');
+ el('resumeEditor').click();check(el('ruleName').value==='Osparat flikutkast åäö'&&doc.activeElement===el('ruleName'),'fortsatt redigering behåller utkast och placerar fokus');
+ const navigationConfirm=w.confirm;let navigationPrompts=0;
+ w.confirm=()=>{navigationPrompts++;return false;};
+ el('tab-suggestions').click();
+ let navigationWrites=0;const navigationRequest=w.LasDemo.request.bind(w.LasDemo);
+ w.LasDemo.request=async message=>{if(['quickRule','learnCreate','importConditions','catchUp','saveRules'].includes(message.type))navigationWrites++;return navigationRequest(message);};
+ el('quickAddBtn').click();await sleep(30);
+ check(navigationPrompts===1&&navigationWrites===0,'ny snabbregel frågar först; avbryt skickar ingen skrivning eller flytt');
+ el('quickExisting').value=navigationRule;fire(el('quickExisting'),'change');el('quickAddRunBtn').click();await sleep(30);
+ check(navigationPrompts===2&&navigationWrites===0,'lägg till i befintlig regel och kör respekterar avbrutet utkastbyte');
+ const navigationLearn=w.LasDemo.setState({}).learn;
+ w.LasDemo.setState({learn:{off:false,suggestions:[{key:'tab-test',domain:'tab.example',target:'demo-fin',count:3}]}});await w.refresh();
+ el('learnBar').querySelector('.primary').click();await sleep(30);
+ check(navigationPrompts===3&&navigationWrites===0,'även inlärda förslag skyddar utkastet i en annan flik');
+ w.LasDemo.setState({learn:navigationLearn});w.LasDemo.request=navigationRequest;w.confirm=navigationConfirm;
+ el('quickExisting').value='';fire(el('quickExisting'),'change');await w.refresh();
+ check(w.eval('JSON.stringify(draft())')===navigationDraft&&w.eval('dirty'),'avbrutna förslag har inte ändrat editorn');
+ check(JSON.stringify(w.LasDemo.setState({}).config)===navigationConfig,'navigering och avbrutna förslag ändrar aldrig sparade regler');
+ el('tab-rules').focus();el('tab-rules').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+ check(doc.activeElement===el('tab-suggestions')&&!el('view-suggestions').hidden,'högerpil väljer nästa flik och flyttar fokus');
+ doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));check(doc.activeElement===el('tab-support'),'End väljer sista fliken');
+ doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));check(doc.activeElement===el('tab-rules'),'piltangenter sveper runt från sista till första fliken');
+ doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));check(doc.activeElement===el('tab-support'),'vänsterpil sveper runt till sista fliken');
+ doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Home',bubbles:true}));check(doc.activeElement===el('tab-rules'),'Home väljer första fliken');
+ w.eval('applyLanguage("en")');check(txt('tab-suggestions').includes('Suggested rules')&&txt('tab-settings').trim().includes('Settings'),'de nya flikarna översätts till engelska');
+ check(w.eval('JSON.stringify(draft())')===navigationDraft,'språkbyte behåller utkastet');
+ w.eval('applyLanguage("sv");dirty=false;loadRule(state.config.rules[0].id,"",{openEditor:false});setRulePanel("list");editorVisited=false;$("resumeEditor").hidden=true;showView("rules");');
+ await w.refresh();
+
  /* --- Sidfoten: versionen ska komma från manifestet, inte från ui.html --- */
  await until(()=>/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version');
  check(/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version, inte texten i ui.html');

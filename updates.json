@@ -3,9 +3,9 @@
     "lasfilter@lokala-verktyg.invalid": {
       "updates": [
         {
-          "version": "1.0.21",
+          "version": "1.0.22",
           "update_link": "https://github.com/Tokke2/Lasfilter/releases/latest/download/SortBro-Thunderbird.xpi",
-          "update_hash": "sha256:344759e56e6f3ecc5c1b2aae323f0cca2a7061d6ef177702a87ca758823a38b3",
+          "update_hash": "sha256:50ff222e3a08458759bed11800e30545ee698e61456b8ae5af62c954940f108e",
           "update_info_url": "https://github.com/Tokke2/Lasfilter/releases/latest"
         }
       ]

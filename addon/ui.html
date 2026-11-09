@@ -2100,6 +2100,27 @@ order@fortnox.se, nyheter@klarna.se"
       </div>
     </div>
 
+
+    <div id="senderModal" class="modal" hidden>
+      <section class="modal-card sender-dialog" role="dialog" aria-modal="true" aria-labelledby="senderTitle" aria-describedby="senderHelp" tabindex="-1">
+        <h2 id="senderTitle" data-i18n="senderTitle">Regel från avsändaren</h2>
+        <div class="sender-dialog-body">
+        <p id="senderHelp" data-i18n="senderHelp">Välj en befintlig regel eller öppna ett nytt utkast. Målmappen visas vid varje regel.</p>
+        <p id="senderAddress" class="technical-value"></p>
+        <label class="field"><span data-i18n="senderType">Vad ska läggas till?</span><select id="senderType"><option value="address" data-i18n="senderExact">Bara denna e-postadress</option><option value="domain" data-i18n="senderDomain">Alla avsändare på domänen</option></select></label>
+        <label class="field"><span data-i18n="senderRuleLabel">Regel och målmapp</span><select id="senderRule"></select></label>
+        <div id="senderPreview" class="sender-preview" aria-live="polite"></div>
+        <p id="senderError" class="notice error" role="alert" hidden></p>
+        <p class="muted" data-i18n="senderSaveNote">Spara startar ingen manuell körning. Ordinarie bevakning fortsätter enligt dina inställningar.</p>
+        </div>
+        <div class="modal-actions">
+          <button id="senderSave" type="button" class="button primary">Spara ändringen</button>
+          <button id="senderRun" type="button" class="button secondary" data-i18n="senderSaveRun">Spara och kör regeln nu</button>
+          <button id="senderCancel" type="button" class="button secondary" data-i18n="cancelBtn">Avbryt</button>
+        </div>
+      </section>
+    </div>
+
     <script src="core.js"></script>
     <script src="filters.js"></script>
     <script src="demo.js"></script>

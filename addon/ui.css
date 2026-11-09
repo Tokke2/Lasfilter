@@ -2949,3 +2949,17 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 }
 
 .status-details > .button { margin-top: 10px; }
+
+/* Sender chooser shares the existing modal's keyboard/focus conventions. */
+.sender-dialog { width: min(760px, calc(100vw - 32px)); }
+.sender-preview { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; background: var(--bg); }
+.sender-preview p { margin: 8px 0; overflow-wrap: anywhere; }
+.sender-dialog .notice { margin-block: 12px; }
+.sender-dialog select { width: 100%; }
+.sender-dialog .modal-actions { flex-wrap: wrap; }
+.sender-dialog { display: flex; flex-direction: column; overflow: hidden; }
+.sender-dialog > h2, .sender-dialog > .modal-actions { flex: none; }
+.sender-dialog-body { overflow-y: auto; min-height: 0; padding: 2px 4px; }
+.sender-dialog > .modal-actions { border-top: 1px solid var(--line); padding-top: 14px; }
+
+.sender-rule-name { font-weight: 650; }

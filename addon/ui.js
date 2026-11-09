@@ -6,6 +6,36 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  senderTitle:"Regel från avsändaren",
+  senderHelp:"Välj en befintlig regel eller öppna ett nytt utkast. Målmappen visas vid varje regel.",
+  senderType:"Vad ska läggas till?",
+  senderExact:"Bara denna e-postadress",
+  senderDomain:"Alla avsändare på domänen",
+  senderRuleLabel:"Regel och målmapp",
+  senderNew:"Skapa ny regel…",
+  senderSave:"Spara ändringen",
+  senderOpen:"Öppna nytt regelutkast",
+  senderSaveRun:"Spara och kör regeln nu",
+  senderSaveNote:"Spara startar ingen manuell körning. Ordinarie bevakning fortsätter enligt dina inställningar.",
+  senderNewNote:"Välj målmapp och kontrollera regeln i editorn. Ingenting sparas förrän du väljer Spara där.",
+  senderBefore:"Nuvarande villkor: ",
+  senderAfter:"Efter sparning: ",
+  senderSource:"Källa: ",
+  senderTarget:"Mål: ",
+  senderOutside:"Mejlet ligger utanför regelns källa. Källan ändras inte när du lägger till avsändaren.",
+  senderPolicy:"Befintliga inställningar för lästa/olästa, årsmappar, provkörning och alternativa mål behålls.",
+  senderDuplicate:"Avsändaren/domänen omfattas redan av ett av regelns avsändarvillkor. Regeln ändras inte.",
+  senderMultiple:"Markera ett enda mejl och högerklicka igen. Flera markerade mejl behandlas inte här.",
+  senderAnd:"Regeln har flera OCH-villkor. Att lägga till en alternativ avsändare kan inte göras utan att ändra logiken. Skapa en separat regel i stället; den befintliga ändras inte.",
+  senderFull:"Regeln har redan åtta villkor. Välj en annan regel eller skapa en ny.",
+  senderInvalid:"Mejlet saknar en giltig avsändaradress. Ingen regel kan skapas här.",
+  senderStale:"Reglerna har ändrats sedan rutan öppnades. Avbryt och högerklicka på mejlet igen för att granska den nya versionen.",
+  senderRunConfirm:"Spara ändringen i ”{name}” och kör regeln? Detta kontrollerar alla mejl i regelns källa, inte bara det högerklickade mejlet. Testläge, paus, läsläge och säkerhetsbroms gäller fortfarande.",
+  senderSaved:"Avsändaren har lagts till. Regeln är sparad.",
+  senderRunFailed:"Regeln sparades, men körningen misslyckades: ",
+  senderRunning:"Regeln sparades. Kontrollerar mejl…",
+  senderRunResult:"Regeln sparades. Kontrollerade {n} mejl, köade {q}.",
+  senderDisabled:"Regeln är avstängd. Tillägget sparas, men regeln aktiveras inte automatiskt.",
   introHide:"Dölj introduktion",
   introShow:"Visa introduktion",
   densityLabel:"Layout",
@@ -810,6 +840,36 @@ const I18N={
   }
  },
  en:{
+  senderTitle:"Rule from sender",
+  senderHelp:"Choose an existing rule or open a new draft. Each rule shows its destination folder.",
+  senderType:"What should be added?",
+  senderExact:"Only this email address",
+  senderDomain:"All senders on this domain",
+  senderRuleLabel:"Rule and destination",
+  senderNew:"Create a new rule…",
+  senderSave:"Save change",
+  senderOpen:"Open new rule draft",
+  senderSaveRun:"Save and run this rule now",
+  senderSaveNote:"Saving does not start a manual run. Normal monitoring continues according to your settings.",
+  senderNewNote:"Choose a destination and review the rule in the editor. Nothing is saved until you choose Save there.",
+  senderBefore:"Current conditions: ",
+  senderAfter:"After saving: ",
+  senderSource:"Source: ",
+  senderTarget:"Destination: ",
+  senderOutside:"The message is outside this rule’s source. Adding the sender does not change the source.",
+  senderPolicy:"Existing read/unread settings, year folders, trial mode and alternative destinations are preserved.",
+  senderDuplicate:"This sender/domain is already covered by one of the rule’s sender conditions. The rule is unchanged.",
+  senderMultiple:"Select just one message and right-click again. Multiple selected messages are not processed here.",
+  senderAnd:"This rule has multiple AND conditions. Adding an alternative sender would require changing the logic. Create a separate rule instead; the existing rule is unchanged.",
+  senderFull:"This rule already has eight conditions. Choose another rule or create a new one.",
+  senderInvalid:"The message has no valid sender address. No rule can be created here.",
+  senderStale:"Rules have changed since this dialog opened. Cancel and right-click the message again to review the new version.",
+  senderRunConfirm:"Save the change to “{name}” and run this rule? This checks all messages in the rule’s source, not just the right-clicked message. Test mode, pause, read settings and the safety brake still apply.",
+  senderSaved:"Sender added. The rule is saved.",
+  senderRunFailed:"The rule was saved, but running it failed: ",
+  senderRunning:"Rule saved. Checking messages…",
+  senderRunResult:"Rule saved. Checked {n} messages, queued {q}.",
+  senderDisabled:"This rule is disabled. The addition is saved, but the rule will not be enabled automatically.",
   introHide:"Hide introduction",
   introShow:"Show introduction",
   densityLabel:"Layout",
@@ -1736,7 +1796,7 @@ function applyLanguage(lang){
  for(const node of document.querySelectorAll('[data-i18n-aria]'))node.setAttribute('aria-label',T(node.dataset.i18nAria));
  for(const node of document.querySelectorAll('[data-i18n-title]'))node.title=T(node.dataset.i18nTitle);
  for(const select of document.querySelectorAll('#folderModal .folder-choice, #tbImportReview .folder-choice'))folderPicker(select,select.value);
- updateReadPolicy();updateMatchHelp();if(folderTreeSession)renderFolderTree();
+ updateReadPolicy();updateMatchHelp();if(folderTreeSession)renderFolderTree();if(senderSession)renderSenderPreview();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
  if(state)applySeason(state.prefs);
  repaint();
@@ -2050,7 +2110,7 @@ function closeFolderModal(){
  if(folderTreeSession?.root)closeFolderTree();
  $('folderModal').hidden=true;document.querySelector('.shell').inert=false;
  if(folderReturnFocus?.isConnected)folderReturnFocus.focus();
- folderReturnFocus=null;
+ folderReturnFocus=null;retrySenderPrefill();
 }
 function openFolderModal(presetAccountId,suggestedName='',opener=document.activeElement){
  const modal=$('folderModal');if(!modal)return;
@@ -2078,27 +2138,116 @@ async function createFolderFromModal(){
  renderRules();toast(T('toastFolderCreated'));
 }
 
-/* ===== Högerklicksmeny i Thunderbird: ny regel från mejl ===== */
-async function applyPrefill(){
- if(!live||DEMO)return false;
- let data=null;
- try{data=await rpc('pendingPrefill');}catch{return false;}
- if(!data)return false;
- await rpc('prefillConsumed').catch(()=>{});
- if(dirty&&!confirm(T('confirmDiscard')))return false;
- loadRule('',data.accountId||'');
- const row=$('conditions')?.children?.[0];
- if(row){
-  const field=row.children[0];
-  field.value=data.domain?'domain':(data.email?'sender':'subject');
-  field.dispatchEvent(new Event('change',{bubbles:true}));
-  row.children[2].value=(data.domain||data.email||data.subject||'').slice(0,256);
+/* Högerklick: transaktionell väljare. Befintligt utkast ändras aldrig vid öppning/Avbryt. */
+let senderSession=null,prefillLoading=false,prefillWaiting=false;
+function retrySenderPrefill(){if(prefillWaiting)queueMicrotask(()=>applyPrefill().catch(alertError));}
+function openSenderModal(data){
+ if(senderSession||!$('folderModal').hidden||folderTreeSession)return false;
+ senderSession={data:structuredClone(data),rules:structuredClone(state.config.rules),revision:state.config.revision,focus:document.activeElement,busy:false,stale:false};
+ $('senderType').value='address';
+ const options=[el('option','',T('senderNew'))];options[0].value='';
+ for(const rule of senderSession.rules){const option=el('option','',rule.name+' → '+label(rule.target)+(rule.enabled?'':' · '+T('ruleOff')));option.value=rule.id;options.push(option);}
+ $('senderRule').replaceChildren(...options);
+ $('senderRule').value=data.action==='add'?(senderSession.rules.find(r=>r.id===selectedId)?.id||senderSession.rules[0]?.id||''):'';
+ $('senderError').hidden=true;
+ document.querySelector('.shell').inert=true;$('senderModal').hidden=false;
+ renderSenderPreview();$('senderType').focus();return true;
+}
+function closeSenderModal(){
+ if(!senderSession||senderSession.busy)return;
+ const focus=senderSession.focus;senderSession=null;$('senderModal').hidden=true;document.querySelector('.shell').inert=false;
+ if(focus?.isConnected&&focus.tabIndex>=0&&!focus.closest('[hidden],[inert]'))focus.focus();else document.querySelector('.nav.active')?.focus();
+ retrySenderPrefill();
+}
+function senderPlan(){
+ const s=senderSession;if(!s)return null;
+ if(s.stale)throw new C.RuleError('stale_config');
+ if(s.data.selectionCount>1)throw new C.RuleError('sender_multiple');
+ const condition=C.senderCondition(s.data.email,$('senderType').value==='domain');
+ const id=$('senderRule').value,rule=s.rules.find(r=>r.id===id);
+ if(id&&!rule)throw new C.RuleError('bad_id');
+ return rule?{...C.addSenderCondition(rule,s.data.email,$('senderType').value==='domain'),original:rule}:{condition,rule:null,duplicate:false};
+}
+function senderErrorText(code){
+ const key=({sender_invalid:'senderInvalid',sender_and:'senderAnd',sender_full:'senderFull',sender_multiple:'senderMultiple',stale_config:'senderStale'})[code];
+ return key?T(key):Terr(code);
+}
+function renderSenderPreview(){
+ const s=senderSession;if(!s)return;
+ $('senderRule').options[0].textContent=T('senderNew');
+ $('senderAddress').textContent=C.email(s.data.email)||T('senderInvalid');
+ const box=$('senderPreview');box.replaceChildren();$('senderError').hidden=true;
+ const existing=!!$('senderRule').value;$('senderSave').textContent=T(existing?'senderSave':'senderOpen');$('senderRun').hidden=!existing;
+ $('senderSave').disabled=$('senderRun').disabled=s.busy;
+ for(const id of ['senderType','senderRule','senderCancel'])$(id).disabled=s.busy;
+ const paragraph=(text,cls='')=>box.append(el('p',cls,text));
+ try{
+  const plan=senderPlan();
+  if(plan.original){
+   const rule=plan.original;
+   paragraph(rule.name,'sender-rule-name');
+   paragraph(T('senderSource')+(rule.scope==='account'?(accounts().find(a=>a.id===rule.sourceAccount)?.name||rule.sourceAccount):label(rule.source)));
+   paragraph(T('senderTarget')+label(rule.target));
+   paragraph(T('senderBefore')+rule.conditions.map(ruleConditionLabel).join(' '+T(rule.match==='all'?'conditionAnd':'conditionOr')+' '));
+   paragraph(T('senderAfter')+plan.rule.conditions.map(ruleConditionLabel).join(' '+T(plan.rule.match==='all'?'conditionAnd':'conditionOr')+' '));
+   paragraph(T('senderPolicy'),'muted');
+   if(rule.scope==='account'?rule.sourceAccount!==s.data.accountId:rule.source!==s.data.folderId)paragraph(T('senderOutside'),'notice');
+   if(!rule.enabled){paragraph(T('senderDisabled'),'notice');$('senderRun').disabled=true;}
+   if(plan.duplicate){paragraph(T('senderDuplicate'),'notice');$('senderSave').disabled=$('senderRun').disabled=true;}
+  }else{paragraph(ruleConditionLabel(plan.condition));paragraph(T('senderNewNote'),'muted');}
+ }catch(err){$('senderError').textContent=senderErrorText(err.code);$('senderError').hidden=false;$('senderSave').disabled=$('senderRun').disabled=true;}
+}
+async function saveSenderChoice(runNow=false){
+ const s=senderSession;if(!s||s.busy)return;
+ const plan=senderPlan();if(plan.duplicate)return;
+ if(runNow&&(!plan.original||!confirm(T('senderRunConfirm').replace('{name}',plan.original.name))))return;
+ if(dirty&&!confirm(T('confirmDiscardEditor')))return;
+ if(!plan.original){
+  closeSenderModal();loadRule('',s.data.accountId||'');
+  $('conditions').replaceChildren();addCondition(plan.condition);$('ruleName').value=(T('defaultRulePrefix')+plan.condition.value).slice(0,100);
+  dirty=true;updateRuleExplanation();$('ruleName').focus();toast(T('toastPrefill'));return;
  }
- if($('ruleName')&&!$('ruleName').value.trim())$('ruleName').value=(T('defaultRulePrefix')+(data.domain||data.email||T('defaultSenderFallback'))).slice(0,100);
- dirty=true;updateRuleExplanation();showView('rules');
- $('ruleName')?.focus();
- toast(T('toastPrefill'));
- return true;
+ s.busy=true;renderSenderPreview();
+ let result;
+ try{
+  result=await rpc('addSenderToRule',{ruleId:plan.original.id,email:s.data.email,wholeDomain:$('senderType').value==='domain',revision:s.revision});
+ }catch(err){
+  s.busy=false;if(err.code==='stale_config')s.stale=true;renderSenderPreview();
+  $('senderError').textContent=senderErrorText(err.code);$('senderError').hidden=false;return;
+ }
+ s.busy=false;closeSenderModal();renderStatus(result.snapshot);
+ if(result.duplicate){toast(T('senderDuplicate'));return;}
+ dirty=false;loadRule(result.ruleId,'',{openEditor:false});setRulePanel('list');showView('rules');
+ document.querySelector('.nav.active')?.focus();toast(T('senderSaved'));
+ if(runNow){
+  toast(T('senderRunning'));
+  try{const r=await rpc('catchUp',{ruleId:result.ruleId,revision:result.snapshot.config.revision});await refresh();toast(T('senderRunResult').replace('{n}',r.scanned).replace('{q}',r.queued));}
+  catch(err){toast(T('senderRunFailed')+Terr(err.code),true);}
+ }
+}
+handle('senderType','change',renderSenderPreview);handle('senderRule','change',renderSenderPreview);
+handle('senderSave','click',()=>saveSenderChoice(false));handle('senderRun','click',()=>saveSenderChoice(true));handle('senderCancel','click',closeSenderModal);
+handle('senderModal','click',event=>{if(event.target===$('senderModal'))closeSenderModal();});
+handle('senderModal','keydown',event=>{
+ if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeSenderModal();return;}
+ if(event.key!=='Tab')return;
+ const items=modalFocusItems($('senderModal')),first=items[0],last=items.at(-1);
+ if(!first){event.preventDefault();return;}
+ if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
+document.addEventListener('focusin',event=>{if(senderSession&&!$('senderModal').contains(event.target)){
+ const target=modalFocusItems($('senderModal'))[0]||$('senderModal').querySelector('[role="dialog"]');target.focus();
+}});
+async function applyPrefill(){
+ if(!live||DEMO||prefillLoading||senderSession||folderTreeSession||!$('folderModal').hidden)return false;
+ prefillLoading=true;prefillWaiting=false;
+ try{
+  const data=await rpc('pendingPrefill');if(!data){retrySenderPrefill();return false;}
+  renderStatus(await rpc('status'));
+  if(!openSenderModal(data)){prefillWaiting=true;return false;}
+  await rpc('prefillConsumed',{token:data.token}).catch(()=>{});return true;
+ }finally{prefillLoading=false;}
 }
 
 function currentToken(){return JSON.stringify(state.config.rules);}
@@ -2543,6 +2692,7 @@ function closeFolderTree(){
  if(session.opener.isConnected&&!session.opener.disabled)session.opener.focus();
  else if(!$('folderModal').hidden)$('folderName').focus();
  else document.querySelector('.nav.active')?.focus();
+ retrySenderPrefill();
 }
 function renderFolderTree(reveal=false){
  const s=folderTreeSession;if(!s)return;
@@ -3739,7 +3889,7 @@ async function refresh(){
 }
 if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
  if(msg?.event==='statusChanged')refresh();
- if(msg?.event==='ruleFromMessage')applyPrefill().catch(()=>{});
+ if(msg?.event==='ruleFromMessage'){prefillWaiting=true;applyPrefill().catch(alertError);}
 });
 (async()=>{
  applyVersionLabel();

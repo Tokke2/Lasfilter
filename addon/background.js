@@ -1,6 +1,6 @@
 'use strict';
 const C=LasCore,B=browser;
-const App={engine:null,logs:[],errorLogs:[],backups:[],prefs:{theme:'system',fontSize:14,density:'comfortable',lineSpacing:'normal',introCollapsed:false,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
+const App={engine:null,logs:[],errorLogs:[],backups:[],prefs:{theme:'system',fontSize:14,density:'comfortable',lineSpacing:'normal',introCollapsed:false,lastRule:'',lastTarget:'',lang:'sv',season:'auto'},writeChain:Promise.resolve(),editChain:Promise.resolve(),mailTab:null,uiTab:null,timer:null,sweepTimer:null,kickTimer:null,logTimer:null,fileLogTimer:null,changeTimer:null,keepUnread:new Map(),prefill:null,prefillSerial:0,lastAutoSweep:null,lastTickAt:0,startedAt:0,startSweepDone:false,
  /* "Lär av din flytt": domäner du själv flyttat till en mapp. Bara domän, mapp
     och antal sparas – aldrig ämne, namn eller mejltext. */
  learned:{off:false,entries:[],snooze:{}}};
@@ -833,12 +833,23 @@ App.handle=async msg=>{
    App.checkRevision(msg.revision);
    return App.importConditions(msg);
   });
+  case 'addSenderToRule':return App.mutate(async()=>{
+   App.checkRevision(msg.revision);
+   const rule=e.config.rules.find(r=>r.id===msg.ruleId);if(!rule)throw new C.RuleError('bad_id');
+   const plan=C.addSenderCondition(rule,msg.email,msg.wholeDomain===true);
+   if(plan.duplicate)return {duplicate:true,ruleId:rule.id,snapshot:App.snapshot()};
+   await App.checkRules([plan.rule]);
+   const rules=e.config.rules.map(r=>r.id===rule.id?plan.rule:r);
+   await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
+   App.log('rules_saved',rules.length);App.scheduleAutoBackup();
+   return {duplicate:false,ruleId:rule.id,snapshot:App.snapshot()};
+  });
   case 'quickRule':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    return App.quickRule(msg);
   });
   case 'pendingPrefill':return App.prefill;
-  case 'prefillConsumed':{App.prefill=null;return true;}
+  case 'prefillConsumed':{if(App.prefill?.token===msg.token)App.prefill=null;return true;}
   case 'selected':{
    const m=await App.selected();return {author:m.author,subject:m.subject,read:m.read,source:m.folder?.id,sourceAccount:m.folder?.accountId||'',email:C.email(m.author),domain:C.email(m.author).split('@')[1]||''};
   }
@@ -855,6 +866,7 @@ App.handle=async msg=>{
    App.log('simulated',1);return {matches,reason,conditions:C.explainRule(r,m).conditions.map(c=>c.ok),paused:e.config.paused===true,dryRun:e.config.dryRun===true,trial:C.trialActive(r),fault:!!e.fault,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&(r.scope==='account'?m.folder?.accountId!==r.sourceAccount:m.folder?.id!==r.source))};
   }
   case 'catchUp':{
+   if(msg.revision!==undefined)App.checkRevision(msg.revision);
    const r=await App.engine.catchUp(msg.ruleId);
    for(const j of App.engine.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
    App.kick();
@@ -1319,7 +1331,7 @@ App.rulePrefillFromMessage=message=>{
  return {author:message?.author||'',email:address,domain:address.split('@')[1]||'',subject:typeof message?.subject==='string'?message.subject.slice(0,256):'',
   folderId:message?.folder?.id||'',accountId:message?.folder?.accountId||'',time:new Date().toISOString()};
 };
-App.ruleFromMessage=async info=>{
+App.ruleFromMessage=async (info,action='new')=>{
  const list=info?.selectedMessages?.messages;
  const first=Array.isArray(list)&&list.length?list[0]:null;
  const folder=info?.displayedFolder||first?.folder;
@@ -1328,7 +1340,7 @@ App.ruleFromMessage=async info=>{
  if(!message.author||message.subject===undefined){
   try{message=await B.messages.get(message.id);}catch{return false;}
  }
- App.prefill=App.rulePrefillFromMessage({...message,folder:message.folder||folder});
+ App.prefill={...App.rulePrefillFromMessage({...message,folder:message.folder||folder}),action,selectionCount:list.length,token:String(++App.prefillSerial)};
  App.log('debug',0,'regelforslag fran hogerklicksmeny');
  const tabs=await B.tabs.query({active:true,currentWindow:true}).catch(()=>[]);
  await App.open(tabs?.[0]);
@@ -1338,21 +1350,26 @@ App.ruleFromMessage=async info=>{
 /* Snabbmenyn skapas en gång, men titeln ska följa språkvalet som allt annat.
    Den skapas innan inställningarna är inlästa, så titeln synkas om så snart de
    finns – och varje gång språket byts. */
-const MENU_ID='sortbro-rule-from-message';
-App.menuTitle=()=>App.prefs?.lang==='en'?'SortBro: Create a filter from this message…':'SortBro: Skapa filter från detta mejl…';
+const MENU_ID='sortbro-rule-from-message',ADD_SENDER_MENU_ID='sortbro-add-sender';
+App.menuTitle=()=>App.prefs?.lang==='en'?'SortBro: Create a rule from this sender…':'SortBro: Skapa regel från avsändaren…';
+App.addSenderMenuTitle=()=>App.prefs?.lang==='en'?'SortBro: Add sender to an existing rule…':'SortBro: Lägg avsändaren i en befintlig regel…';
 App.syncMenu=()=>{
  try{
   if(!B.menus?.update)return;
+  Promise.resolve(B.menus.update(ADD_SENDER_MENU_ID,{title:App.addSenderMenuTitle()})).catch(()=>{});
   Promise.resolve(B.menus.update(MENU_ID,{title:App.menuTitle()})).catch(()=>{});
  }catch{}
 };
 try{
- if(B.menus?.create)Promise.resolve(B.menus.create({id:MENU_ID,title:App.menuTitle(),contexts:['message_list']})).catch(()=>{});
+ if(B.menus?.create){
+  Promise.resolve(B.menus.create({id:MENU_ID,title:App.menuTitle(),contexts:['message_list']})).catch(()=>{});
+  Promise.resolve(B.menus.create({id:ADD_SENDER_MENU_ID,title:App.addSenderMenuTitle(),contexts:['message_list']})).catch(()=>{});
+ }
 }catch{}
 App.ready.then(()=>App.syncMenu()).catch(()=>{});
 if(B.menus?.onClicked)B.menus.onClicked.addListener((info,tab)=>{
- if(info?.menuItemId!=='sortbro-rule-from-message')return;
- App.ruleFromMessage(info).catch(()=>App.log('error',0,'hogerklicksmeny_misslyckades'));
+ if(![MENU_ID,ADD_SENDER_MENU_ID].includes(info?.menuItemId))return;
+ App.ruleFromMessage(info,info.menuItemId===ADD_SENDER_MENU_ID?'add':'new').catch(()=>App.log('error',0,'hogerklicksmeny_misslyckades'));
 });
 B.folders.onFolderInfoChanged.addListener(()=>{
  App.engine?.invalidateFolders();

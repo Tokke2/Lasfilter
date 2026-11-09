@@ -54,7 +54,12 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
   - Snabbvägen: i **⚡ Skapa regel på tio sekunder** väljer du *Lägg till i: \<regel\>* i listan och trycker knappen – då läggs avsändaren in i den regeln direkt, och **⚡ Lägg till och flytta nu** kör den också. Har regeln villkor sedan tidigare frågar SortBro först, eftersom nya avsändare blir alternativ (ELLER).
 - **1-klicksmallar:** *Fakturor & Kvitton*, *Order & Leverans*, *Nyhetsbrev*, *System & Notiser* och *Bokföring* fyller i regelnamn och villkor. Om en mapp med passande namn finns väljs den automatiskt som mål; annars väljer du målmapp och sparar.
 - **＋ Ny mapp:** skapar målmappen direkt i Thunderbird (via tilläggets mapp-API) och väljer den som mål. Mappen kan skapas både från regelkortet och från snabbformuläret.
-- **Högerklicksmeny på mejl:** *SortBro: Skapa filter från detta mejl…* öppnar SortBro med en ny regel förifylld från mejlet (avsändardomän, adress eller ämne). Regeln sparas först när du själv trycker Spara.
+- **Högerklicksmeny på mejl:** markera ett enda mejl i Thunderbirds mejllista och välj **SortBro: Lägg avsändaren i en befintlig regel…** eller **SortBro: Skapa regel från avsändaren…**.
+  - Väljaren visar adressen, befintliga regler och deras målmappar. **Bara denna e-postadress** är standard; **Alla avsändare på domänen** kräver ett uttryckligt val.
+  - För en befintlig regel visas källa, mål och villkor före/efter ändringen. **Spara ändringen** sparar utan manuell körning. **Spara och kör regeln nu** kräver ytterligare bekräftelse och kontrollerar hela regelns källa, inte bara det högerklickade mejlet. Ordinarie bevakning fortsätter enligt befintliga inställningar efter sparning.
+  - Ett enda villkor kan få ett ELLER-alternativ, och ELLER-regler kan utökas. **Regler med flera OCH-villkor breddas inte automatiskt**; välj en separat ny regel i stället. Dubbletter och redan täckande exakta domänvillkor upptäcks. Fulla regler får inte fler än åtta villkor.
+  - För en ny regel öppnas ett osparat utkast i editorn; välj målmapp och granska innan du sparar. En saknad eller ogiltig avsändaradress ersätts aldrig med ämnesraden.
+  - Avbryt/Escape ändrar inget i regeln eller ditt pågående editorutkast. Om en sparning skulle ersätta ett osparat utkast frågar SortBro först.
 
 ## Thunderbirds egna filter – läs in dem och skriv ut dina egna
 
@@ -240,7 +245,7 @@ med **Skapa regel**, **Inte nu** och **Sluta föreslå**.
 
 ## Integritet och behörigheter
 
-Behörigheter som Thunderbird visar: läsa konton och mappar (`accountsRead`), skapa mappar i kontot när du själv trycker *＋ Ny mapp* (`accountsFolders`), läsa meddelandehuvuden, flytta meddelanden, markera läst vid återställning, lägga till en post i högerklicksmenyn på mejl (`menus`), lagra egna inställningar lokalt och spara exporterade filer (`downloads`).
+Behörigheter som Thunderbird visar: läsa konton och mappar (`accountsRead`), skapa mappar i kontot när du själv trycker *＋ Ny mapp* (`accountsFolders`), läsa meddelandehuvuden, flytta meddelanden, markera läst vid återställning, lägga till val i högerklicksmenyn på mejl (`menus`), lagra egna inställningar lokalt och spara exporterade filer (`downloads`).
 
 Datorns nätverk används aldrig: tilläggets säkerhetspolicy är `connect-src 'none'`. Swish-QR-koden ritas helt lokalt i gränssnittet.
 
@@ -502,6 +507,19 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.22
+
+- **Lägg avsändaren i en befintlig regel via högerklick.** Två namngivna menyval i Thunderbirds mejllista öppnar samma granskare: befintlig regel eller nytt utkast. Exakt adress är förvalt; hela domänen är ett aktivt val.
+- **Granska före sparning.** Regelväljaren visar målmapp. Förhandsvisningen visar regelns namn, källa, mål och villkoren före/efter. Källa, mål, läsläge, olästhantering, årsmappar, provkörning och alternativa mål bevaras vid tillägget. En avstängd regel aktiveras inte automatiskt.
+- **Inga tysta logikändringar.** Regler med flera OCH-villkor kan inte breddas med ett nytt ELLER-alternativ i detta flöde. Välj en separat ny regel i stället. Dubbletter, fulla regler och saknade avsändaradresser stoppas med förklaring. Kontrollen finns även i bakgrunden, inte bara i gränssnittet.
+- **Spara och kör är skilda val.** Spara startar ingen manuell körning. Spara och kör frågar först och gäller hela regelns källa; testläge, paus, läsläge och säkerhetsbroms gäller fortfarande. Om körningen misslyckas efter en lyckad sparning står det uttryckligen att regeln redan är sparad.
+- **Utkast och samtidighet skyddas.** Avbryt behåller utkastet, dubbelklick startar inte flera sparningar och ändrad regelversion kräver ny granskning. Ett nytt högerklick ersätter inte avsändaren i en redan öppen dialog. Mappdialoger får avslutas innan en väntande avsändardialog öppnas.
+- **Samma tillgänglighet som resten av SortBro.** Svenska/engelska, tangentbord, återställt fokus, ljust/mörkt och textstorlek 12–24 px. Vid stor text rullar dialoginnehållet medan åtgärdsknapparna ligger kvar synliga.
+
+Thunderbirds **inbyggda uppdatering via GitHub Releases är oförändrad**. Inget nytt uppdateringsskript, hjälpprogram, tilläggsberoende eller någon ny behörighet har lagts till. Veckobackup och befintliga reglers funktion ändras inte förrän du själv sparar en ändring.
+
+Verifierat med **448 automatiska tester, 468 DOM-kontroller och 24 webbläsarlayouter** (600/840/1280 px, 12/14/20/24 px text, ljust/mörkt, SV/EN och båda tätheterna). Webbläsartestet använder simulerade Thunderbird-API:er och provar faktisk tangentbordsnavigation, meddelandehändelser, köade högerklick, mappdialoger och sparning. **Inte provat i riktig Thunderbird eller Windows här.** Installera den nya XPI:n ovanpå den befintliga; avinstallera inte först.
 
 ## Nyheter i 1.0.21
 

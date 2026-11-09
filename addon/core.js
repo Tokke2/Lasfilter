@@ -565,7 +565,23 @@ function ruleMatchesSearch(rule,query,folders=[]){
   ...(rule.branches||[]).map(b=>conditionText(b.condition)+' '+folderText(b.target))].join(' '));
  return words.every(word=>text.includes(word));
 }
-const api={ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+/* Högerklicksflödet får bara lägga till ett uttryckligt alternativ, aldrig
+   byta en flervillkorsregel från OCH till ELLER eller kasta gamla villkor. */
+function senderCondition(address,wholeDomain=false){
+ const value=email(address);if(!value||value.length>LIMITS.value)fail('sender_invalid');
+ return {field:wholeDomain?'domain':'sender',op:'equals',value:wholeDomain?value.split('@')[1]:value};
+}
+function addSenderCondition(raw,address,wholeDomain=false){
+ const rule=validateRule(raw),condition=senderCondition(address,wholeDomain);
+ const duplicate=rule.conditions.some(c=>c.op==='equals'&&(
+  (c.field===condition.field&&(c.field==='sender'?email(c.value)===condition.value:norm(c.value)===norm(condition.value)))||
+  (!wholeDomain&&c.field==='domain'&&domain(c.value)===email(address).split('@')[1])));
+ if(duplicate)return {rule,condition,duplicate:true};
+ if(rule.match==='all'&&rule.conditions.length>1)fail('sender_and');
+ if(rule.conditions.length>=LIMITS.conditions)fail('sender_full');
+ return {rule:validateRule({...rule,match:'any',conditions:[...rule.conditions,condition]}),condition,duplicate:false};
+}
+const api={senderCondition,addSenderCondition,ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
 whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

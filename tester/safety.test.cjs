@@ -413,8 +413,8 @@ test('snabbmenyns titel finns på båda språken',()=>{
  assert.match(bg,/menus\.update\(MENU_ID/,'menyn ska uppdateras när språket byts');
  assert.match(bg,/App\.syncMenu\(\);return next;/,'språkbytet ska synka menyn');
  const line=bg.match(/App\.menuTitle=\(\)=>[^\n]+/)[0];
- assert.match(line,/SortBro: Skapa filter/);
- assert.match(line,/SortBro: Create a filter/,'engelsk titel saknas');
+ assert.match(line,/SortBro: Skapa regel/);
+ assert.match(line,/SortBro: Create a rule/,'engelsk titel saknas');
 });
 
 test('zippen innehåller allt som hör till releasen',()=>{

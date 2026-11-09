@@ -139,6 +139,13 @@ globalThis.LasDemo=(()=>{
       {reason:'unread',subject:'Orderbekräftelse',domain:'klarna.se'},
       {reason:'target',subject:'Arkiv/2025',domain:'example.invalid'}]};break;
    }
+   case 'addSenderToRule':{
+    if(m.revision!==state.config.revision)throw new LasCore.RuleError('stale_config');
+    const rule=state.config.rules.find(r=>r.id===m.ruleId);if(!rule)throw new LasCore.RuleError('bad_id');
+    const plan=LasCore.addSenderCondition(rule,m.email,m.wholeDomain===true);
+    if(!plan.duplicate)saveRules(state.config.rules.map(r=>r.id===rule.id?plan.rule:r));
+    data={duplicate:plan.duplicate,ruleId:rule.id,snapshot:state};break;
+   }
    case 'pendingPrefill':data=mockPrefill;mockPrefill=null;break;
    case 'prefillConsumed':data=true;break;
    case 'saveRules':saveRules(m.rules);data=state;break;

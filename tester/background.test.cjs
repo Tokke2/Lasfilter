@@ -1405,11 +1405,11 @@ test('snabbmenyns titel följer språkvalet',async()=>{
  api.menus.update=async(id,opts)=>{updates.push([id,opts.title]);};
  const {app,tick}=await loadBackground(api);
  await tick.settle(Promise.resolve());
- assert.match(updates[0][1],/^SortBro: Skapa filter/,'svensk titel när inget annat valts');
+ assert.match(updates[0][1],/^SortBro: Skapa regel/,'svensk titel när inget annat valts');
  await tick.settle(app.handle({type:'prefs',prefs:{lang:'en'}}));
- assert.match(app.menuTitle(),/^SortBro: Create a filter/,'engelsk titel efter språkbytet');
+ assert.match(app.menuTitle(),/^SortBro: Create a rule/,'engelsk titel efter språkbytet');
  assert.equal(updates.at(-1)[0],'sortbro-rule-from-message','menyn uppdateras, inte en ny rad');
- assert.match(updates.at(-1)[1],/Create a filter/);
+ assert.match(updates.at(-1)[1],/Create a rule/);
 });
 
 /* ── Samlad fellogg ─────────────────────────────────────────────────────── */
@@ -1570,4 +1570,58 @@ test('JSON-import hittar svenska normaliserade mappnamn men gissar inte vid dubb
  const folders=[{id:'new',accountId:'a',name:'Årsöversikt',accountName:'Åsas konto',label:'Åsas konto · /Årsöversikt'}];
  assert.equal(app.extractImportedRules(backup,folders)[0].target,'new');
  assert.equal(app.extractImportedRules(backup,[...folders,{...folders[0],id:'second'}])[0].target,'old');
+});
+
+/* Högerklicksflödet: en separat, striktare operation än fri villkorsimport. */
+function senderFixture(app,over={}){
+ const engine=fakeEngineWithRules(app);
+ engine.config.rules=[C.validateRule({id:'sender-rule',name:'Kvitton',enabled:true,source:'inbox',sourceAccount:'a',scope:'folder',target:'fin',match:'all',conditions:[{field:'sender',op:'equals',value:'old@example.se'}],...over})];
+ return engine;
+}
+test('högerklick sparar en exakt avsändare utan att starta en manuell körning',async()=>{
+ const {app,api}=await loadBackground();inboxAccount(api);const engine=senderFixture(app,{readFilter:'read',unreadAction:'keep',yearFolders:true});
+ let runs=0;engine.catchUp=async()=>{runs++;return {};};
+ const result=await app.handle({type:'addSenderToRule',ruleId:'sender-rule',email:'NEW@example.se',revision:0});
+ assert.equal(result.duplicate,false);assert.equal(engine.config.revision,1);assert.equal(runs,0);
+ const r=engine.config.rules[0];assert.equal(r.conditions[1].value,'new@example.se');assert.equal(r.conditions[1].field,'sender');
+ assert.equal(r.scope,'folder');assert.equal(r.source,'inbox');assert.equal(r.target,'fin');assert.equal(r.readFilter,'read');assert.equal(r.unreadAction,'keep');assert.equal(r.yearFolders,true);
+});
+test('servern stoppar OCH-breddning även om gränssnittet kringgås',async()=>{
+ const {app,api}=await loadBackground();inboxAccount(api);const engine=senderFixture(app,{conditions:[{field:'domain',op:'equals',value:'old.se'},{field:'subject',op:'contains',value:'Faktura'}]});
+ const before=JSON.stringify(engine.config);
+ await assert.rejects(app.handle({type:'addSenderToRule',ruleId:'sender-rule',email:'new@example.se',revision:0}),e=>e.code==='sender_and');assert.equal(JSON.stringify(engine.config),before);
+});
+test('dubblett skriver ingen ny regelversion och ändrar inga inställningar',async()=>{
+ const {app,api}=await loadBackground();inboxAccount(api);const engine=senderFixture(app);
+ const before=JSON.stringify(engine.config),result=await app.handle({type:'addSenderToRule',ruleId:'sender-rule',email:'old@example.se',revision:0});
+ assert.equal(result.duplicate,true);assert.equal(JSON.stringify(engine.config),before);
+});
+test('inaktuell regelversion och borttagen regel avvisas',async()=>{
+ const {app,api}=await loadBackground();inboxAccount(api);const engine=senderFixture(app);engine.config.revision=2;
+ await assert.rejects(app.handle({type:'addSenderToRule',ruleId:'sender-rule',email:'new@example.se',revision:1}),e=>e.code==='stale_config');
+ await assert.rejects(app.handle({type:'addSenderToRule',ruleId:'removed',email:'new@example.se',revision:2}),e=>e.code==='bad_id');assert.equal(engine.config.revision,2);
+ await assert.rejects(app.handle({type:'catchUp',ruleId:'sender-rule',revision:1}),e=>e.code==='stale_config');
+});
+test('två samtidiga tillägg kan inte skriva över varandra',async()=>{
+ const {app,api}=await loadBackground();inboxAccount(api);const engine=senderFixture(app);
+ const results=await Promise.allSettled(['a','b'].map(x=>app.handle({type:'addSenderToRule',ruleId:'sender-rule',email:x+'@example.se',revision:0})));
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.code,'stale_config');assert.equal(engine.config.rules[0].conditions.length,2);
+});
+test('högerklick överför adress, konto, mapp och val utan att spara',async()=>{
+ const {app,api}=await loadBackground();inboxAccount(api);const engine=senderFixture(app);app.open=async()=>{};
+ const before=JSON.stringify(engine.config);
+ await app.ruleFromMessage({selectedMessages:{messages:[{id:1,author:'Anna <Anna@exempel.se>',subject:'Hej',folder:{id:'inbox',accountId:'a'}}]}},'add');
+ const data=await app.handle({type:'pendingPrefill'});assert.equal(data.action,'add');assert.equal(data.email,'anna@exempel.se');assert.equal(data.accountId,'a');assert.equal(data.folderId,'inbox');assert.equal(data.selectionCount,1);assert(data.token);assert.equal(JSON.stringify(engine.config),before);
+ await app.ruleFromMessage({selectedMessages:{messages:[{id:2,author:'b@exempel.se',subject:'Nästa',folder:{id:'inbox',accountId:'a'}}]}},'new');
+ await app.handle({type:'prefillConsumed'});assert.equal(app.prefill.email,'b@exempel.se','kvittens utan token får inte radera ett väntande val');
+ await app.handle({type:'prefillConsumed',token:data.token});assert.equal(app.prefill.email,'b@exempel.se','en sen kvittens raderar inte nästa högerklick');
+ await app.handle({type:'prefillConsumed',token:app.prefill.token});assert.equal(app.prefill,null);
+});
+test('båda snabbmenyvalen registreras och följer språkbytet',async()=>{
+ const api=stubApi(),created=[],updated=[];api.menus.create=async x=>created.push(x);api.menus.update=async(id,x)=>updated.push({id,...x});
+ const {app}=await loadBackground(api);
+ assert(created.some(x=>x.id==='sortbro-add-sender'&&x.contexts.includes('message_list')));
+ assert(created.some(x=>x.id==='sortbro-rule-from-message'));
+ await app.handle({type:'prefs',prefs:{lang:'en'}});
+ assert(updated.some(x=>x.id==='sortbro-add-sender'&&/Add sender/.test(x.title)));
 });

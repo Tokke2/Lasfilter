@@ -8,7 +8,7 @@ test('ogiltiga och för långa avsändare stoppas, ingen ämnesrad blir avsända
  for(const address of ['',null,'foo','a@x','a@x.se, b@y.se','<a@x.se><b@y.se>','a'.repeat(260)+'@example.se'])assert.throws(()=>C.senderCondition(address),e=>e.code==='sender_invalid');
 });
 test('ett enda OCH-villkor får ett explicit ELLER-alternativ utan andra förändringar',()=>{
- const old=rule({readFilter:'read',unreadAction:'window',yearFolders:true,trialUntil:2000000000000,branches:[{condition:{field:'subject',op:'contains',value:'Order'},target:'orders'}]}),snapshot=structuredClone(old);
+ const old=rule({readFilter:'read',unreadAction:'window',openTiming:'before',yearFolders:true,trialUntil:2000000000000,branches:[{condition:{field:'subject',op:'contains',value:'Order'},target:'orders'}]}),snapshot=structuredClone(old);
  const plan=C.addSenderCondition(old,'new@example.se');
  assert.equal(plan.rule.match,'any');assert.equal(plan.rule.conditions.length,2);assert.deepEqual(old,snapshot);
  for(const key of Object.keys(old).filter(k=>!['conditions','match'].includes(k)))assert.deepEqual(plan.rule[key],old[key],key);

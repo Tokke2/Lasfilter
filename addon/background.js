@@ -641,76 +641,147 @@ App.quickRule=async(msg)=>{
  App.log('debug',0,'snabbregel skapad: '+C.choiceSummary(rule.conditions[0])+' -> '+(target.name||target.label||'målmapp'));
  return {ruleId:rule.id,rule,condition:rule.conditions[0],target:{id:target.id,name:target.name||'',label:target.label||''},snapshot:App.snapshot()};
 };
-App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='')=>{
- const rule=App.engine?.config.rules.find(r=>r.id===ruleId);
- const action=rule?.unreadAction||'default';
- /* Mejlet ska ligga i målmappen innan fönstret öppnas. Öppnade vi id:t direkt efter
-    flytten visade Thunderbird en tom ruta, eftersom mejlet redan lämnat källmappen.
-    Därför två krav innan något öppnas: rätt mapp – och att kroppen går att läsa. */
- const lookup=async()=>{
-  if(targetFolderId&&headerMessageId){
-   const found=await App.engine?.findByHeader(targetFolderId,headerMessageId);
-   if(Number.isSafeInteger(found?.id))return found.id;
+/* Only a folder-scoped, unique identity may be opened. A global headerMessageId
+   fallback can select the old copy or a duplicate and is deliberately not used. */
+App.mailWindows=new Map();App.beforeWindows=new Map();App.openingWindow=false;
+App.windowCall=(promise,ms=5000)=>{
+ let timer;return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('display_timeout')),ms);})]).finally(()=>clearTimeout(timer));
+};
+App.windowClosed=id=>{
+ const info=App.mailWindows.get(id);if(!info)return;
+ App.mailWindows.delete(id);
+ if(info.beforeKey){const before=App.beforeWindows.get(info.beforeKey);if(before)before.closed=true;}
+ App.kick();
+};
+App.windowStillOpen=async id=>{
+ try{const tabs=await App.windowCall(B.tabs.query({}));if(!Array.isArray(tabs))return true;if(tabs.some(t=>t.id===id))return true;App.windowClosed(id);return false;}catch{return true;}
+};
+App.windowOpen=async message=>{
+ for(const [id,info] of App.mailWindows){
+  if(info.messageId===message.id||(info.folderId===message.folder?.id&&info.headerMessageId===message.headerMessageId)){
+   if(await App.windowStillOpen(id))return true;
   }
-  if(Number.isSafeInteger(id)&&targetFolderId){
-   try{
-    const cur=await B.messages.get(id);
-    if(cur?.folder?.id===targetFolderId)return id;
-   }catch{}
+ }
+ return false;
+};
+App.folderMessage=async(folderId,headerMessageId)=>{
+ let page;
+ try{
+  page=await App.windowCall(B.messages.query({folderId,headerMessageId}));
+  if(!Array.isArray(page?.messages))return {status:'unknown'};
+  if(page.id||page.messages.length>1)return {status:'ambiguous'};
+  if(!page.messages.length)return {status:'none'};
+  const m=page.messages[0];
+  return m.folder?.id===folderId&&m.headerMessageId===headerMessageId&&Number.isSafeInteger(m.id)?{status:'one',message:m}:{status:'unknown'};
+ }catch{return {status:'unknown'};}
+ finally{if(page?.id)await App.windowCall(B.messages.abortList(page.id),2000).catch(()=>{});}
+};
+App.messageReady=async(id,folderId,headerMessageId,date)=>{
+ try{
+  const check=async()=>{const m=await App.windowCall(B.messages.get(id));return m?.folder?.id===folderId&&m.headerMessageId===headerMessageId&&Number.isFinite(date)&&+new Date(m.date)===date;};
+  if(!await check())return false;
+  const full=await App.windowCall(B.messages.getFull(id));
+  if(!full||typeof full!=='object'||Array.isArray(full)||(!full.headers&&!full.parts?.length&&typeof full.body!=='string'))return false;
+  return await check();
+ }catch{return false;}
+};
+App.openVerifiedWindow=async(message,beforeKey='',proof=async()=>true,asFile=false)=>{
+ const {id,headerMessageId}=message,folderId=message.folder?.id,date=+new Date(message.date);
+ if(!folderId||!headerMessageId||!await App.messageReady(id,folderId,headerMessageId,date))return null;
+ let tab,existing,abandoned=false,file;
+ try{
+  if(!await proof())return null;
+  if(asFile){
+   file=await App.windowCall(B.messages.getRaw(id,{data_format:'File'}));
+   if(!file||!(file.size>0)||typeof file.arrayBuffer!=='function'||!await App.messageReady(id,folderId,headerMessageId,date)||!await proof())return null;
   }
-  return null;
- };
- /* Går mejlet att läsa alls? Ett oläst IMAP-mejl som ännu inte hämtats hem ger ett
-    tomt fönster i stället för ett fel – då öppnar vi hellre ingenting. */
- const readable=async mid=>{
-  if(!Number.isSafeInteger(mid))return false;
-  if(typeof B.messages?.getFull!=='function')return true;
-  try{
-   const full=await B.messages.getFull(mid);
-   return !!full&&(Array.isArray(full.parts)?full.parts.length>0:true);
-  }catch{return false;}
- };
- let targetId=null,ready=false;
+  existing=await App.windowCall(B.tabs.query({}));if(!Array.isArray(existing))return null;
+  const opening=Promise.resolve(B.messageDisplay.open(asFile?{file,location:'window'}:{messageId:id,location:'window'}));
+  opening.then(async late=>{
+   if(!abandoned||!Number.isSafeInteger(late?.id)||existing.some(t=>t.id===late.id))return;
+   App.mailWindows.set(late.id,{messageId:id,folderId,headerMessageId,beforeKey});
+   try{await App.windowCall(B.tabs.remove(late.id));App.windowClosed(late.id);}catch{App.log('error',0,'kunde inte stanga forsenat mejlfonster');}
+  }).catch(()=>{});
+  tab=await App.windowCall(opening,10000);
+  if(!Number.isSafeInteger(tab?.id)||existing.some(t=>t.id===tab.id))throw new Error('no_new_message_tab');
+  App.mailWindows.set(tab.id,{messageId:id,folderId,headerMessageId,beforeKey});
+  // An accepted open() call does not mean a rendered message. Verify the actual
+  // tab and identity; close only the new tab we own if it remains blank/wrong.
+  for(const delay of [0,150,350,700,1500,2500]){
+   if(delay)await new Promise(r=>setTimeout(r,delay));
+   if(!await App.windowStillOpen(tab.id))return null;
+   const raw=await App.windowCall(B.messageDisplay.getDisplayedMessages(tab.id));
+   const shown=Array.isArray(raw)?raw:raw?.messages;
+   if(Array.isArray(shown)&&shown.length===1&&(asFile?shown[0]?.external===true&&shown[0].headerMessageId===headerMessageId&&+new Date(shown[0].date)===date:shown[0]?.id===id)&&await App.messageReady(id,folderId,headerMessageId,date)&&await proof()){
+    App.log('debug',0,asFile?'mejlet verifierat visat fran lokal meddelandekopia':'mejlet verifierat visat i eget fonster');return tab;
+   }
+  }
+ }catch{abandoned=true;}
+ if(Number.isSafeInteger(tab?.id)&&Array.isArray(existing)&&!existing.some(t=>t.id===tab.id)){
+  try{await App.windowCall(B.tabs.remove(tab.id));App.windowClosed(tab.id);}catch{App.log('error',0,'kunde inte stanga obekraftat mejlfonster');}
+ }
+ // A local RFC 822 File is independent of a stale IMAP URI. No download or
+ // persistent export is created, and the original identity is checked again.
+ if(!asFile&&!abandoned&&(!Number.isSafeInteger(tab?.id)||!App.mailWindows.has(tab.id))){
+  const fallback=await App.openVerifiedWindow(message,beforeKey,proof,true);if(fallback)return fallback;
+ }
+ App.log('error',0,'mejlfonstret visade inte ratt meddelande - oppningen avbruten');return null;
+};
+App.beforeMove=async(message,record)=>{
+ if(!App.engine?.enabled()||App.engine.config.dryRun)return false;
+ // Closed-window receipts are session-only. After a restart we verify/open the
+ // source again; a saved flag alone never authorises a move.
+ for(const key of App.beforeWindows.keys())if(!App.engine?.records?.has(key))App.beforeWindows.delete(key);
+ const existing=App.beforeWindows.get(record.key);
+ if(existing){
+  if(!existing.closed)await App.windowStillOpen(existing.tabId);
+  return existing.confirmed===true&&existing.closed===true;
+ }
+ if(App.openingWindow||App.engine?.sweeping>0)return false;
+ for(const [id,info] of App.mailWindows)if(info.beforeKey&&await App.windowStillOpen(id))return false;
+ App.openingWindow=true;
+ try{
+  const tab=await App.openVerifiedWindow(message,record.key);
+  if(!tab){App.engine?.stop('window_error');return false;}
+  App.beforeWindows.set(record.key,{tabId:tab.id,confirmed:true,closed:!App.mailWindows.has(tab.id)});
+  App.log('debug',0,'fore flytt: vantar tills mejlfonstret stangs');return false;
+ }finally{App.openingWindow=false;}
+};
+App.openUnread=async(id,ruleId,targetFolderId='',headerMessageId='',sourceFolderId='',date=NaN,fromSweep=false)=>{
+ const rule=App.engine?.config.rules.find(r=>r.id===ruleId),action=rule?.unreadAction||'default';
+ if(!rule||!targetFolderId||!sourceFolderId||sourceFolderId===targetFolderId||!headerMessageId||!Number.isFinite(date))return null;
+ let message=null;
  for(const delay of [0,300,700,1500,3000]){
   if(delay)await new Promise(r=>setTimeout(r,delay));
-  targetId=await lookup();
-  if(Number.isSafeInteger(targetId)&&await readable(targetId)){ready=true;break;}
+  const [target,source]=await Promise.all([App.folderMessage(targetFolderId,headerMessageId),App.folderMessage(sourceFolderId,headerMessageId)]);
+  if(target.status==='one'&&source.status==='none'&&await App.messageReady(target.message.id,targetFolderId,headerMessageId,date)){message=target.message;break;}
  }
- if(!ready){
-  App.log('debug',0,Number.isSafeInteger(targetId)?'olasta mejlet gick inte att lasa an - fonstret oppnades inte':'olasta mejlet kunde inte hittas i malmappen - fonstret oppnades inte');
-  return null;
- }
- if(action==='read'){
-  for(const delay of [150,800])setTimeout(()=>B.messages.update(targetId,{read:true}).catch(()=>{}),delay);
-  return targetId;
- }
- // Popup-skydd: under ett pågående mass-svep (eller när kön redan är lång)
- // öppnas aldrig nya fönster – mejlet behålls bara oläst.
- const sweeping=App.engine?.sweeping||0;
- const shouldOpenWindow=C.shouldOpenWindow({action,pending:App.engine?.pending.size||0,sweeping,fromSweep:sweeping>0,openWindow:App.engine?.config.openWindow!==false});
- App.keepUnread.set(targetId,Date.now()+30000);
- if(shouldOpenWindow){
-  /* Kvittot: loggen ska kunna svara på om fönstret verkligen visade något.
-     Tidsgränsen larmar men släcker inte förväntan – kommer visningen strax efteråt
-     skrivs kvittot ändå, i stället för att tappas på en sekund. */
-  const expectation={messageId:targetId,headerMessageId:headerMessageId||'',at:Date.now()};
-  App.expectDisplay=expectation;
-  setTimeout(()=>{if(App.expectDisplay===expectation)App.log('debug',0,'olasta mejlet visades inte i fonstret');},5200);
+ if(!message){App.log('error',0,'flyttmal eller lasbart mejl kunde inte verifieras - inget fonster oppnades');return null;}
+ const targetId=message.id;
+ if(action==='read'){await B.messages.update(targetId,{read:true});return targetId;}
+ const shouldOpen=C.shouldOpenWindow({action,fromSweep,pending:App.engine?.pending.size||0,sweeping:App.engine?.sweeping||0,openWindow:App.engine?.config.openWindow!==false});
+ if(shouldOpen&&!App.openingWindow&&App.mailWindows.size<3){
+  App.openingWindow=true;
   try{
-   await B.messageDisplay.open({messageId:targetId,location:'window'});
-   App.log('debug',0,'olasta mejlet oppnat i malmappen');
-  }catch{
-   /* Id:t kan ha bytts i samma stund – identiteten (Message-ID) följer alltid med. */
-   if(headerMessageId){
-    try{await B.messageDisplay.open({headerMessageId,location:'window'});App.log('debug',0,'olasta mejlet oppnat via meddelande-id');}
-    catch{App.expectDisplay=null;App.log('error',0,'oppna_olast_fonster_misslyckades');}
-   }else{App.expectDisplay=null;App.log('error',0,'oppna_olast_fonster_misslyckades');}
-  }
- }else App.log('debug',0,'olasta mejlet behalls som olast: popup-skydd');
- for(const delay of [250,1000,3000])setTimeout(()=>B.messages.update(targetId,{read:false}).catch(()=>App.log('error',0,'aterstall_olast_misslyckades')),delay);
- setTimeout(()=>App.keepUnread.delete(targetId),30000);
- return targetId;
+  // Resolve again immediately before opening, never reuse the source ID or a
+  // header-only global lookup. A copy left in source is not a completed move.
+  const [target,source]=await Promise.all([App.folderMessage(targetFolderId,headerMessageId),App.folderMessage(sourceFolderId,headerMessageId)]);
+  if(target.status!=='one'||source.status!=='none')return null;
+  message=target.message;
+  if(+new Date(message.date)!==date)return null;
+  const proof=async()=>{const [dst,src]=await Promise.all([App.folderMessage(targetFolderId,headerMessageId),App.folderMessage(sourceFolderId,headerMessageId)]);return dst.status==='one'&&dst.message.id===message.id&&+new Date(dst.message.date)===date&&src.status==='none';};
+  if(!await App.openVerifiedWindow(message,'',proof))return null;
+  }finally{App.openingWindow=false;}
+ }
+ const currentId=message.id;
+ App.keepUnread.set(currentId,Date.now()+30000);
+ for(const delay of [250,1000,3000])setTimeout(async()=>{
+  try{const current=await B.messages.get(currentId);if(current.folder?.id===targetFolderId&&current.headerMessageId===headerMessageId&&+new Date(current.date)===date)await B.messages.update(currentId,{read:false});}catch{App.log('error',0,'aterstall_olast_misslyckades');}
+ },delay);
+ setTimeout(()=>App.keepUnread.delete(currentId),30000);
+ return currentId;
 };
+
 App.onNewMail=async(folder,list)=>{
  await App.ready;if(![...(folder?.specialUse||[]),folder?.type].includes('inbox'))return;
  let page=list,all=[];
@@ -1122,7 +1193,7 @@ App.ready=(async()=>{
  if(['auto',...SEASONS].includes(p.season))App.prefs.season=p.season;
  App.applySeasonIcon();
  App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
-  notify:App.openUnread,brakeLimit:App.brakeLimit,ruleDone:App.brakeRecord});
+  notify:App.openUnread,beforeMove:App.beforeMove,windowOpen:App.windowOpen,brakeLimit:App.brakeLimit,ruleDone:App.brakeRecord});
  App.engine.trialRestore?.(data.trial);
  App.learned=App.cleanLearned(data.learned);
  let needResweep=false;
@@ -1305,20 +1376,7 @@ B.messages.onMoved.addListener((old,moved)=>App.ready.then(async()=>{
  return done;
 }).catch(()=>App.fail('internal_error')));
 B.messageDisplay.onMessagesDisplayed.addListener(()=>App.ready.then(()=>App.engine.tick()).catch(()=>App.fail('display_error')));
-/* Kvitto på att fönstret visade något: samma meddelande som vi just öppnade ska
-   dyka upp i visningen. Loggen kan då svara på om en tom ruta kom från oss eller ej. */
-B.messageDisplay.onMessagesDisplayed.addListener(tab=>{
- const want=App.expectDisplay;
- if(!want)return;
- App.ready.then(async()=>{
-  try{
-   const shown=await B.messageDisplay.getDisplayedMessages(tab?.id);
-   const hit=(shown||[]).some(m=>m&&(m.id===want.messageId||(want.headerMessageId&&m.headerMessageId===want.headerMessageId)));
-   if(hit){if(App.expectDisplay===want)App.expectDisplay=null;App.log('debug',0,'olasta mejlet visades i fonstret');}
-  }catch{}
- }).catch(()=>{});
-});
-B.tabs.onRemoved.addListener(id=>{if(App.uiTab===id)App.uiTab=null;if(App.mailTab===id)App.mailTab=null;App.ready.then(()=>App.engine.tick()).catch(()=>{});});
+B.tabs.onRemoved.addListener(id=>{App.windowClosed(id);if(App.uiTab===id)App.uiTab=null;if(App.mailTab===id)App.mailTab=null;App.ready.then(()=>App.engine.tick()).catch(()=>{});});
 B.tabs.onActivated.addListener(({tabId})=>B.tabs.get(tabId).then(App.captureTab).catch(()=>{}));
 B.mailTabs.onSelectedMessagesChanged.addListener(tab=>App.captureTab(tab));
 B.commands.onCommand.addListener(cmd=>{

@@ -1390,3 +1390,79 @@ test('svepets överhoppade felmappar registreras utan detaljlogg',async()=>{
  assert.ok(f.logs.some(x=>x.event==='error'&&x.data.detail.startsWith('svep_query_failed')));
  assert.doesNotMatch(JSON.stringify(f.logs),/SECRET/);
 });
+
+function beforeFixture(extra={}){
+ const f=fixture({moveMode:'direct',...extra});Object.assign(f.e.config.rules[0],{unreadAction:'window',openTiming:'before',readFilter:'unread'});f.messages.get(1).read=false;
+ f.before={closed:false,calls:0};f.e.hooks.beforeMove=async()=>{f.before.calls++;return f.before.closed;};return f;
+}
+test('före flytt: väntar på fönsterstängning och två sekunders osynlighet',async()=>{
+ const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();assert.equal(f.api.calls.length,0);assert.equal(f.before.calls,1);
+ f.messages.get(1).read=true;await f.e.readChanged(f.messages.get(1),{read:true},{read:false});await f.e.tick();assert.equal(f.api.calls.length,0);assert.equal(f.e.pending.size,1);
+ f.before.closed=true;await f.e.tick();assert.equal(f.api.calls.length,0);f.advance();await f.e.tick();
+ assert.equal(f.api.calls.length,1);assert.equal(f.notifications.length,0,'öppnas inte igen efter flytten');
+});
+test('före flytt: annan visning måste också lämnas, även i direktläge',async()=>{
+ const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();f.before.closed=true;f.shown.add(1);
+ f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);f.shown.clear();await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,1);
+});
+test('före flytt: okänd/hängande visning räknas inte som osynlig',async()=>{
+ const f=beforeFixture();f.e.hooks.displayTimeout=5;await f.e.enqueue(f.messages.get(1));await f.e.tick();f.before.closed=true;
+ f.api.messageDisplay.getDisplayedMessages=async()=>new Promise(()=>{});await f.e.tick();assert.equal(f.api.calls.length,0);assert(f.e.fault);
+});
+test('före flytt: paus, provläge och regelns provkörning öppnar/flyttar ingenting',async()=>{
+ for(const mode of ['paused','dryRun','trial']){
+  const f=beforeFixture();await f.e.enqueue(f.messages.get(1));
+  if(mode==='paused')f.e.config.paused=true;if(mode==='dryRun')f.e.config.dryRun=true;if(mode==='trial')f.e.config.rules[0].trialUntil=Date.UTC(2030,0,1);
+  await f.e.tick();assert.equal(f.before.calls,0,mode);assert.equal(f.api.calls.length,0,mode);
+ }
+});
+test('ett SortBro-fönster skyddar sitt mejl även mot en annan direktregel',async()=>{
+ const f=fixture({moveMode:'direct'});f.e.hooks.windowOpen=async()=>true;await f.ready();assert.equal(f.api.calls.length,0);assert.equal(f.e.pending.size,1);
+ f.e.hooks.windowOpen=async()=>false;await f.e.tick();assert.equal(f.api.calls.length,1);
+});
+test('före flytt: regeländring under öppningen gör aldrig ett gammalt flyttförsök',async()=>{
+ const f=beforeFixture();f.e.hooks.beforeMove=async()=>{f.e.epoch++;f.e.config.rulesVersion++;return true;};await f.e.enqueue(f.messages.get(1));await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);
+});
+test('före flytt: återstart kräver nytt visningskvitto, inte bara en sparad flagga',async()=>{
+ const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();const records=f.e.recordList();assert.equal(records[0].openedBefore,true);
+ const g=beforeFixture();g.messages.get(1).read=true;await g.e.restore(records);await g.e.tick();assert.equal(g.before.calls,1);assert.equal(g.api.calls.length,0);
+});
+test('efter flytt: notisen bär källa, ursprungsdatum och svepmarkering',async()=>{
+ const f=fixture({moveMode:'direct'});f.messages.get(1).read=false;await f.e.catchUp('rule1');await f.e.tick();
+ assert.equal(f.notifyArgs[0][4],'inbox');assert.equal(f.notifyArgs[0][5],+msg().date);assert.equal(f.notifyArgs[0][6],true);
+});
+test('regelfältet openTiming är bakåtkompatibelt och valideras',()=>{
+ assert.equal(C.validateRule(base()).openTiming,'after');assert.equal(C.validateRule({...base(),openTiming:'before'}).openTiming,'before');
+ for(const value of ['invalid',null,0])assert.throws(()=>C.validateRule({...base(),openTiming:value}),e=>e.code==='bad_rule');
+});
+test('före flytt: IMAP-storleken får ändras när samma meddelandes kropp laddas',async()=>{
+ const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();
+ f.messages.get(1).size=456;f.messages.get(1).read=true;f.before.closed=true;await f.e.tick();f.advance();await f.e.tick();
+ assert.equal(f.api.calls.length,1);assert.equal(f.notifications.length,0);
+});
+test('före flytt: annat Message-ID eller datum stoppas även med öppningsflagga',async()=>{
+ for(const field of ['headerMessageId','date']){
+  const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();f.before.closed=true;
+  f.messages.get(1)[field]=field==='date'?new Date('2027-01-01'):'different@x';await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);
+ }
+});
+test('före flytt: väntan skapar ingen omedelbar kick-loop',async()=>{
+ const f=beforeFixture();let kicks=0;f.e.hooks.kick=()=>kicks++;await f.e.enqueue(f.messages.get(1));kicks=0;
+ for(let i=0;i<5;i++)await f.e.tick();assert.equal(kicks,0);assert.equal(f.api.calls.length,0);
+});
+test('före flytt: extern lokal visning av samma mejl skyddar också källan',async()=>{
+ const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();f.before.closed=true;
+ f.api.messageDisplay.getDisplayedMessages=async()=>[{...f.messages.get(1),id:800,external:true,folder:undefined}];
+ f.advance();await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);
+ f.api.messageDisplay.getDisplayedMessages=async()=>[];await f.e.tick();f.advance();await f.e.tick();assert.equal(f.api.calls.length,1);
+});
+test('före flytt: paus under journalskrivning stoppar även det sista flyttsteget',async()=>{
+ const f=beforeFixture();await f.e.enqueue(f.messages.get(1));await f.e.tick();f.before.closed=true;await f.e.tick();f.advance();
+ f.e.hooks.persist=async()=>{if([...f.e.records.values()].some(r=>r.stage==='attempted'))f.e.config.paused=true;};
+ await f.e.tick();assert.equal(f.api.calls.length,0);
+});
+test('före flytt: full fönsterkö skjuter upp överskott utan 15 sekunders väntan per mejl',async()=>{
+ const f=beforeFixture();delete f.e.hooks.ackTimeout;let ticks=0;const tick=f.e.tick.bind(f.e);f.e.tick=async()=>{ticks++;return tick();};
+ for(let id=2;id<=103;id++)f.messages.set(id,{...msg(id),read:false});
+ const result=await f.e.catchUp('rule1');assert.equal(f.e.pending.size,100);assert.equal(result.deferred,3);assert(ticks<=103,'högst en tick per köat mejl, ingen tömningsloop');assert.equal(f.api.calls.length,0);
+});

@@ -6,6 +6,11 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  openTimingLabel:"När ska mejlfönstret öppnas?",
+  openTimingAfter:"Efter verifierad flytt till målmappen",
+  openTimingBefore:"Före flytten – vänta tills fönstret stängs",
+  openTimingHelp:"Före: öppnar ett mejl i taget i källmappen. Flytten väntar tills fönstret är stängt och mejlet inte längre visas i någon annan flik. Mejlet kan markeras läst när du öppnar det. Efter: öppnar först när rätt mejl har verifierats i målmappen. Ett fönster som inte visar rätt mejl stängs.",
+  summaryOpenTiming:"Fönster: {timing}.",
   senderTitle:"Regel från avsändaren",
   senderHelp:"Välj en befintlig regel eller öppna ett nytt utkast. Målmappen visas vid varje regel.",
   senderType:"Vad ska läggas till?",
@@ -371,9 +376,9 @@ const I18N={
   testStopped:"Sorteringen är stoppad av ett fel. Kontrollera statusen.",
   ruleMoveUnreadLabel:'Flytta även olästa mejl direkt (annars väntar de tills du har läst dem)',
   unreadMoveNote:'Kryssad ruta: olästa mejl som matchar regeln flyttas direkt. Omarkerad: de ligger kvar och flyttas först när du har läst dem.',
-  ruleOpenWindowLabel:'Öppna olästa mejl i ett nytt fönster efter flytten',
+  ruleOpenWindowLabel:'Öppna olästa mejl i ett nytt fönster',
   unreadChoiceTitle:'Olästa mejl – välj vad som ska hända',
-  unreadChoiceNote:'Fönstervalet gäller bara när olästa mejl flyttas direkt. Då öppnas mejlet först när det ligger i målmappen – aldrig som en tom ruta.',
+  unreadChoiceNote:'Fönstervalet gäller olästa mejl som regeln får behandla. Välj nedan om de ska öppnas före eller efter flytten.',
   ruleTrialLabel:'Provkör i 7 dagar innan regeln flyttar något',
   trialNote:'Under provkörningen räknar regeln bara hur många mejl den skulle flytta. Ingenting flyttas, och regeln påverkar inte de andra reglerna. Efter sju dagar frågar SortBro om du vill aktivera den.',
   trialBadge:'TEST',
@@ -409,7 +414,7 @@ const I18N={
   unreadActionLabel:'När olästa mejl flyttas av denna regel',
   uaDefault:'Enligt standardinställning (Inställningar)',
   uaKeep:'Behåll som oläst i målmappen (utan popup-fönster)',
-  uaWindow:'Öppna i nytt fönster och behåll som oläst',
+  uaWindow:'Öppna i nytt fönster (tidpunkt väljs ovan)',
   uaRead:'Markera som läst vid flytt',
   branchSummary:'Avancerat: olika mål beroende på ämne',
   branchNote:'Första fördelningen som matchar styr målmappen. Övriga mejl går till målmappen ovan.',
@@ -813,6 +818,7 @@ const I18N={
    uncertain_move:'Ett flyttförsök fick osäkert svar. Klicka på "Rensa spärr och fortsätt" (eller under Inställningar) för att återuppta bevakningen.',
    storage_error:'Inställningarna kunde inte sparas. Motorn är stoppad i denna session.',
    invalid_storage:'Lagrade inställningar kunde inte läsas. Bevakningen är stoppad.',
+   window_error:'Mejlfönstret kunde inte visa rätt mejl. Flytten har inte startat. Kontrollera mejlet i källmappen och välj Rensa spärr och fortsätt för ett nytt försök.',
    display_error:'Visningsstatus kunde inte läsas säkert. Bevakningen är stoppad.',
    move_error:'Mapp eller meddelande kunde inte kontrolleras för flytt. Kontrollera regel och mappar.',
    sweep_error:'Kontrollen av befintliga mejl misslyckades. Kontrollera att regelns käll- och målmappar finns kvar och är skrivbara.',
@@ -840,6 +846,11 @@ const I18N={
   }
  },
  en:{
+  openTimingLabel:"When should the message window open?",
+  openTimingAfter:"After a verified move to the destination",
+  openTimingBefore:"Before moving – wait until the window closes",
+  openTimingHelp:"Before: opens one message at a time in the source folder. The move waits until the window is closed and no other tab displays the message. Opening it may mark it read. After: opens only once the correct message is verified in the destination. A window that fails to display the correct message is closed.",
+  summaryOpenTiming:"Window: {timing}.",
   senderTitle:"Rule from sender",
   senderHelp:"Choose an existing rule or open a new draft. Each rule shows its destination folder.",
   senderType:"What should be added?",
@@ -1205,9 +1216,9 @@ const I18N={
   testStopped:"Sorting has stopped because of an error. Check its status.",
   ruleMoveUnreadLabel:'Move unread emails right away too (otherwise they wait until you have read them)',
   unreadMoveNote:'Box ticked: unread emails matching the rule are moved right away. Cleared: they stay put and move only after you have read them.',
-  ruleOpenWindowLabel:'Open unread emails in a new window after the move',
+  ruleOpenWindowLabel:'Open unread emails in a new window',
   unreadChoiceTitle:'Unread emails – choose what should happen',
-  unreadChoiceNote:'The window choice applies only when unread emails move right away. The email opens first when it is in the target folder – never as an empty window.',
+  unreadChoiceNote:'The window choice applies to unread messages this rule may process. Choose below whether to open them before or after moving.',
   ruleTrialLabel:'Trial run for 7 days before the rule moves anything',
   trialNote:'During the trial the rule only counts how many emails it would move. Nothing moves, and the rule does not affect your other rules. After seven days SortBro asks whether to activate it.',
   trialBadge:'TEST',
@@ -1243,7 +1254,7 @@ const I18N={
   unreadActionLabel:'When unread emails are moved by this rule',
   uaDefault:'Use global default (Settings)',
   uaKeep:'Keep unread in target folder (no popup window)',
-  uaWindow:'Open in new window and keep unread',
+  uaWindow:'Open in a new window (choose timing above)',
   uaRead:'Mark as read when moved',
   branchSummary:'Advanced: route to different folders by subject',
   branchNote:'The first matching branch sets the target folder. Other matching emails go to the main target folder above.',
@@ -1647,6 +1658,7 @@ const I18N={
    uncertain_move:'A move attempt returned an uncertain status. Click "Clear lock & resume" (or under Settings) to resume monitoring.',
    storage_error:'Settings could not be saved. Engine is stopped for this session.',
    invalid_storage:'Stored settings could not be read. Monitoring is stopped.',
+   window_error:'The window could not display the correct message. The move has not started. Check the message in the source folder, then choose Clear lock & resume to try again.',
    display_error:'Message display state could not be verified safely. Monitoring is stopped.',
    move_error:'Folder or message could not be verified for moving. Check rule and folders.',
    sweep_error:'Scanning existing messages failed. Verify that the rule\'s folders exist and are writable.',
@@ -1724,6 +1736,7 @@ function updateReadPolicy(){
     död ruta som ser ut som en inställning som inte gör något. */
  const movesUnread=$('ruleMoveUnread')?.checked===true;
  if($('ruleOpenWindow'))$('ruleOpenWindow').disabled=!movesUnread;
+ if($('ruleOpenTiming'))$('ruleOpenTiming').disabled=!movesUnread||!$('ruleOpenWindow').checked;
  if($('unreadChoiceNote'))$('unreadChoiceNote').classList.toggle('muted-out',!movesUnread);
  const map={
   default:['policyDefaultTitle','policyDefaultBody'],
@@ -2094,6 +2107,7 @@ function applyTemplate(key){
  if($('ruleReadFilter'))$('ruleReadFilter').value=template.readFilter||(($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both');
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=($('quickOpenWindow')&&$('quickOpenWindow').checked)?'window':'keep';
  if($('ruleYearFolders'))$('ruleYearFolders').checked=template.yearFolders===true;
+ $('ruleOpenTiming').value='after';
  if(!$('source')?.value){const first=accounts()[0];if(first)accountOptions(first.id);}
  const auto=folders.find(f=>{const n=C.norm((f.name||'')+' '+(f.label||''));return template.hints.some(h=>n.includes(C.norm(h)));});
  if($('target'))targetOptions(auto?.id||$('target').value||'');
@@ -2810,6 +2824,7 @@ function updateRuleExplanation(){
  for(const [flag,key] of [[!$('enabled').checked,'summaryDisabled'],[$('ruleTrial')?.checked,'testTrial'],[state?.config.paused,'testPaused'],[state?.config.dryRun,'testDryRun'],[state?.fault,'testStopped']])if(flag)line(T(key));
  line(explanationText('summaryTiming',{mode:$('ruleReadFilter').selectedOptions[0]?.textContent||''}));
  line(explanationText('summaryUnread',{action:$('ruleUnreadAction').selectedOptions[0]?.textContent||''}));
+ if(!$('ruleOpenTiming').disabled)line(explanationText('summaryOpenTiming',{timing:$('ruleOpenTiming').selectedOptions[0]?.textContent||''}));
  if($('ruleYearFolders').checked)line(T('summaryYear'));
  if($('branches').children.length){
   line(T('summaryBranches'));
@@ -2888,7 +2903,7 @@ function addCondition(c={field:'domain',op:'equals',value:''}){
  const join=el('span','condition-join');join.setAttribute('aria-hidden','true');
  row.append(field,op,value,remove,join);$('conditions').append(row);updateRuleExplanation();
 }
-function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',yearFolders:$('ruleYearFolders')?.checked===true,
+function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',openTiming:$('ruleOpenTiming').value,yearFolders:$('ruleYearFolders')?.checked===true,
   trialUntil:$('ruleTrial')?.checked===true?(old?.trialUntil&&old.trialUntil>Date.now()?old.trialUntil:Date.now()+C.LIMITS.trialDays*86400000):0,
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.querySelector('.folder-choice').value}))});}
@@ -2900,6 +2915,7 @@ function loadRule(id='',presetAccount='',{openEditor=true}={}){
  $('match').value=rule?.match||'any';
  if($('ruleReadFilter'))$('ruleReadFilter').value=rule?.readFilter||'default';
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=rule?.unreadAction||'default';
+ $('ruleOpenTiming').value=rule?.openTiming||'after';
  if($('ruleYearFolders'))$('ruleYearFolders').checked=rule?.yearFolders===true;
  setTrialFields(rule);
  updateReadPolicy();
@@ -3114,6 +3130,7 @@ handle('ruleOpenWindow','change',()=>{
 });
 handle('ruleReadFilter','change',()=>{dirty=true;updateReadPolicy();});
 handle('ruleUnreadAction','change',()=>{dirty=true;updateReadPolicy();});
+handle('ruleOpenTiming','change',()=>{dirty=true;updateRuleExplanation();});
 handle('addCondition','click',()=>{addCondition({field:'subject',op:'contains',value:''});dirty=true;});
 /* ＋ Importera domäner/adresser: en lista blir flera villkor i regeln som redigeras. */
 function importIntoEditor(){

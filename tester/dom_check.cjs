@@ -197,6 +197,25 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  w.LasDemo.setState({config:senderOriginal,backups:senderBackups});await w.refresh();
  w.eval('dirty=false;loadRule(state.config.rules[0].id,"",{openEditor:false});setRulePanel("list");editorVisited=false;$("resumeEditor").hidden=true;showView("rules");');
 
+ /* Regelns fönstertidpunkt: explicit val, bakåtkompatibel standard, ingen autosparning. */
+ const timingConfig=structuredClone(w.LasDemo.setState({}).config),timingId=timingConfig.rules[0].id;
+ w.eval('loadRule(state.config.rules[0].id)');
+ check(el('ruleOpenTiming').value==='after','gamla regler får Efter, inte ändrad flyttordning');
+ el('ruleReadFilter').value='both';fire(el('ruleReadFilter'),'change');el('ruleUnreadAction').value='window';fire(el('ruleUnreadAction'),'change');
+ check(!el('ruleOpenTiming').disabled,'tidpunkten kan väljas när fönsteröppning är på');
+ el('ruleOpenTiming').value='before';fire(el('ruleOpenTiming'),'change');
+ check(w.eval('draft().openTiming')==='before'&&w.eval('dirty'),'Före hamnar i det osparade utkastet');
+ check(!w.LasDemo.setState({}).config.rules[0].openTiming||w.LasDemo.setState({}).config.rules[0].openTiming==='after','tidpunktsbyte sparar inte automatiskt');
+ check(txt('ruleSummaryBody').includes('Före flytten'),'sammanfattningen förklarar vald tidpunkt');
+ el('tab-suggestions').click();el('tab-rules').click();check(el('ruleOpenTiming').value==='before','flikbyte behåller tidsvalet');
+ w.eval('applyLanguage("en")');check(el('ruleOpenTiming').selectedOptions[0].textContent.includes('Before moving'),'tidsvalet översätts utan att ändras');w.eval('applyLanguage("sv")');
+ el('save').click();await until(()=>w.LasDemo.setState({}).config.rules.find(r=>r.id===timingId)?.openTiming==='before'&&!el('save').disabled,'Före sparas på rätt regel');
+ w.loadRule(timingId);check(el('ruleOpenTiming').value==='before','sparat Före återläses i editorn');
+ el('ruleOpenWindow').checked=false;fire(el('ruleOpenWindow'),'change');check(el('ruleOpenTiming').disabled&&el('ruleOpenTiming').value==='before','avstängt fönster inaktiverar tidsvalet utan att kasta det');
+ el('ruleOpenWindow').checked=true;fire(el('ruleOpenWindow'),'change');check(!el('ruleOpenTiming').disabled&&el('ruleOpenTiming').value==='before','återaktivering behåller det tidigare valet');
+ el('newRule').click();check(el('ruleOpenTiming').value==='after','ny regel ärver inte Före från en annan regel');
+ w.LasDemo.setState({config:timingConfig});await w.refresh();w.eval('dirty=false;loadRule(state.config.rules[0].id,"",{openEditor:false});setRulePanel("list");showView("rules");');
+
  /* --- Sidfoten: versionen ska komma från manifestet, inte från ui.html --- */
  await until(()=>/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version');
  check(/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version, inte texten i ui.html');
@@ -709,7 +728,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  await sleep(50);
  check(el('ruleOpenWindow').disabled===false,'fönstervalet går att göra när olästa flyttas');
  check(!el('unreadChoiceNote').classList.contains('muted-out'),'och förklaringen syns igen');
- check(/efter flytten/i.test(doc.querySelector('[data-i18n="ruleOpenWindowLabel"]')?.textContent||''),'rutan säger att fönstret kommer efter flytten');
+ check(el('ruleOpenTiming').value==='after'&&el('ruleOpenTiming').options.length===2,'befintliga regler behåller Efter men kan välja Före');
 
  /* ── Kompakta regler och menyn för sparade regler ─────────────────────── */
  w.LasDemo.setState({config:{...w.LasCore.defaults(),dryRun:true,paused:false,rules:[

@@ -265,7 +265,7 @@ function fromSortBroRule(rule,{uriPrefix='',folderPath='',type='17'}={}){
  if((rule.branches||[]).length)notes.push('branches');
  if(rule.yearFolders===true)notes.push('yearFolders');
  if(['read','unread'].includes(rule.readFilter))notes.push('readPolicy');
- if(rule.unreadAction==='window')notes.push('readPolicy');
+ if(rule.unreadAction==='window'||(rule.openTiming==='before'&&rule.unreadAction==='default'))notes.push('readPolicy');
  const extraActions=[];
  if(rule.unreadAction==='read')extraActions.push('action="Mark read"');
  if(!terms.length)return {ok:false,notes,skipped,reason:'empty'};

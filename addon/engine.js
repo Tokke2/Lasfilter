@@ -98,19 +98,25 @@ class Engine {
    new Promise((resolve,reject)=>{timer=setTimeout(()=>{if(typeof onTimeout==='function')resolve(onTimeout());else reject(new Error('timeout'));},ms);})
   ]);
  }
- async displayed(){
-  const ids=new Set(),tabs=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,()=>[]);
+ async displayed(strict=false){
+  const ids=new Set(),tabs=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,strict?undefined:()=>[]);
   const mailTabs=(tabs||[]).filter(tab=>['mail','messageDisplay'].includes(tab?.type));
   await Promise.all(mailTabs.map(async tab=>{
    try{
-    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??400,()=>[]);
+    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??400,strict?undefined:()=>[]);
     const messages=Array.isArray(raw)?raw:Array.isArray(raw?.messages)?raw.messages:raw==null?[]:null;
     if(!messages)throw new C.RuleError('display_error');
-    for(const m of messages)if(Number.isSafeInteger(m?.id))ids.add(m.id);
+    for(const m of messages){
+     if(Number.isSafeInteger(m?.id))ids.add(m.id);
+     // External RFC822 views have a different session ID, including on restart.
+     if(strict&&m?.external===true)for(const job of this.pending.values()){
+      if(m.headerMessageId===job.record.headerMessageId&&+new Date(m.date)===job.record.date)ids.add(job.id);
+     }
+    }
    }catch(error){
     // En flik kan ha stängts mellan listning och kontroll. Bara en bekräftat
     // försvunnen flik får ignoreras; övriga fel stoppar bevakningen.
-    const current=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,()=>[]);
+    const current=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,strict?undefined:()=>[]);
     if((current||[]).some(t=>t.id===tab.id))throw error;
    }
   }));
@@ -133,6 +139,10 @@ class Engine {
   const key=C.fingerprint(m);if(!key||!Number.isFinite(+new Date(m.date))||!Number.isSafeInteger(m.size))return null;
   return {key,headerMessageId:m.headerMessageId,date:+new Date(m.date),size:m.size,source:source||rule.source,target,ruleId:rule.id,notify:notify===true,
    unread:m.read!==true,rulesVersion:this.config.rulesVersion,stage:'pending',created:this.now()};
+ }
+ jobIdentity(message,record){
+  const key=C.fingerprint(message);
+  return !!key&&(key===record.key||(record.openedBefore===true&&message.headerMessageId===record.headerMessageId&&+new Date(message.date)===record.date));
  }
  ruleMode(rule){return rule?.readFilter||'default';}
  /* Årsmappar: målet blir <regelns mapp>/<årtal>, t.ex. Arkiv/2025. Mappen
@@ -224,6 +234,7 @@ class Engine {
  async readChanged(m,changed,old={}){
   if(changed.read===undefined)return false;
   this.invalidateFolders();
+  if(this.pending.get(m.id)?.record.openedBefore)return false;
   if(changed.read===false){
    await this.dropId(m.id);
    if(!this.enabled())return false;
@@ -244,6 +255,7 @@ class Engine {
   const target=forced?forced.target:await this.resolveTarget(rule,message);
   if(!target||target===message.folder.id){this.debug('kö avvisad id='+message.id+' mejlet ligger redan i målmappen');return false;}
   const record=this.makeRecord(message,rule,target,forced?message.folder.id:null,notify);
+  if(record)record.fromSweep=forced?.fromSweep===true;
   if(!record){this.log('skipped',1);this.debug('kö avvisad id='+message.id+' saknar fingeravtryck (Message-ID/datum/storlek)');return false;}
   if(this.done.has(record.key)||this.records.has(record.key)||this.pending.has(message.id)){this.debug('kö avvisad id='+message.id+' redan hanterad eller köad');return false;}
   if(this.records.size>=C.LIMITS.queue){this.debug('kö full: meddelandet lämnas till nästa automatiska svep');return false;}
@@ -283,10 +295,10 @@ class Engine {
   const afterKey=after?C.fingerprint(after):'';if(afterKey){this.done.add(afterKey);this.trimDone();}
   this.records.delete(op.record.key);this.pending.delete(id);this.inflight.delete(id);
   this.stats.moved++;this.log('moved',1);this.invalidateFolders();
-  if(op.record.unread){
+  if(op.record.unread&&!op.record.openedBefore){
    /* Målmapp och Message-ID följer alltid med: öppnaren väntar in mejlet där i
       stället för att öppna ett id som redan lämnat källmappen (tom ruta). */
-   this.hooks.notify?.(Number.isSafeInteger(after?.id)?after.id:null,op.record.ruleId,op.record.target||'',op.record.headerMessageId||'');
+   Promise.resolve(this.hooks.notify?.(Number.isSafeInteger(after?.id)?after.id:null,op.record.ruleId,op.record.target||'',op.record.headerMessageId||'',op.record.source||'',op.record.date,op.record.fromSweep===true)).catch(()=>this.log('error',0,'oppna_mejl_misslyckades'));
   }
   op.resolve(true);await this.persist();this.change();return true;
  }
@@ -313,7 +325,7 @@ class Engine {
      !Number.isFinite(raw.date)||!Number.isSafeInteger(raw.size)||typeof raw.source!=='string'||typeof raw.target!=='string'||
      !['pending','attempted'].includes(raw.stage)||typeof raw.ruleId!=='string'||!Number.isFinite(raw.created))continue;
    const r={key:raw.key,headerMessageId:raw.headerMessageId,date:raw.date,size:raw.size,source:raw.source,target:raw.target,
-    ruleId:raw.ruleId,rulesVersion:raw.rulesVersion,stage:raw.stage,created:raw.created,unread:raw.unread===true||raw.notify===true};
+    ruleId:raw.ruleId,rulesVersion:raw.rulesVersion,stage:raw.stage,created:raw.created,unread:raw.unread===true||raw.notify===true,openedBefore:raw.openedBefore===true,fromSweep:raw.fromSweep===true};
    if(r.key!==JSON.stringify([r.headerMessageId,r.date,r.size]))continue;
    if(r.stage==='attempted'){
     const inTarget=await this.findByHeader(r.target,r.headerMessageId);
@@ -333,9 +345,10 @@ class Engine {
     if(found.length!==1)continue;
     const m=found[0],rule=this.config.rules.find(x=>x.id===r.ruleId&&x.enabled),first=C.firstMatch(this.config.rules,m);
     if(first&&first.id!==r.ruleId)continue;
+    if(r.openedBefore&&(!r.unread||rule?.openTiming!=='before'))continue;
     const rf=this.ruleMode(rule),allowUnread=notify||['both','unread'].includes(rf)||this.config.moveMode==='direct';
     const expected=rule?await this.resolveTarget(rule,m,{create:false}):'';
-    if((!allowUnread&&m.read!==true)||(rf==='unread'&&m.read===true)||m.folder?.id!==r.source||C.fingerprint(m)!==r.key||!rule||!C.match(rule,m,false,true)||expected!==r.target)continue;
+    if((!allowUnread&&m.read!==true)||(rf==='unread'&&m.read===true&&!r.openedBefore)||m.folder?.id!==r.source||!this.jobIdentity(m,r)||!rule||!C.match(rule,m,false,true)||expected!==r.target)continue;
     r.notify=notify;this.records.set(r.key,r);this.pending.set(m.id,{id:m.id,record:r,persisted:true,hiddenSince:null});
    }catch{this.log('error');}
   }
@@ -476,6 +489,9 @@ class Engine {
          this.hooks.kick?.();
          const waitStart=Date.now();
          while(this.records.size>=C.LIMITS.queue&&this.enabled()&&Date.now()-waitStart<15000){
+          // Window jobs cannot drain until the user closes them (or this sweep
+          // ends). Defer overflow rather than busy-waiting 15 seconds per mail.
+          if(this.pending.size&&[...this.pending.values()].every(j=>j.waitingWindow))break;
           if(!this.busy)await this.tick();
           else await new Promise(r=>setTimeout(r,40));
          }
@@ -589,7 +605,7 @@ class Engine {
   finally{
    this.busy=false;this.change();
    if(this.enabled()&&this.pending.size){
-    const ready=[...this.pending.values()].some(j=>j.persisted&&j.record.stage==='pending'&&(this.config.moveMode==='direct'||j.record.notify===true||['both','unread'].includes(this.ruleMode(this.config.rules.find(r=>r.id===j.record.ruleId)))||(j.hiddenSince!==null&&this.now()-j.hiddenSince>=2000)));
+    const ready=[...this.pending.values()].some(j=>!j.waitingWindow&&j.persisted&&j.record.stage==='pending'&&(this.config.moveMode==='direct'||j.record.notify===true||['both','unread'].includes(this.ruleMode(this.config.rules.find(r=>r.id===j.record.ruleId)))||(j.hiddenSince!==null&&this.now()-j.hiddenSince>=2000)));
     if(ready)this.hooks.kick?.();
    }
   }
@@ -610,7 +626,7 @@ class Engine {
    const rf=this.ruleMode(rule);
    const allowUnread=job.record.notify||rf==='both'||rf==='unread'||this.config.moveMode==='direct';
    const expected=rule?await this.resolveTarget(rule,m,{create:false}):'';
-   if((rf==='unread'&&m.read===true)||(m.read!==true&&!allowUnread)||m.folder?.id!==job.record.source||C.fingerprint(m)!==job.record.key||!rule||!C.match(rule,m,false,true)||expected!==job.record.target){this.debug('jobb '+job.id+' slappt: villkor/kalla/ fingeravtryck stammer inte langre');await this.dropId(job.id);return;}
+   if((rf==='unread'&&m.read===true&&!job.record.openedBefore)||(m.read!==true&&!allowUnread)||m.folder?.id!==job.record.source||!this.jobIdentity(m,job.record)||!rule||!C.match(rule,m,false,true)||expected!==job.record.target){this.debug('jobb '+job.id+' slappt: villkor/kalla/ fingeravtryck stammer inte langre');await this.dropId(job.id);return;}
    // Kontrollera den faktiska källan och det faktiska målet. Detta är viktigt
    // för svep från undermappar, fördelningsmål och flyttar mellan konton.
    const pairKey=job.record.source+'\0'+job.record.target;
@@ -627,24 +643,39 @@ class Engine {
     }
    }
    if(!this.enabled()||epoch!==this.epoch)return;
-   const direct=this.config.moveMode==='direct'||job.record.notify===true||rf==='both'||rf==='unread';
-   if(!direct&&(await this.currentDisplayed(batchState)).has(job.id)){this.debug('jobb '+job.id+' vantar: visas fortfarande i nagon flik');job.hiddenSince=null;return;}
+   job.waitingWindow=false;
+   // A window opened by SortBro protects its message even if another rule would
+   // otherwise move it directly. Unknown tab state is not evidence of closure.
+   if(await this.hooks.windowOpen?.(m)){job.waitingWindow=true;job.hiddenSince=null;return;}
+   const before=job.record.unread&&rule.openTiming==='before'&&(rule.unreadAction==='window'||((rule.unreadAction||'default')==='default'&&this.config.openWindow!==false));
+   if(before&&this.trialActive(rule)){await this.dropId(job.id);return;}
+   if(before&&!this.config.dryRun){
+    if(!job.record.openedBefore){job.record.openedBefore=true;job.hiddenSince=null;await this.persist();}
+    if(!this.enabled()||epoch!==this.epoch)return;
+    if(!this.hooks.beforeMove||!await this.hooks.beforeMove(m,job.record)){job.waitingWindow=true;return;}
+    if((await this.displayed(true)).has(job.id)){job.hiddenSince=null;job.waitingWindow=true;return;}
+    if(job.hiddenSince===null){job.hiddenSince=this.now();job.waitingWindow=true;return;}
+    if(this.now()-job.hiddenSince<2000){job.waitingWindow=true;return;}
+   }
+   const direct=!before&&(this.config.moveMode==='direct'||job.record.notify===true||rf==='both'||rf==='unread');
+   if(!direct&&(before?await this.displayed(true):await this.currentDisplayed(batchState)).has(job.id)){this.debug('jobb '+job.id+' vantar: visas fortfarande i nagon flik');job.hiddenSince=null;return;}
    if(!this.enabled()||epoch!==this.epoch)return;
    if(this.config.dryRun){
     this.pending.delete(job.id);this.records.delete(job.record.key);this.done.add(job.record.key);this.trimDone();
     await this.persist();this.stats.simulated++;this.log('simulated',1);return;
    }
    let latest;try{latest=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet forsvann fore flytt');await this.dropId(job.id);return;}
-   const visible=direct?new Set():await this.currentDisplayed(batchState);
+   const visible=direct?new Set():before?await this.displayed(true):await this.currentDisplayed(batchState);
    const expectedLatest=await this.resolveTarget(rule,latest,{create:false});
-   if(!this.enabled()||epoch!==this.epoch||(rf==='unread'&&latest.read===true)||(latest.read!==true&&!allowUnread)||latest.folder?.id!==job.record.source||
-      C.fingerprint(latest)!==job.record.key||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||expectedLatest!==job.record.target){
+   if(!this.enabled()||epoch!==this.epoch||(rf==='unread'&&latest.read===true&&!job.record.openedBefore)||(latest.read!==true&&!allowUnread)||latest.folder?.id!==job.record.source||
+      !this.jobIdentity(latest,job.record)||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||expectedLatest!==job.record.target){
     if(job.record.rulesVersion===this.config.rulesVersion){this.debug('jobb '+job.id+' vantar: last/visas/utanfor kalla just nu');job.record.stage='pending';job.hiddenSince=null;}
     else{this.records.delete(job.record.key);this.pending.delete(job.id);}
     await this.persist();return;
    }
    // Journalen skrivs FÖRE flytt. Ett osäkert försök återupptas aldrig automatiskt.
    job.record.stage='attempted';await this.persist();
+   if(!this.enabled()||epoch!==this.epoch||job.record.rulesVersion!==this.config.rulesVersion||await this.hooks.windowOpen?.(latest)||(before&&(await this.displayed(true)).has(job.id))){job.record.stage='pending';job.hiddenSince=null;await this.persist();return;}
    let resolve;const ack=new Promise(r=>resolve=r);
    op={record:job.record,resolve,confirmed:false};this.inflight.set(job.id,op);
    this.done.add(job.record.key);this.trimDone();called=true;

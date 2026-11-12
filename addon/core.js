@@ -35,6 +35,7 @@ function validateRule(raw){
  if(!raw||typeof raw!=='object')fail('bad_rule');
  const scope=raw.scope===undefined?'folder':raw.scope;if(!['folder','account'].includes(scope))fail('bad_rule');
  const readFilter=raw.readFilter===undefined?'default':raw.readFilter;if(!['default','read','unread','both'].includes(readFilter))fail('bad_rule');
+ const openTiming=raw.openTiming===undefined?'after':raw.openTiming;if(!['before','after'].includes(openTiming))fail('bad_rule');
  const unreadAction=raw.unreadAction===undefined?'default':raw.unreadAction;if(!['default','keep','window','read'].includes(unreadAction))fail('bad_rule');
  /* Provkörning: en regel kan gå i testläge till ett datum. 0 betyder ingen
     provkörning. Fältet saknas i regler från tidigare versioner och blir då 0. */
@@ -42,7 +43,7 @@ function validateRule(raw){
  if(typeof trialUntil!=='number'||!Number.isFinite(trialUntil)||trialUntil<0)fail('bad_rule');
  const r={id:text(raw.id,80,'bad_id'),name:text(raw.name,100,'bad_name'),enabled:raw.enabled===true,
   source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(raw.sourceAccount,2048,'choose_source'):'',scope,
-  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction,trialUntil:Math.floor(trialUntil),yearFolders:raw.yearFolders===true};
+  target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction,openTiming,trialUntil:Math.floor(trialUntil),yearFolders:raw.yearFolders===true};
  if(!/^[a-zA-Z0-9_-]+$/.test(r.id))fail('bad_id');
  if(r.scope==='folder'&&r.source===r.target)fail('same_folder');
  if(!['all','any'].includes(r.match))fail('bad_match');

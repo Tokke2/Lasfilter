@@ -61,6 +61,18 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
   - För en ny regel öppnas ett osparat utkast i editorn; välj målmapp och granska innan du sparar. En saknad eller ogiltig avsändaradress ersätts aldrig med ämnesraden.
   - Avbryt/Escape ändrar inget i regeln eller ditt pågående editorutkast. Om en sparning skulle ersätta ett osparat utkast frågar SortBro först.
 
+## Mejlfönster före eller efter flytten
+
+I regelredigerarens steg 3 kan du välja **När ska mejlfönstret öppnas?** när regeln får behandla olästa mejl och fönsteröppning är på.
+
+- **Före flytten – vänta tills fönstret stängs:** öppnar mejlet i källmappen, ett källfönster åt gången. Flytten väntar tills det verifierade fönstret är stängt, mejlet inte visas i någon annan flik och två sekunder har gått. Thunderbird kan markera mejlet läst under visningen; det avbryter inte denna väntande flytt.
+- **Efter verifierad flytt till målmappen:** standard för nya och befintliga regler. SortBro kräver en entydig träff med rätt Message-ID och datum i målmappen, ingen träff kvar i källmappen och läsbart meddelandeinnehåll innan det öppnas. Källans gamla sessions-ID används inte för öppningen.
+- **Skydd mot tomma rutor:** öppningsanropet räcker inte som kvitto. SortBro kontrollerar vilket mejl den nya fliken rapporterar och stänger sin egen misslyckade visning. Om Thunderbirds vanliga visning blir tom försöker SortBro en gång med en lokal RFC822-kopia i minnet, utan export till Hämtade filer. Även den måste rapportera rätt meddelande. Andra, redan öppna fönster stängs aldrig av denna kontroll.
+- Om visningen misslyckas **före** flytten stoppas bevakningen och mejlet lämnas kvar i källmappen. Kontrollera mejlet och välj **Rensa spärr och fortsätt** för ett nytt försök. Efter en omstart krävs ett nytt visningskvitto; en sparad väntemarkering räcker inte för att flytta.
+- Testläge/provkörning öppnar inte dessa fönster. Automatisk efteröppning är begränsad vid svep och stora köer; högst tre egna efterfönster hålls öppna. Inställningar för att behålla oläst eller markera läst finns kvar.
+
+Kontrollerna använder Thunderbirds meddelande- och visnings-API. De kan inte garantera att varje HTML-mejl faktiskt målas korrekt på skärmen; vid kvarstående vit ruta behövs kontroll i din Thunderbird-installation.
+
 ## Thunderbirds egna filter – läs in dem och skriv ut dina egna
 
 Du som redan har fyrtio filter behöver inte skriva om dem. Under **Regler → Importera & exportera regler** finns kortet **🔁 Thunderbirds egna filter**:
@@ -102,8 +114,7 @@ SortBro arkiverar **ingenting av sig självt**. Det finns ingen inbyggd årsarki
 
 Kryssrutan **Flytta även olästa mejl direkt** i steg 3 styr läsläget för regeln:
 
-- **Kryssad** → olästa mejl som matchar regeln flyttas **direkt**, utan att vänta på att bli lästa. Det gäller i alla mappar regeln söker i, inte bara i Inkorgen. Flytten sker omedelbart när mejlet kommer in eller vid nästa svep. Den andra kryssrutan, **Öppna olästa mejl i ett nytt fönster efter flytten**, är regelns eget val: kryssad öppnas mejlet i ett fönster när det väl ligger i målmappen, omarkerad ligger det kvar som oläst utan fönster. Valet görs alltså **när regeln skapas** och gäller bara den regeln – det är inte en global inställning. Är *Flytta även olästa mejl direkt* omarkerad är fönstervalet gråtonat, eftersom det då inte finns någon flytt att öppna efter.
-- **Fönstret öppnas först när mejlet ligger i målmappen – och bara om det går att visa.** SortBro väntar in flytten och letar upp mejlet i målmappen (via Message-ID om id:t bytts). Sedan krävs **två** saker innan fönstret öppnas: mejlet ska ligga i målmappen **och** innehållet ska gå att läsa. Ett oläst mejl som ännu inte hämtats hem från servern skulle annars ge just en tom ruta. Går något av kraven inte igenom inom några sekunder öppnas **inget** fönster alls – hellre inget fönster än ett tomt – och orsaken skrivs i loggen: `olasta mejlet kunde inte hittas i malmappen` respektive `olasta mejlet gick inte att lasa an`. Även när fönstret öppnas skrivs ett kvitto (`olasta mejlet oppnat i malmappen` och `olasta mejlet visades i fonstret`), så loggen kan svara på om en tom ruta alls kom från SortBro eller från Thunderbird själv. Skulle id:t bytas i samma sekund som fönstret öppnas görs ett andra försök på mejlets identitet (Message-ID), som alltid följer med flytten.
+- **Kryssad** → regeln får även behandla olästa mejl. **Öppna olästa mejl i ett nytt fönster** styr om fönstret ska öppnas, och **När ska mejlfönstret öppnas?** väljer före eller efter flytten (se avsnittet ovan). Före väntar på stängning; Efter verifierar mål och källa innan öppning. Valen gäller bara den regeln. Utan fönster flyttas mejlet utan automatisk öppning.
 - **Omarkerad** → olästa mejl ligger kvar och flyttas först när du har läst dem och lämnat dem (minst två sekunder utan visning i någon flik eller något fönster).
 
 Under **Avancerat: läsläge & olika mål beroende på ämne** finns samma sak som fyra läslägen: *enligt standard*, *endast lästa*, *både olästa och lästa* samt *endast olästa* – kryssrutan håller sig i synk med läget.
@@ -506,7 +517,17 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Röda dagar, frånvaro och arbetsflöden hanteras inte. Ställ in paus manuellt vid behov.
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
-Testade miljöer och resultat finns i `TESTRESULTAT.md`. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.23
+
+- **Före eller efter per regel.** Före öppnar i källmappen och väntar på stängt fönster samt två sekunder utan annan visning. Befintliga regler behåller Efter.
+- **Verifierad efteröppning.** Entydigt mål, tom källa, rätt datum och läsbart innehåll krävs; inget globalt Message-ID-reservanrop som kan välja fel kopia.
+- **Skydd mot vita rutor.** Felaktig egen visning stängs. En lokal meddelandekopia kan användas som reservväg, men måste också verifieras. Misslyckad förevisning stoppar flytten.
+- **Väntan överlever läst-markering.** Ingen flytt medan det egna fönstret är öppet, även med direktläge. Provkörning, paus, regeländringar och omstart omfattas av säkerhetskontrollerna.
+- **Oförändrade behörigheter och uppdatering.** Inga nya beroenden i tillägget, ingen ändring av CSP eller den inbyggda uppdateringen via Releases.
+
+Verifierat med **474 automatiska tester, 479 DOM-kontroller och 24 Chromium-layouter** (SV/EN, 600/840/1280 px, 12/14/20/24 px text, ljust/mörkt, tangentbordsval och sparning/återläsning). Testerna använder simulerade Thunderbird-API:er. **Inte provat i riktig Thunderbird eller Windows här.** Installera ovanpå befintlig version, utan att avinstallera.
 
 ## Nyheter i 1.0.22
 

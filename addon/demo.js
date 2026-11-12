@@ -21,7 +21,8 @@ globalThis.LasDemo=(()=>{
  function saveRules(rules){snapshots.unshift(structuredClone(state.config));snapshots.splice(5);state.backups=snapshots.map((c,i)=>({index:i,time:new Date().toISOString(),count:c.rules.length}));state.config.rules=LasCore.validateRules(rules);state.config.revision++;}
  async function request(m){try{let data;
   switch(m.type){
-   case 'status':data=state;break;case 'folders':data=folders;break;case 'selected':data=selected;break;
+   case 'status':state.readerPause=LasCore.readerPauseState(state.readerPause?.until||0);data=state;break;
+   case 'setReaderPause':state.readerPause=LasCore.readerPauseState(LasCore.readerPauseDeadline(m.mode));data=state;break;case 'folders':data=folders;break;case 'selected':data=selected;break;
    case 'prefs':{
     const p=m.prefs||{};
     if(p.filterUris&&typeof p.filterUris==='object')state.prefs.filterUris=p.filterUris;

@@ -27,7 +27,7 @@ function clock(){
  const RealDate=Date;let now=RealDate.now();const timers=new Map();let seq=1;
  class FakeDate extends RealDate{static now(){return now;}}
  FakeDate.parse=RealDate.parse;FakeDate.UTC=RealDate.UTC;
- const api={Date:FakeDate,now:()=>now,
+ const api={Date:FakeDate,now:()=>now,advance:ms=>now+=ms,
   setTimeout:(fn,ms=0)=>{const id=seq++;timers.set(id,{fn,at:now+(Number(ms)||0)});return id;},
   clearTimeout:id=>{timers.delete(id);},
   setInterval:()=>seq++,clearInterval:()=>{},
@@ -1739,4 +1739,87 @@ test('flytt spärras även när läsfönstrets innehåll har visats men fönstre
  await engine.enqueue({...w.message});await tick.settle(engine.tick(),100);
  for(let i=0;i<5;i++){tick.setTimeout(()=>{},3000);await tick.flush(20);await tick.settle(engine.tick(),100);}
  assert.equal(moves,0);assert.equal(engine.pending.size,1);assert.equal(w.opened.length,1);assert(app.beforeWindows.values().next().value.confirmed);
+});
+
+test('läsfönsterpaus sparas separat utan regeländring eller regelbackup',async()=>{
+ const {app,api,tick}=await loadBackground();const e=unreadEngine(app),before=JSON.stringify(e.config),saved=[];
+ api.storage.local.set=async value=>saved.push(value);
+ for(const [mode,duration] of [['15m',900000],['1h',3600000],['manual',null]]){
+  const now=tick.now(),status=await app.setReaderPause(mode);
+  assert.equal(status.paused,true);assert.equal(status.until,duration===null?-1:now+duration);
+  assert.equal(app.snapshot().readerPause.until,status.until);
+ }
+ assert.equal(JSON.stringify(e.config),before);assert.equal(saved.length,3);
+ assert(saved.every(x=>Object.keys(x).join(',')==='readerPauseUntil'));
+ await app.setReaderPause('resume');assert.equal(app.readerPauseState().paused,false);assert.equal(saved.at(-1).readerPauseUntil,0);
+});
+test('tidsstyrd läsfönsterpaus släpper vid sluttiden, även efter sovglapp',async()=>{
+ const {app,tick}=await loadBackground();unreadEngine(app);await app.setReaderPause('15m');
+ let kicked=0;app.kick=()=>kicked++;
+ tick.advance(899999);app.refreshReaderPause();assert.equal(app.readerPauseState().paused,true);assert.equal(kicked,0);
+ tick.advance(1);app.refreshReaderPause();assert.equal(app.readerPauseState().paused,false);assert.equal(kicked,1);
+ app.refreshReaderPause();assert.equal(kicked,1);
+ await app.setReaderPause('1h');kicked=0;tick.advance(7200000);app.refreshReaderPause();assert.equal(app.readerPauseState().paused,false);assert.equal(kicked,1);
+ await app.setReaderPause('manual');tick.advance(365*86400000);app.refreshReaderPause();assert.equal(app.readerPauseState().paused,true);
+});
+test('väntande Före-mejl öppnas inte under paus och blir inte felspärrat',async()=>{
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+ await app.setReaderPause('manual');
+ for(let i=0;i<3;i++)assert.equal(await app.beforeMove(w.message,{key:'job'}),false);
+ assert.equal(w.opened.length,0);assert.equal(app.beforeWindows.size,0);assert.equal(e.fault,'');
+ await app.setReaderPause('resume');await tick.settle(app.beforeMove(w.message,{key:'job'}),100);
+ assert.equal(w.opened.length,1);assert.equal(app.beforeWindows.get('job').closed,false);
+});
+test('paus under kroppshämtning skjuter upp öppningen utan window_error',async()=>{
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+ const full=api.messages.getFull;let release;api.messages.getFull=()=>new Promise(resolve=>release=resolve);
+ const opening=app.beforeMove(w.message,{key:'job'});await new Promise(r=>setImmediate(r));assert.equal(typeof release,'function');
+ await app.setReaderPause('manual');await app.setReaderPause('resume');release(await full());
+ assert.equal(await tick.settle(opening,100),false);assert.equal(w.opened.length,0);assert.equal(e.fault,'');assert.equal(app.readers.size,0);
+});
+test('osparat pausval blockerar öppning direkt och dubbla val skrivs i ordning',async()=>{
+ const {app,api}=await loadBackground();unreadEngine(app);let release;const saved=[];
+ api.storage.local.set=async data=>{saved.push(data.readerPauseUntil);if(saved.length===1)await new Promise(resolve=>release=resolve);};
+ const first=app.setReaderPause('manual');const second=app.setReaderPause('resume');
+ assert.equal(app.readerPauseState().paused,true);assert.equal(app.readerPauseState().saving,true);
+ await new Promise(r=>setImmediate(r));release();await Promise.all([first,second]);
+ assert.deepEqual(saved,[-1,0]);assert.equal(app.readerPauseState().paused,false);assert.equal(app.readerPauseState().saving,false);
+});
+test('misslyckad paussparning kvitteras inte och skyddar fortsatt sortering',async()=>{
+ const {app,api}=await loadBackground();const e=unreadEngine(app);app.readerPauseUntil=-1;
+ api.storage.local.set=async()=>{throw Error('disk');};
+ await assert.rejects(app.setReaderPause('resume'),e=>e.code==='storage_error');assert.equal(app.readerPauseState().paused,true);assert.equal(app.readerPauseState().saving,false);assert.equal(e.fault,'storage_error');
+});
+test('pausen återläses vid start medan utgången paus och nyinstallation är aktiva',async()=>{
+ for(const value of [-1,Date.now()+3600000,Date.now()-60000,undefined]){
+  const api=stubApi();api.storage.local.get=async()=>({beforeReaderMigration:1,readerPauseUntil:value});
+  const {app}=await loadBackground(api);assert.equal(app.readerPauseState().paused,value===-1||value>Date.now());
+ }
+ const api=stubApi();api.storage.local.get=async()=>({beforeReaderMigration:1,readerPauseUntil:'bad'});
+ const {app}=await loadBackground(api);assert.equal(app.readerPauseState().paused,true);assert.equal(app.engine.fault,'invalid_storage');
+});
+test('endast rätt läsfönster får ändra paus via sin sessionskanal',async()=>{
+ const {app,api}=await loadBackground();windowApi(api,app);unreadEngine(app);
+ app.readers.set('token',{tabId:11,closed:false,data:{},ready:true});const sender={id:api.runtime.id,url:api.runtime.getURL('reader.html')+'#token',tab:{id:11}};
+ await assert.rejects(app.readerRequest({type:'readerPause',token:'token',mode:'manual'},{...sender,tab:{id:12}}));assert.equal(app.readerPauseState().paused,false);
+ await assert.rejects(app.readerRequest({type:'readerPause',token:'token',mode:'invalid'},sender));assert.equal(app.readerPauseState().paused,false);
+ assert.equal((await app.readerRequest({type:'readerPause',token:'token',mode:'manual'},sender)).paused,true);
+ assert.equal((await app.readerRequest({type:'readerData',token:'token'},sender)).readerPause.until,-1);
+ assert.equal((await app.readerRequest({type:'readerState',token:'token'},sender)).paused,true);
+});
+test('riktig motor: öppet mejl får avslutas under pausen, nästa mejl ligger kvar',async()=>{
+ const {app,tick,api}=await loadBackground();inboxAccount(api);const w=windowApi(api,app);w.message.folder.id='inbox';
+ const Engine=require('../addon/engine.js'),rule=C.validateRule({id:'r1',name:'Före',enabled:true,source:'inbox',target:'fin',match:'any',conditions:[{field:'domain',op:'equals',value:'example.se'}],readFilter:'unread',unreadAction:'window',openTiming:'before'});
+ let moves=0,kicks=0;const engine=new Engine(api,{...C.defaults(),dryRun:false,moveMode:'direct',rules:[rule]},{now:tick.now,persist:async()=>{},beforeMove:app.beforeMove,windowOpen:app.windowOpen,kick:()=>kicks++,ackTimeout:5});app.engine=engine;
+ api.folders.get=async id=>({id,accountId:'a',name:id,specialUse:[]});api.folders.getFolderCapabilities=async()=>({canAddMessages:true,canDeleteMessages:true});
+ api.messages.move=async(ids,target)=>{moves++;const old={...w.message,folder:{...w.message.folder}};w.message.id+=100;w.message.folder.id=target;await engine.onMoved({messages:[old]},{messages:[{...w.message}]});};
+ await engine.enqueue({...w.message});await tick.settle(engine.tick(),100);assert.equal(w.opened.length,1);
+ await app.setReaderPause('manual');await tick.settle(engine.tick(),100);assert.equal(moves,0);
+ w.tabs.clear();app.windowClosed(11);await tick.settle(engine.tick(),100);tick.advance(2100);await tick.settle(engine.tick(),100);assert.equal(moves,1);
+ Object.assign(w.message,{id:300,headerMessageId:'next@x',folder:{id:'inbox'},read:false});await engine.enqueue({...w.message});kicks=0;
+ for(let i=0;i<3;i++){tick.advance(2100);await tick.settle(engine.tick(),100);}
+ assert.equal(moves,1);assert.equal(w.opened.length,1);assert.equal(engine.pending.size,1);assert.equal(kicks,0,'ingen omedelbar kick-loop');
+ w.message.read=true;await engine.readChanged({...w.message},{read:true},{read:false});await tick.settle(engine.tick(),100);assert.equal(moves,1);
+ await app.setReaderPause('resume');await tick.settle(engine.tick(),100);assert.equal(w.opened.length,2);assert.equal(moves,1,'fortsätt är inte en flyttknapp');
+ w.tabs.clear();app.windowClosed(12);await tick.settle(engine.tick(),100);tick.advance(2100);await tick.settle(engine.tick(),100);assert.equal(moves,2);
 });

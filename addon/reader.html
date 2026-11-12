@@ -18,6 +18,18 @@
 <p id="attachments"></p>
 <p id="error" role="alert" hidden></p>
 </main>
+<section id="readerPauseControls" hidden aria-labelledby="readerPauseTitle">
+<h2 id="readerPauseTitle">Pausa nya läsfönster</h2>
+<p id="readerPauseHelp">Gäller Före-fönster. Mejlen som väntar på visning ligger kvar under pausen. Detta redan öppna mejl kan flyttas när du stänger det och övriga visningar är stängda. Övrig sortering fortsätter.</p>
+<label for="readerPauseDuration" id="readerPauseDurationLabel">Pausens längd</label>
+<div class="pause-actions">
+<select id="readerPauseDuration"><option value="15m">15 minuter</option><option value="1h">1 timme</option><option value="manual">Tills jag fortsätter</option></select>
+<button id="readerPauseApply" type="button">Pausa nya fönster</button>
+<button id="readerPauseResume" type="button" hidden>Fortsätt med nya läsfönster</button>
+</div>
+<p id="readerPauseStatus" role="status"></p>
+<p id="readerPauseError" role="alert" hidden></p>
+</section>
 <footer><button id="close" type="button">Stäng mejlet</button><span id="copyright">© Rickard Längkvist</span></footer>
 </body>
 </html>

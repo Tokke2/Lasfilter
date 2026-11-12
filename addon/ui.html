@@ -172,6 +172,10 @@
           </button>
         </nav>
 
+        <div id="readerPauseNotice" class="notice reader-pause-banner" hidden>
+          <span id="readerPauseNoticeText" role="status"></span>
+          <button id="readerPauseResumeNotice" class="button secondary" type="button" data-i18n="readerPauseResume">Fortsätt med nya läsfönster</button>
+        </div>
         <div id="notice" role="alert" class="notice" hidden=""></div>
 
         <section id="runGuide" class="run-guide" aria-live="polite">
@@ -1275,6 +1279,16 @@ order@fortnox.se, nyheter@klarna.se"
                 <h2 data-i18n="sortingSection">Sortering &amp; säkerhet</h2>
               </summary>
               <div class="settings-body">
+                <section class="reader-pause-settings" aria-labelledby="readerPauseTitle">
+                  <h3 id="readerPauseTitle" data-i18n="readerPauseTitle">Pausa nya läsfönster</h3>
+                  <p class="muted" data-i18n="readerPauseHelp">Gäller Före-fönster. Mejlen som väntar på visning ligger kvar under pausen. Redan öppnade mejl kan flyttas efter stängning. Övrig sortering fortsätter. Pausen bevaras vid omstart.</p>
+                  <label class="field"><span data-i18n="readerPauseDurationLabel">Pausens längd</span><select id="readerPauseDuration"><option value="15m" data-i18n="readerPause15">15 minuter</option><option value="1h" data-i18n="readerPause60">1 timme</option><option value="manual" data-i18n="readerPauseManual">Tills jag fortsätter</option></select></label>
+                  <div class="reader-pause-actions">
+                    <button id="readerPauseApply" type="button" class="button secondary" data-i18n="readerPauseApply">Pausa nya fönster</button>
+                    <button id="readerPauseResume" type="button" class="button secondary" data-i18n="readerPauseResume" hidden>Fortsätt med nya läsfönster</button>
+                  </div>
+                  <p id="readerPauseStatus" role="status"></p>
+                </section>
                 <label class="field">
                   <span data-i18n="moveModeLabel"
                     >Standardläge för regler (när regeln står på Standard)</span

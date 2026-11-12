@@ -74,6 +74,19 @@ I regelredigerarens steg 3 kan du välja **När ska mejlfönstret öppnas?** nä
 
 Textvisningen och stängningsspärren testas automatiskt, men din Thunderbird-/IMAP-installation behöver fortfarande kontrolleras med ett testmejl.
 
+### Stängknapp och paus för nya läsfönster
+
+När texten har visats och kvitterats heter knappen **Stäng och flytta när övriga visningar är stängda**. Den stänger samma fönster som tidigare; flyttspärren, kontrollen av andra visningar och tvåsekundersväntan är oförändrade. Om texten inte kan visas står det bara **Stäng mejlet**, och ingen flytt godkänns.
+
+Under **Pausa nya läsfönster** i läsfönstret eller **Inställningar → Sortering & säkerhet** finns tre val:
+
+- **15 minuter** eller **1 timme:** visar en sluttid och återupptar automatiskt när tiden gått ut, även efter datorvila eller omstart.
+- **Tills jag fortsätter:** ligger kvar tills du trycker **Fortsätt med nya läsfönster**.
+
+Att välja en längd sparar inget förrän du trycker **Pausa nya fönster**. Pausen gäller nya **Före-fönster**: mejl som ännu väntar på visning ligger kvar och flyttas inte i stället för att öppnas. Ett redan öppnat mejl kan avslutas och flyttas efter att du stängt det och övriga visningar är stängda. Övrig sortering och det uttryckliga Efter-läget påverkas inte. För att stoppa all sortering använder du den vanliga **Pausa**-knappen.
+
+En synlig pausrad med **Fortsätt** finns i huvudgränssnittet även om du har stängt läsfönstret. Pausen lagras separat och ändrar varken regler, deras version, globala bevakningspausen eller osparade utkast. Veckobackupens rytm påverkas inte.
+
 ## Thunderbirds egna filter – läs in dem och skriv ut dina egna
 
 Du som redan har fyrtio filter behöver inte skriva om dem. Under **Regler → Importera & exportera regler** finns kortet **🔁 Thunderbirds egna filter**:
@@ -519,6 +532,17 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.25
+
+Endast de valda förslagen **3 och 4**:
+
+- **Tydligare stängknapp:** ”Stäng och flytta när övriga visningar är stängda” efter bekräftad textvisning. Ingen ändring av när flytten tillåts; vid visningsfel står det fortsatt bara ”Stäng mejlet”.
+- **Pausa nya läsfönster:** 15 minuter, 1 timme eller tills du fortsätter. Finns i läsfönstret och under Sortering & säkerhet, med aktuell status och Fortsätt även i huvudgränssnittet.
+- **Väntande mejl skyddas:** pausen hoppar aldrig över förevisningen för att flytta direkt. Ett redan öppnat mejl får avslutas, medan nästa väntar. Även paus under kroppshämtning hanteras utan falskt visningsfel. Pausvalet sparas över omstart och tidsstyrda pauser tar hänsyn till datorvila.
+- **Oförändrade regler och behörigheter:** ingen ny behörighet eller tilläggsberoende, ingen ändring av uppdatering eller veckobackup. Osparade regelutkast bevaras vid paus/fortsätt och språkbyte.
+
+Verifierat med **503 automatiska tester, 491 DOM-kontroller och 48 Chromium-layouter** för läsfönster och inställningar (SV/EN, 600/840/1280 px, 12/14/20/24 px, ljust/mörkt, tangentbordsstyrning och fokus). Thunderbird-API:erna är simulerade. **Inte provat i riktig Thunderbird eller Windows här.** Installera ovanpå befintlig version utan att avinstallera.
 
 ## Nyheter i 1.0.24
 

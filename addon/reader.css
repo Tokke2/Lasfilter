@@ -3,7 +3,7 @@
 :root[data-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
 body { margin: 0; background: light-dark(#f7f9fc,#151b25); color: light-dark(#182537,#e6edf6); }
-header,main,footer { padding: 1rem clamp(1rem,4vw,3rem); }
+header,main,footer,#readerPauseControls { padding: 1rem clamp(1rem,4vw,3rem); }
 header { border-bottom: 1px solid #8390a5; }
 header p { margin-bottom: 0; }
 h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
@@ -14,3 +14,11 @@ p { overflow-wrap: anywhere; }
 footer { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
 button { font: inherit; padding: .65rem 1.1rem; cursor: pointer; border: 1px solid #6f819d; border-radius: .4rem; }
 button:focus-visible,#body:focus-visible { outline: 3px solid #518fff; outline-offset: 3px; }
+
+#readerPauseControls { border-top: 1px solid #8390a5; }
+#readerPauseControls h2 { font-size: 1.2rem; margin-top: 0; }
+.pause-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .5rem; }
+select { font: inherit; padding: .65rem; max-width: 100%; min-width: 0; }
+button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+select:focus-visible { outline: 3px solid #518fff; outline-offset: 3px; }
+#readerPauseError { color: light-dark(#a52c24,#ffb4a8); }

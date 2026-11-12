@@ -1466,3 +1466,13 @@ test('före flytt: full fönsterkö skjuter upp överskott utan 15 sekunders vä
  for(let id=2;id<=103;id++)f.messages.set(id,{...msg(id),read:false});
  const result=await f.e.catchUp('rule1');assert.equal(f.e.pending.size,100);assert.equal(result.deferred,3);assert(ticks<=103,'högst en tick per köat mejl, ingen tömningsloop');assert.equal(f.api.calls.length,0);
 });
+
+test('läsfönsterpaus har endast godkända längder och exakt sluttid',()=>{
+ const now=1700000000000;
+ assert.equal(C.readerPauseDeadline('15m',now),now+900000);assert.equal(C.readerPauseDeadline('1h',now),now+3600000);
+ assert.equal(C.readerPauseDeadline('manual',now),-1);assert.equal(C.readerPauseDeadline('resume',now),0);
+ assert.equal(C.readerPauseState(now+1,now).paused,true);assert.equal(C.readerPauseState(now,now).paused,false);
+ assert.equal(C.readerPauseState(-1,now+86400000).paused,true);
+ for(const mode of [null,undefined,'15','forever',15,{},''])assert.throws(()=>C.readerPauseDeadline(mode,now));
+ for(const until of [-2,NaN,Infinity,'-1',null,{},1.5])assert.throws(()=>C.readerPauseState(until,now));
+});

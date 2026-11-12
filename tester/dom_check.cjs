@@ -216,6 +216,28 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  el('newRule').click();check(el('ruleOpenTiming').value==='before','ny regel väljer Före för säker visning innan flytt');
  w.LasDemo.setState({config:timingConfig});await w.refresh();w.eval('dirty=false;loadRule(state.config.rules[0].id,"",{openEditor:false});setRulePanel("list");showView("rules");');
 
+ /* Paus för nya läsfönster är separat från regler, utkast och global paus. */
+ const pauseConfig=structuredClone(w.LasDemo.setState({}).config);
+ w.loadRule(pauseConfig.rules[0].id);el('ruleName').value='Osparat utkast under läsfönsterpaus';fire(el('ruleName'),'input');
+ el('tab-settings').click();el('sortingSettings').open=true;
+ check(el('readerPauseDuration').options.length===3,'läsfönsterpausen erbjuder 15 minuter, 1 timme och tills jag fortsätter');
+ el('readerPauseDuration').value='1h';fire(el('readerPauseDuration'),'change');
+ check(!w.LasDemo.setState({}).readerPause?.paused,'att välja pauslängd sparar inte förrän Pausa klickas');
+ el('readerPauseApply').click();await until(()=>w.LasDemo.setState({}).readerPause?.paused&&!el('readerPauseApply').disabled,'paus sparas');
+ check(w.LasDemo.setState({}).readerPause.until>Date.now()+3590000,'en timmes paus får en verklig sluttid');
+ check(!el('readerPauseNotice').hidden&&!el('readerPauseResume').hidden,'pausen syns med Fortsätt både globalt och i inställningarna');
+ check(txt('readerPauseStatus').includes('automatiskt'),'tidsstyrd paus förklarar automatisk återstart');
+ check(JSON.stringify(w.LasDemo.setState({}).config)===JSON.stringify(pauseConfig),'paus ändrar inte regeldata, revision eller global paus');
+ w.eval('applyLanguage("en")');check(txt('readerPauseStatus').includes('paused until')&&el('readerPauseDuration').selectedOptions[0].textContent==='1 hour','pausstatus och tidsval översätts till engelska');w.eval('applyLanguage("sv")');
+ el('readerPauseDuration').value='manual';el('readerPauseApply').click();await until(()=>w.LasDemo.setState({}).readerPause?.until===-1&&!el('readerPauseApply').disabled,'manuell paus sparas');
+ check(txt('readerPauseStatus').includes('tills du fortsätter'),'manuell paus visas utan låtsad sluttid');
+ el('readerPauseResumeNotice').focus();el('readerPauseResumeNotice').click();await until(()=>!w.LasDemo.setState({}).readerPause?.paused&&!el('readerPauseApply').disabled,'Fortsätt fungerar efter stängt läsfönster');
+ check(el('readerPauseNotice').hidden&&el('readerPauseResume').hidden,'Fortsätt tar bort pausbeskedet');
+ check(doc.activeElement.id==='tab-settings','fokus hamnar på synlig flik när pausbanderollen försvinner');
+ w.LasDemo.setState({readerPause:{paused:true,until:Date.now()-1000}});await w.refresh();check(el('readerPauseNotice').hidden,'utgången paus visas inte som aktiv efter återläsning');
+ el('tab-rules').click();check(el('ruleName').value==='Osparat utkast under läsfönsterpaus'&&w.eval('dirty'),'paus och Fortsätt bevarar osparat regelutkast');
+ w.eval('dirty=false;loadRule(state.config.rules[0].id,"",{openEditor:false});setRulePanel("list");');
+
  /* --- Sidfoten: versionen ska komma från manifestet, inte från ui.html --- */
  await until(()=>/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version');
  check(/v9\.9\.9/.test(doc.querySelector('[data-i18n="versionText"]')?.textContent||''),'sidfoten visar manifestets version, inte texten i ui.html');

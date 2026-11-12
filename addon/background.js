@@ -741,6 +741,31 @@ App.openVerifiedWindow=async(message,beforeKey='',proof=async()=>true,asFile=fal
 /* Safe pre-move reader: content is fetched before creating any window. Native
    messageDisplay can report the right header while its body is still white. */
 App.readers=new Map();
+// Separate from the global sorting pause: never changes rules, their revision,
+// display receipts or pending jobs. Absolute deadlines survive reload/sleep.
+App.readerPauseUntil=0;App.readerPausePending=0;App.readerPauseEpoch=0;App.readerPauseWasActive=false;
+App.readerPauseState=()=>{const state=C.readerPauseState(App.readerPauseUntil,Date.now());return {...state,paused:state.paused||App.readerPausePending>0,saving:App.readerPausePending>0};};
+App.readerPauseChanged=()=>{
+ App.changed();B.runtime.sendMessage({event:'readerPauseChanged',readerPause:App.readerPauseState()}).catch(()=>{});
+};
+App.refreshReaderPause=()=>{
+ const active=App.readerPauseState().paused;
+ if(App.readerPauseWasActive&&!active){App.readerPauseChanged();App.kick();}
+ App.readerPauseWasActive=active;
+};
+App.setReaderPause=async mode=>{
+ const until=C.readerPauseDeadline(mode,Date.now());
+ // Block new opens immediately, also while storage is queued behind other work.
+ App.readerPausePending++;App.readerPauseEpoch++;
+ try{
+  await App.write(async()=>{await B.storage.local.set({readerPauseUntil:until});App.readerPauseUntil=until;});
+ }catch{App.engine?.stop('storage_error');throw new C.RuleError('storage_error');}
+ finally{
+  App.readerPausePending--;App.readerPauseWasActive=App.readerPauseState().paused;
+  App.readerPauseChanged();App.kick();
+ }
+ return App.readerPauseState();
+};
 App.readerParts=full=>{
  let size=0,nodes=0;const attachments=[];
  const walk=(part,depth=0)=>{
@@ -767,13 +792,16 @@ App.readerRequest=async(msg,sender)=>{
  if(sender.id!==B.runtime.id||sender.url!==expected||!Number.isSafeInteger(sender.tab?.id)||!entry||entry.closed)throw new C.RuleError('bad_request');
  if(entry.tabId===null)entry.tabId=sender.tab.id;
  if(entry.tabId!==sender.tab.id)throw new C.RuleError('bad_request');
- if(msg.type==='readerData')return entry.data;
+ if(msg.type==='readerData')return {...entry.data,readerPause:App.readerPauseState()};
+ if(msg.type==='readerState')return App.readerPauseState();
+ if(msg.type==='readerPause')return App.setReaderPause(msg.mode);
  if(msg.type!=='readerReady')throw new C.RuleError('bad_request');
  entry.ready=true;return true;
 };
 App.openSourceReader=async(message,record)=>{
  const {id,headerMessageId}=message,folderId=message.folder?.id,date=+new Date(message.date);
- const engine=App.engine,epoch=engine.epoch,version=engine.config.rulesVersion;
+ const engine=App.engine,epoch=engine.epoch,version=engine.config.rulesVersion,pauseEpoch=App.readerPauseEpoch;
+ if(App.readerPauseState().paused)return {deferred:true};
  const valid=async()=>{
   if(!engine.enabled()||engine.config.dryRun||engine.epoch!==epoch||engine.config.rulesVersion!==version)return false;
   const current=await App.windowCall(B.messages.get(id));
@@ -784,6 +812,7 @@ App.openSourceReader=async(message,record)=>{
   if(!await valid())return null;
   const content=App.readerParts(await App.windowCall(B.messages.getFull(id),15000));
   if(!await valid())return null;
+  if(App.readerPauseState().paused||pauseEpoch!==App.readerPauseEpoch)return {deferred:true};
   token=crypto.randomUUID();entry={tabId:null,ready:false,closed:false,data:{...content,subject:String(message.subject||'(utan ämne)'),author:String(message.author||''),date,lang:App.prefs.lang,fontSize:App.prefs.fontSize,theme:App.prefs.theme}};
   App.readers.set(token,entry);
   const opening=Promise.resolve(B.windows.create({url:B.runtime.getURL('reader.html')+'#'+token,type:'popup',width:900,height:760,allowScriptsToClose:true}));
@@ -816,11 +845,12 @@ App.beforeMove=async(message,record)=>{
   if(!existing.closed)await App.windowStillOpen(existing.tabId);
   return existing.confirmed===true&&existing.closed===true;
  }
- if(App.openingWindow||App.engine?.sweeping>0)return false;
+ if(App.readerPauseState().paused||App.openingWindow||App.engine?.sweeping>0)return false;
  for(const [id,info] of App.mailWindows)if(info.beforeKey&&await App.windowStillOpen(id))return false;
  App.openingWindow=true;
  try{
   const tab=await App.openSourceReader(message,record);
+  if(tab?.deferred)return false;
   if(!tab){App.engine?.stop('window_error');return false;}
   App.beforeWindows.set(record.key,{tabId:tab.id,confirmed:true,closed:!App.mailWindows.has(tab.id)});
   App.log('debug',0,'fore flytt: vantar tills mejlfonstret stangs');return false;
@@ -879,7 +909,7 @@ App.selected=async()=>{
 };
 App.snapshot=()=>{
  const e=App.engine;
- return {config:e.config,prefs:App.prefs,stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
+ return {config:e.config,prefs:App.prefs,readerPause:App.readerPauseState(),stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
    fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
    enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,brake:e.config.brake!==false,
@@ -974,6 +1004,7 @@ App.handle=async msg=>{
  const e=App.engine;
  switch(msg.type){
   case 'status':return App.snapshot();
+  case 'setReaderPause':await App.setReaderPause(msg.mode);return App.snapshot();
   case 'folders':return App.folderList();
   case 'createFolder':return App.createFolder(msg.parentId,msg.name,msg.accountId);
   case 'inboxHints':return App.inboxHints(msg);
@@ -1252,11 +1283,12 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned','beforeReaderMigration']);
+ const data=await B.storage.local.get(['config','work','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned','beforeReaderMigration','readerPauseUntil']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  if(typeof data.cacheDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(data.cacheDay))App.lastCacheDay=data.cacheDay;
  let cfg=C.defaults(),fault='';
+ try{App.readerPauseUntil=C.readerPauseState(data.readerPauseUntil===undefined?0:data.readerPauseUntil,Date.now()).until;App.readerPauseWasActive=App.readerPauseState().paused;}catch{App.readerPauseUntil=-1;fault='invalid_storage';}
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
  // The requested correction is applied once to existing window rules. Later
  // explicit timing choices remain untouched; no weekly backup is triggered here.
@@ -1324,7 +1356,7 @@ App.ready=(async()=>{
    App.reloadStaleUi laddar om den som inte matchar den här versionen. */
  App.timer=setInterval(()=>{
   const now=Date.now(),gap=App.lastTickAt?now-App.lastTickAt:0;
-  App.lastTickAt=now;
+  App.lastTickAt=now;App.refreshReaderPause();
   /* Ett glapp på över två minuter betyder att datorn sovit eller att Thunderbird stått still.
      Har svepet hunnit bli försenat tar vi igen det direkt i stället för att vänta på timern. */
   if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
@@ -1437,7 +1469,7 @@ App.startUpdateWatch();
 B.browserAction.onClicked.addListener(tab=>App.open(tab).catch(()=>App.log('error')));
 B.runtime.onMessage.addListener((msg,sender)=>{
  if(sender.id!==B.runtime.id||msg?.event)return undefined;
- if(['readerData','readerReady'].includes(msg?.type))return App.readerRequest(msg,sender).then(data=>({success:true,data})).catch(()=>({success:false,error:'reader_unavailable'}));
+ if(['readerData','readerReady','readerState','readerPause'].includes(msg?.type))return App.readerRequest(msg,sender).then(data=>({success:true,data})).catch(()=>({success:false,error:'reader_unavailable'}));
  if(msg?.uiBuild!==UI_BUILD)App.reloadStaleUi(sender,msg);
  return App.handle(msg).then(data=>({success:true,data})).catch(err=>{
   const code=err instanceof C.RuleError?err.code:'internal_error';

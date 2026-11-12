@@ -6,6 +6,18 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  readerPauseTitle:"Pausa nya läsfönster",
+  readerPauseDurationLabel:"Pausens längd",
+  readerPause15:"15 minuter",
+  readerPause60:"1 timme",
+  readerPauseManual:"Tills jag fortsätter",
+  readerPauseApply:"Pausa nya fönster",
+  readerPauseResume:"Fortsätt med nya läsfönster",
+  readerPauseHelp:"Gäller Före-fönster. Mejlen som väntar på visning ligger kvar under pausen. Redan öppnade mejl kan flyttas efter stängning. Övrig sortering fortsätter. Pausen bevaras vid omstart.",
+  readerPauseOff:"Nya läsfönster är inte pausade.",
+  readerPauseUntil:"Nya läsfönster är pausade till {time}. De återupptas automatiskt.",
+  readerPauseIndefinite:"Nya läsfönster är pausade tills du fortsätter.",
+  readerPauseSaving:"Sparar pausval…",
   openTimingLabel:"När ska mejlfönstret öppnas?",
   openTimingAfter:"Efter verifierad flytt till målmappen",
   openTimingBefore:"Före flytten – vänta tills fönstret stängs",
@@ -846,6 +858,18 @@ const I18N={
   }
  },
  en:{
+  readerPauseTitle:"Pause new reading windows",
+  readerPauseDurationLabel:"Pause duration",
+  readerPause15:"15 minutes",
+  readerPause60:"1 hour",
+  readerPauseManual:"Until I resume",
+  readerPauseApply:"Pause new windows",
+  readerPauseResume:"Resume new reading windows",
+  readerPauseHelp:"Applies to Before-move windows. Messages waiting for display stay put during the pause. Already-open messages may move after closing. Other sorting continues. The pause survives a restart.",
+  readerPauseOff:"New reading windows are not paused.",
+  readerPauseUntil:"New reading windows are paused until {time}. They resume automatically.",
+  readerPauseIndefinite:"New reading windows are paused until you resume.",
+  readerPauseSaving:"Saving pause choice…",
   openTimingLabel:"When should the message window open?",
   openTimingAfter:"After a verified move to the destination",
   openTimingBefore:"Before moving – wait until the window closes",
@@ -1811,7 +1835,7 @@ function applyLanguage(lang){
  for(const select of document.querySelectorAll('#folderModal .folder-choice, #tbImportReview .folder-choice'))folderPicker(select,select.value);
  updateReadPolicy();updateMatchHelp();if(folderTreeSession)renderFolderTree();if(senderSession)renderSenderPreview();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
- if(state)applySeason(state.prefs);
+ if(state){applySeason(state.prefs);renderReaderPause();}
  repaint();
 }
 
@@ -2348,8 +2372,27 @@ function renderCache(next){
  if($('autoClear'))$('autoClear').checked=next?.cache?.on!==false;
  if($('cacheStatus'))$('cacheStatus').textContent=cacheStatusText(next?.cache);
 }
+let readerPauseBusy=false;
+function renderReaderPause(){
+ const pause=state?.readerPause||{paused:false,until:0};
+ const text=pause.saving?T('readerPauseSaving'):!pause.paused?T('readerPauseOff'):pause.until===-1?T('readerPauseIndefinite'):T('readerPauseUntil').replace('{time}',new Date(pause.until).toLocaleString(locale(),{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}));
+ for(const id of ['readerPauseStatus','readerPauseNoticeText'])if($(id).textContent!==text)$(id).textContent=text;
+ const pauseFocus=document.activeElement,returnFocus=[$('readerPauseResume'),$('readerPauseResumeNotice')].includes(pauseFocus)&&!pause.paused;
+ $('readerPauseNotice').hidden=!pause.paused;$('readerPauseResume').hidden=!pause.paused;
+ for(const id of ['readerPauseDuration','readerPauseApply','readerPauseResume','readerPauseResumeNotice'])$(id).disabled=readerPauseBusy||pause.saving===true;
+ if(returnFocus&&!readerPauseBusy){if(pauseFocus===$('readerPauseResumeNotice'))document.querySelector('.nav[aria-selected="true"]')?.focus();else $('readerPauseApply').focus();}
+}
+async function setReaderPause(mode){
+ if(readerPauseBusy)return;
+ const origin=document.activeElement;readerPauseBusy=true;renderReaderPause();
+ try{renderStatus(await rpc('setReaderPause',{mode}));}
+ finally{readerPauseBusy=false;renderReaderPause();if(mode==='resume'&&!state?.readerPause?.paused){if(origin===$('readerPauseResumeNotice'))document.querySelector('.nav[aria-selected="true"]')?.focus();else $('readerPauseApply').focus();}}
+}
+handle('readerPauseApply','click',()=>setReaderPause($('readerPauseDuration').value));
+handle('readerPauseResume','click',()=>setReaderPause('resume'));
+handle('readerPauseResumeNotice','click',()=>setReaderPause('resume'));
 function renderStatus(next){
- state=next;applyTheme(state.prefs);applySeason(state.prefs);
+ state=next;applyTheme(state.prefs);applySeason(state.prefs);renderReaderPause();
  const cfg=state.config,active=cfg.rules.filter(r=>r.enabled).length;
  $('navCount').textContent=cfg.rules.length;bumpCount('countRules',active);bumpCount('countQueue',state.queued);
  bumpCount('countMoved',state.stats.moved);bumpCount('countMatched',state.stats.matched);$('simulated').textContent=state.stats.simulated+' test';

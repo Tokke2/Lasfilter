@@ -582,7 +582,17 @@ function addSenderCondition(raw,address,wholeDomain=false){
  if(rule.conditions.length>=LIMITS.conditions)fail('sender_full');
  return {rule:validateRule({...rule,match:'any',conditions:[...rule.conditions,condition]}),condition,duplicate:false};
 }
-const api={senderCondition,addSenderCondition,ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+function readerPauseDeadline(mode,now=Date.now()){
+ if(mode==='resume')return 0;
+ if(mode==='manual')return -1;
+ if(!['15m','1h'].includes(mode))fail('bad_request');
+ return now+(mode==='15m'?15:60)*60000;
+}
+function readerPauseState(until=0,now=Date.now()){
+ if(!Number.isSafeInteger(until)||until< -1)fail('bad_request');
+ return {until,paused:until===-1||until>now};
+}
+const api={readerPauseDeadline,readerPauseState,senderCondition,addSenderCondition,ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
 whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

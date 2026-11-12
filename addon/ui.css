@@ -2963,3 +2963,7 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .sender-dialog > .modal-actions { border-top: 1px solid var(--line); padding-top: 14px; }
 
 .sender-rule-name { font-weight: 650; }
+
+.reader-pause-banner, .reader-pause-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.reader-pause-banner > span { flex: 1 1 18rem; }
+.reader-pause-settings { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }

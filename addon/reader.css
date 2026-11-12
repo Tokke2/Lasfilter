@@ -1,0 +1,16 @@
+:root { color-scheme: light dark; font: 16px/1.6 system-ui,sans-serif; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: light-dark(#f7f9fc,#151b25); color: light-dark(#182537,#e6edf6); }
+header,main,footer { padding: 1rem clamp(1rem,4vw,3rem); }
+header { border-bottom: 1px solid #8390a5; }
+header p { margin-bottom: 0; }
+h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
+p { overflow-wrap: anywhere; }
+#note,#attachments { font-size: .9rem; }
+#body { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 8rem; padding: 1.25rem; border: 1px solid #8390a5; border-radius: .5rem; background: light-dark(white,#1c2736); }
+#error { border: 2px solid #c34b3d; padding: 1rem; }
+footer { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+button { font: inherit; padding: .65rem 1.1rem; cursor: pointer; border: 1px solid #6f819d; border-radius: .4rem; }
+button:focus-visible,#body:focus-visible { outline: 3px solid #518fff; outline-offset: 3px; }

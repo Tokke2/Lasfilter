@@ -213,7 +213,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  w.loadRule(timingId);check(el('ruleOpenTiming').value==='before','sparat Före återläses i editorn');
  el('ruleOpenWindow').checked=false;fire(el('ruleOpenWindow'),'change');check(el('ruleOpenTiming').disabled&&el('ruleOpenTiming').value==='before','avstängt fönster inaktiverar tidsvalet utan att kasta det');
  el('ruleOpenWindow').checked=true;fire(el('ruleOpenWindow'),'change');check(!el('ruleOpenTiming').disabled&&el('ruleOpenTiming').value==='before','återaktivering behåller det tidigare valet');
- el('newRule').click();check(el('ruleOpenTiming').value==='after','ny regel ärver inte Före från en annan regel');
+ el('newRule').click();check(el('ruleOpenTiming').value==='before','ny regel väljer Före för säker visning innan flytt');
  w.LasDemo.setState({config:timingConfig});await w.refresh();w.eval('dirty=false;loadRule(state.config.rules[0].id,"",{openEditor:false});setRulePanel("list");showView("rules");');
 
  /* --- Sidfoten: versionen ska komma från manifestet, inte från ui.html --- */
@@ -728,7 +728,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  await sleep(50);
  check(el('ruleOpenWindow').disabled===false,'fönstervalet går att göra när olästa flyttas');
  check(!el('unreadChoiceNote').classList.contains('muted-out'),'och förklaringen syns igen');
- check(el('ruleOpenTiming').value==='after'&&el('ruleOpenTiming').options.length===2,'befintliga regler behåller Efter men kan välja Före');
+ check(el('ruleOpenTiming').value==='before'&&el('ruleOpenTiming').options.length===2,'nya regler får Före och Efter finns kvar som uttryckligt val');
 
  /* ── Kompakta regler och menyn för sparade regler ─────────────────────── */
  w.LasDemo.setState({config:{...w.LasCore.defaults(),dryRun:true,paused:false,rules:[

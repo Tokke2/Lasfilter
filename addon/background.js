@@ -381,7 +381,7 @@ App.learnCreate=async key=>{
  const rule=C.validateRule({
   id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
   name:entry.domain,enabled:true,scope:'account',source:entry.source,sourceAccount,target:entry.target,
-  match:'any',readFilter:'default',unreadAction:'default',yearFolders:false,
+  match:'any',readFilter:'default',unreadAction:'default',openTiming:'before',yearFolders:false,
   conditions:[{field:'domain',op:'equals',value:entry.domain}],branches:[]
  });
  await App.checkRules([rule]);
@@ -634,6 +634,7 @@ App.quickRule=async(msg)=>{
  if(!source||source===msg.target)throw new C.RuleError('choose_source');
  const rule=C.ruleFromChoice({name:msg.name,field:msg.field,value:msg.value,target:msg.target,source,sourceAccount,
   moveUnread:msg.moveUnread!==false,openWindow:msg.openWindow===true});
+ rule.openTiming='before';
  await App.checkRules([rule]);
  const rules=[...e.config.rules,rule];
  await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
@@ -650,6 +651,7 @@ App.windowCall=(promise,ms=5000)=>{
 App.windowClosed=id=>{
  const info=App.mailWindows.get(id);if(!info)return;
  App.mailWindows.delete(id);
+ if(info.readerToken){const entry=App.readers.get(info.readerToken);if(entry)entry.closed=true;App.readers.delete(info.readerToken);}
  if(info.beforeKey){const before=App.beforeWindows.get(info.beforeKey);if(before)before.closed=true;}
  App.kick();
 };
@@ -657,6 +659,15 @@ App.windowStillOpen=async id=>{
  try{const tabs=await App.windowCall(B.tabs.query({}));if(!Array.isArray(tabs))return true;if(tabs.some(t=>t.id===id))return true;App.windowClosed(id);return false;}catch{return true;}
 };
 App.windowOpen=async message=>{
+ try{
+  const tabs=await App.windowCall(B.tabs.query({})),prefix=B.runtime.getURL('reader.html')+'#';
+  if(!Array.isArray(tabs))return true;
+  if(tabs.some(t=>typeof t.url==='string'&&t.url.startsWith(prefix)&&!App.mailWindows.has(t.id)))return true;
+  // Own extension documents remain inspectable in MV2 even when tabs URLs are
+  // redacted without tabs permission. A reader from an earlier session blocks.
+  const views=B.extension?.getViews?.({});
+  if(Array.isArray(views)&&views.some(view=>{const url=view.location?.href;return typeof url==='string'&&url.startsWith(prefix)&&!App.readers.has(url.slice(prefix.length));}))return true;
+ }catch{return true;}
  for(const [id,info] of App.mailWindows){
   if(info.messageId===message.id||(info.folderId===message.folder?.id&&info.headerMessageId===message.headerMessageId)){
    if(await App.windowStillOpen(id))return true;
@@ -727,6 +738,74 @@ App.openVerifiedWindow=async(message,beforeKey='',proof=async()=>true,asFile=fal
  }
  App.log('error',0,'mejlfonstret visade inte ratt meddelande - oppningen avbruten');return null;
 };
+/* Safe pre-move reader: content is fetched before creating any window. Native
+   messageDisplay can report the right header while its body is still white. */
+App.readers=new Map();
+App.readerParts=full=>{
+ let size=0,nodes=0;const attachments=[];
+ const walk=(part,depth=0)=>{
+  if(!part||depth>30||++nodes>1000)throw new Error('mime_limit');
+  const type=String(part.contentType||'').split(';')[0].toLowerCase();
+  const disposition=part.headers?.['content-disposition']?.join(' ')||'';
+  if(part.name||/^attachment\b/i.test(disposition)||depth>0&&type==='message/rfc822'){
+   attachments.push(String(part.name||'bilaga').slice(0,256));return [];
+  }
+  if(['text/plain','text/html'].includes(type)&&typeof part.body==='string'&&part.body.trim()){
+   size+=part.body.length;if(size>2*1024*1024)throw new Error('body_limit');
+   return [{type,body:part.body}];
+  }
+  const children=(part.parts||[]).map(p=>walk(p,depth+1));
+  if(type==='multipart/alternative')return children.find(p=>p.some(x=>x.type==='text/plain'))||children.find(p=>p.length)||[];
+  return children.flat();
+ };
+ const parts=walk(full);if(!parts.length)throw new Error('no_readable_body');
+ return {parts,attachments};
+};
+App.readerRequest=async(msg,sender)=>{
+ const entry=App.readers.get(msg.token);
+ const expected=B.runtime.getURL('reader.html')+'#'+msg.token;
+ if(sender.id!==B.runtime.id||sender.url!==expected||!Number.isSafeInteger(sender.tab?.id)||!entry||entry.closed)throw new C.RuleError('bad_request');
+ if(entry.tabId===null)entry.tabId=sender.tab.id;
+ if(entry.tabId!==sender.tab.id)throw new C.RuleError('bad_request');
+ if(msg.type==='readerData')return entry.data;
+ if(msg.type!=='readerReady')throw new C.RuleError('bad_request');
+ entry.ready=true;return true;
+};
+App.openSourceReader=async(message,record)=>{
+ const {id,headerMessageId}=message,folderId=message.folder?.id,date=+new Date(message.date);
+ const engine=App.engine,epoch=engine.epoch,version=engine.config.rulesVersion;
+ const valid=async()=>{
+  if(!engine.enabled()||engine.config.dryRun||engine.epoch!==epoch||engine.config.rulesVersion!==version)return false;
+  const current=await App.windowCall(B.messages.get(id));
+  return current.folder?.id===folderId&&current.headerMessageId===headerMessageId&&+new Date(current.date)===date;
+ };
+ let token,entry,created,abandoned=false;
+ try{
+  if(!await valid())return null;
+  const content=App.readerParts(await App.windowCall(B.messages.getFull(id),15000));
+  if(!await valid())return null;
+  token=crypto.randomUUID();entry={tabId:null,ready:false,closed:false,data:{...content,subject:String(message.subject||'(utan ämne)'),author:String(message.author||''),date,lang:App.prefs.lang,fontSize:App.prefs.fontSize,theme:App.prefs.theme}};
+  App.readers.set(token,entry);
+  const opening=Promise.resolve(B.windows.create({url:B.runtime.getURL('reader.html')+'#'+token,type:'popup',width:900,height:760,allowScriptsToClose:true}));
+  opening.then(async late=>{if(abandoned&&Number.isSafeInteger(late?.id))try{await B.windows.remove(late.id);}catch{}}).catch(()=>{});
+  created=await App.windowCall(opening,10000);
+  const tab=created?.tabs?.[0]||(Number.isSafeInteger(created?.id)?(await App.windowCall(B.tabs.query({windowId:created.id})))[0]:null);
+  if(!Number.isSafeInteger(tab?.id)||entry.tabId!==null&&entry.tabId!==tab.id)throw new Error('reader_tab');
+  entry.tabId=tab.id;
+  App.mailWindows.set(tab.id,{messageId:id,folderId,headerMessageId,beforeKey:record.key,readerToken:token});
+  for(let i=0;i<80;i++){
+   if(entry.ready&&await valid()){
+    App.log('debug',0,'fore flytt: mejltext visad i SortBro-lasfonster; vantar pa stangning');return tab;
+   }
+   if(!await App.windowStillOpen(tab.id))break;
+   await new Promise(r=>setTimeout(r,250));
+  }
+ }catch{abandoned=true;}
+ if(Number.isSafeInteger(created?.id))try{await App.windowCall(B.windows.remove(created.id));if(entry?.tabId!==null)App.windowClosed(entry.tabId);}catch{}
+ if(token)App.readers.delete(token);
+ return null;
+};
+
 App.beforeMove=async(message,record)=>{
  if(!App.engine?.enabled()||App.engine.config.dryRun)return false;
  // Closed-window receipts are session-only. After a restart we verify/open the
@@ -741,7 +820,7 @@ App.beforeMove=async(message,record)=>{
  for(const [id,info] of App.mailWindows)if(info.beforeKey&&await App.windowStillOpen(id))return false;
  App.openingWindow=true;
  try{
-  const tab=await App.openVerifiedWindow(message,record.key);
+  const tab=await App.openSourceReader(message,record);
   if(!tab){App.engine?.stop('window_error');return false;}
   App.beforeWindows.set(record.key,{tabId:tab.id,confirmed:true,closed:!App.mailWindows.has(tab.id)});
   App.log('debug',0,'fore flytt: vantar tills mejlfonstret stangs');return false;
@@ -1173,12 +1252,20 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned']);
+ const data=await B.storage.local.get(['config','work','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned','beforeReaderMigration']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  if(typeof data.cacheDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(data.cacheDay))App.lastCacheDay=data.cacheDay;
  let cfg=C.defaults(),fault='';
  try{if(data.config!==undefined)cfg=C.config(data.config);}catch{fault='invalid_storage';}
+ // The requested correction is applied once to existing window rules. Later
+ // explicit timing choices remain untouched; no weekly backup is triggered here.
+ if(!fault&&data.beforeReaderMigration!==1){
+  const rules=cfg.rules.map(r=>(r.unreadAction==='window'||(r.unreadAction==='default'&&cfg.openWindow!==false))?{...r,openTiming:'before'}:r);
+  const changed=rules.some((r,i)=>r.openTiming!==cfg.rules[i].openTiming);
+  const next=changed?{...cfg,rules,revision:cfg.revision+1,rulesVersion:cfg.rulesVersion+1}:cfg;
+  try{await B.storage.local.set({config:next,beforeReaderMigration:1});cfg=next;}catch{fault='storage_error';}
+ }
  App.logs=C.cleanLogs(data.logs);App.errorLogs=C.cleanErrorLogs(Array.isArray(data.errorLogs)?data.errorLogs:data.logs);App.backups=[];
  for(const b of (Array.isArray(data.backups)?data.backups:[]).slice(0,5)){try{App.backups.push({time:b.time,config:C.config(b.config)});}catch{}}
  const p=data.prefs||{};
@@ -1350,6 +1437,7 @@ App.startUpdateWatch();
 B.browserAction.onClicked.addListener(tab=>App.open(tab).catch(()=>App.log('error')));
 B.runtime.onMessage.addListener((msg,sender)=>{
  if(sender.id!==B.runtime.id||msg?.event)return undefined;
+ if(['readerData','readerReady'].includes(msg?.type))return App.readerRequest(msg,sender).then(data=>({success:true,data})).catch(()=>({success:false,error:'reader_unavailable'}));
  if(msg?.uiBuild!==UI_BUILD)App.reloadStaleUi(sender,msg);
  return App.handle(msg).then(data=>({success:true,data})).catch(err=>{
   const code=err instanceof C.RuleError?err.code:'internal_error';

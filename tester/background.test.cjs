@@ -65,7 +65,7 @@ async function loadBackground(api=stubApi(),options={}){
  const tick=clock();
  const browser=api;
  const sandbox={console,JSON,Math,Number,String,Array,Object,Map,Set,WeakMap,Promise,Error,TypeError,RegExp,Symbol,Boolean,isNaN,parseInt,parseFloat,structuredClone,
-  Date:tick.Date,setTimeout:tick.setTimeout,clearTimeout:tick.clearTimeout,setInterval:tick.setInterval,clearInterval:tick.clearInterval,
+  crypto:require('node:crypto').webcrypto,Date:tick.Date,setTimeout:tick.setTimeout,clearTimeout:tick.clearTimeout,setInterval:tick.setInterval,clearInterval:tick.clearInterval,
   LasCore:C,
   LasFilters:require(path.join(ROOT,'addon','filters.js')),
   /* Blob/URL behövs för att skriva loggfilen. Testet kan fånga innehållet
@@ -621,7 +621,7 @@ test('villkor importeras in i en regel som redan finns',async()=>{
 function unreadEngine(app,over={}){
  return fakeEngine(app,{records:new Map(),config:{...C.defaults(),dryRun:false,moveMode:'direct',rules:[{id:'r1',enabled:true,name:'Mejl',unreadAction:'window',openTiming:'after'}]},...over});
 }
-function windowApi(api){
+function windowApi(api,app){
  const message={id:99,folder:{id:'fin',accountId:'a'},headerMessageId:'<h@x>',read:false,date:new Date('2026-10-08'),size:100,author:'a@example.se',subject:'Hej'};
  const tabs=new Map(),opened=[],removed=[],updated=[];
  api.messages.query=async q=>({messages:q.folderId===message.folder.id&&q.headerMessageId===message.headerMessageId?[{...message}]:[]});
@@ -632,10 +632,20 @@ function windowApi(api){
  api.tabs.remove=async id=>{removed.push(id);tabs.delete(id);};
  api.messageDisplay.open=async args=>{opened.push(args);const tab={id:10+opened.length,windowId:100+opened.length,type:'messageDisplay'};tabs.set(tab.id,tab);return tab;};
  api.messageDisplay.getDisplayedMessages=async id=>({messages:tabs.has(id)?[{...message}]:[]});
- return {message,tabs,opened,removed,updated};
+ const fixture={message,tabs,opened,removed,updated,readerReady:true};
+ api.runtime.id='test-addon';api.runtime.getURL=p=>'moz-extension://test/'+p;
+ api.windows.create=async args=>{
+  opened.push(args);const tab={id:10+opened.length,windowId:100+opened.length,type:'content',url:args.url};tabs.set(tab.id,tab);
+  const token=args.url.split('#')[1],sender={id:api.runtime.id,url:args.url,tab};
+  await app.readerRequest({type:'readerData',token},sender);
+  if(fixture.readerReady)await app.readerRequest({type:'readerReady',token},sender);
+  return {id:tab.windowId,tabs:[tab]};
+ };
+ api.windows.remove=async id=>{for(const tab of tabs.values())if(tab.windowId===id){removed.push(tab.id);tabs.delete(tab.id);app.windowClosed(tab.id);}};
+ return fixture;
 }
 test('efter: öppnar mål-ID först efter entydigt mål, tom källa och läsbart innehåll',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  let attempts=0;const query=api.messages.query;
  api.messages.query=async q=>{if(q.folderId==='fin'&&++attempts<3)return {messages:[]};return query(q);};
  const id=await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+new Date('2026-10-08')),100);
@@ -643,13 +653,13 @@ test('efter: öppnar mål-ID först efter entydigt mål, tom källa och läsbart
  assert(app.logs.some(x=>/verifierat visat/.test(x.data.detail)));assert.equal(app.mailWindows.size,1);
 });
 test('efter: kopia kvar i källan är inte en verifierad flytt',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  const query=api.messages.query;api.messages.query=async q=>q.folderId==='inbox'?{messages:[{...w.message,id:7,folder:{id:'inbox'}}]}:query(q);
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+new Date('2026-10-08')),100),null);assert.equal(w.opened.length,0);
 });
 test('efter: okänd källstatus, saknat mål och tvetydigt Message-ID öppnar inget',async()=>{
  for(const mode of ['source-error','missing','duplicate','paged']){
-  const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);const query=api.messages.query;
+  const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);const query=api.messages.query;
   api.messages.query=async q=>{
    if(mode==='source-error'&&q.folderId==='inbox')throw Error('offline');
    if(q.folderId==='fin'&&mode==='missing')return {messages:[]};
@@ -661,7 +671,7 @@ test('efter: okänd källstatus, saknat mål och tvetydigt Message-ID öppnar in
 });
 test('efter: oläsbar kropp eller återanvänt sessions-ID får aldrig öppnas',async()=>{
  for(const mode of ['body-error','empty-api','reused-id']){
-  const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+  const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
   if(mode==='body-error')api.messages.getFull=async()=>{throw Error('offline');};
   if(mode==='empty-api')api.messages.getFull=async()=>[];
   if(mode==='reused-id')api.messages.get=async()=>({...w.message,headerMessageId:'<different@x>'});
@@ -670,7 +680,7 @@ test('efter: oläsbar kropp eller återanvänt sessions-ID får aldrig öppnas',
 });
 test('tomt eller felaktigt mejlfönster stängs och ger aldrig ett falskt visningskvitto',async()=>{
  for(const wrong of [false,true]){
-  const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+  const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
   api.messageDisplay.getDisplayedMessages=async()=>wrong?[{...w.message,id:500}]:[];
   assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+new Date('2026-10-08')),150),null);
   assert.equal(w.opened.length,1);assert.deepEqual(w.removed,[11]);assert.equal(app.mailWindows.size,0);
@@ -678,13 +688,13 @@ test('tomt eller felaktigt mejlfönster stängs och ger aldrig ett falskt visnin
  }
 });
 test('fel vid öppning ger ingen global headerMessageId-reservväg',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);let calls=0;
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);let calls=0;
  api.messageDisplay.open=async args=>{calls++;assert.equal(args.messageId,99);assert.equal(args.headerMessageId,undefined);throw Error('gone');};
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+new Date('2026-10-08')),100),null);assert.equal(calls,1);assert.equal(w.removed.length,0);
 });
 test('read/keep och popup-skydd behålls efter verifierad flytt',async()=>{
  for(const mode of ['read','keep','sweep','queue']){
-  const {app,tick,api}=await loadBackground();const w=windowApi(api);const e=unreadEngine(app);
+  const {app,tick,api}=await loadBackground();const w=windowApi(api,app);const e=unreadEngine(app);
   e.config.rules[0].unreadAction=['read','keep'].includes(mode)?mode:'window';
   if(mode==='sweep')e.sweeping=1;if(mode==='queue')e.pending=new Map([[1,{}],[2,{}],[3,{}],[4,{}]]);
   assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+new Date('2026-10-08')),100),99);assert.equal(w.opened.length,0);
@@ -692,7 +702,7 @@ test('read/keep och popup-skydd behålls efter verifierad flytt',async()=>{
  }
 });
 test('före: källa öppnas och klartecken ges först när det verifierade fönstret stängts',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);w.message.folder.id='inbox';const e=unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);
  const record={key:'job',ruleId:'r1'};e.records.set('job',record);
  assert.equal(await tick.settle(app.beforeMove(w.message,record),100),false);assert.equal(app.beforeWindows.get('job').confirmed,true);
  assert.equal(await app.beforeMove(w.message,record),false);assert.equal(w.opened.length,1);
@@ -700,18 +710,18 @@ test('före: källa öppnas och klartecken ges först när det verifierade föns
  assert.equal(await app.beforeMove(w.message,record),true);assert.equal(w.opened.length,1);
 });
 test('före: misslyckad visning stoppar motorn, ingen flytt eller popup-loop',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
- api.messageDisplay.getDisplayedMessages=async()=>[];
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+ w.readerReady=false;
  assert.equal(await tick.settle(app.beforeMove(w.message,{key:'job',ruleId:'r1'}),100),false);
  assert.equal(e.fault,'window_error');assert.deepEqual(w.removed,[11]);assert.equal(app.beforeWindows.size,0);
 });
 test('före: högst ett källfönster åt gången; ingen öppning mitt under svep',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('a',{});e.records.set('b',{});
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('a',{});e.records.set('b',{});
  e.sweeping=1;assert.equal(await app.beforeMove(w.message,{key:'a'}),false);assert.equal(w.opened.length,0);e.sweeping=0;
  await tick.settle(app.beforeMove(w.message,{key:'a'}));assert.equal(await app.beforeMove(w.message,{key:'b'}),false);assert.equal(w.opened.length,1);
 });
 test('fönsterstatus som inte går att läsa behandlas inte som ett stängt fönster',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+new Date('2026-10-08')));
  api.tabs.query=async()=>{throw Error('unknown');};assert.equal(await app.windowOpen(w.message),true);
 });
@@ -1616,26 +1626,26 @@ test('båda snabbmenyvalen registreras och följer språkbytet',async()=>{
 });
 
 test('försenat open-svar efter timeout får inte lämna en vit ruta',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  api.messageDisplay.open=()=>new Promise(resolve=>tick.setTimeout(()=>{w.tabs.set(55,{id:55,type:'messageDisplay'});resolve({id:55});},12000));
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+w.message.date),100),null);
  await tick.flush(50);await tick.settle(Promise.resolve(),20);assert(w.removed.includes(55));assert.equal(w.tabs.size,0);
 });
 test('fönster som fanns före anropet stängs aldrig som en felaktig ny ruta',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);w.tabs.set(44,{id:44,type:'messageDisplay'});
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);w.tabs.set(44,{id:44,type:'messageDisplay'});
  api.messageDisplay.open=async()=>({id:44});
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+w.message.date),100),null);assert.equal(w.removed.length,0);assert(w.tabs.has(44));
 });
 test('samma Message-ID med fel datum räcker inte som identitetsbevis',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+w.message.date-86400000),100),null);assert.equal(w.opened.length,0);
 });
 test('svepmarkering skyddar mot popup-storm även efter att svepet har avslutats',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+w.message.date,true),100),99);assert.equal(w.opened.length,0);
 });
 test('före: riktig motor + öppnare flyttar först efter stängt, verifierat källfönster',async()=>{
- const {app,tick,api}=await loadBackground();inboxAccount(api);const w=windowApi(api);w.message.folder.id='inbox';
+ const {app,tick,api}=await loadBackground();inboxAccount(api);const w=windowApi(api,app);w.message.folder.id='inbox';
  const Engine=require('../addon/engine.js');
  const rule=C.validateRule({id:'r1',name:'Före',enabled:true,source:'inbox',target:'fin',match:'any',conditions:[{field:'domain',op:'equals',value:'example.se'}],readFilter:'unread',unreadAction:'window',openTiming:'before'});
  let moves=0;const engine=new Engine(api,{...C.defaults(),dryRun:false,moveMode:'direct',rules:[rule]},{now:tick.now,persist:async()=>{},beforeMove:app.beforeMove,windowOpen:app.windowOpen,notify:app.openUnread,ackTimeout:5});app.engine=engine;
@@ -1649,7 +1659,7 @@ test('före: riktig motor + öppnare flyttar först efter stängt, verifierat k�
 });
 
 test('tom inbyggd visning kan ersättas med verifierad lokal RFC822-kopia',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  const file={size:120,arrayBuffer:async()=>new ArrayBuffer(120)};api.messages.getRaw=async(id,options)=>{assert.equal(id,99);assert.equal(options.data_format,'File');return file;};
  const nativeOpen=api.messageDisplay.open;api.messageDisplay.open=async args=>{if(args.file)assert.equal(args.file,file);return nativeOpen(args);};
  api.messageDisplay.getDisplayedMessages=async id=>id===12?{messages:[{...w.message,id:200,folder:undefined,external:true}]}:[];
@@ -1657,8 +1667,76 @@ test('tom inbyggd visning kan ersättas med verifierad lokal RFC822-kopia',async
  assert.equal(w.opened.length,2);assert.deepEqual(w.removed,[11]);assert.equal(w.opened[1].file,file);assert.equal(app.mailWindows.size,1);
 });
 test('lokal reservkopia måste också visa rätt identitet och får inte bli kvar tom',async()=>{
- const {app,tick,api}=await loadBackground();const w=windowApi(api);unreadEngine(app);
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
  api.messages.getRaw=async()=>({size:120,arrayBuffer:async()=>new ArrayBuffer(120)});
  api.messageDisplay.getDisplayedMessages=async id=>id===12?[{...w.message,id:200,external:true,headerMessageId:'wrong@x'}]:[];
  assert.equal(await tick.settle(app.openUnread(7,'r1','fin','<h@x>','inbox',+w.message.date),250),null);assert.deepEqual(w.removed,[11,12]);
+});
+
+test('före: inbyggd vit ruta används inte – kroppen hämtas före eget fönster',async()=>{
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+ api.messageDisplay.open=async()=>{throw Error('native window must not be used');};
+ api.messageDisplay.getDisplayedMessages=async()=>[{...w.message}];
+ const full=api.messages.getFull;let loaded=false;api.messages.getFull=async()=>{assert.equal(w.opened.length,0);loaded=true;return full();};
+ assert.equal(await tick.settle(app.beforeMove(w.message,{key:'job'}),100),false);assert(loaded);assert.match(w.opened[0].url,/reader.html#/);
+ assert(app.beforeWindows.get('job').confirmed);assert.equal(await app.beforeMove(w.message,{key:'job'}),false);
+ app.windowClosed(999);assert.equal(await app.beforeMove(w.message,{key:'job'}),false);
+ w.tabs.clear();app.windowClosed(11);assert.equal(await app.beforeMove(w.message,{key:'job'}),true);assert.equal(app.readers.size,0);
+});
+test('före: tom kropp, enbart bilagor och misslyckad hämtning öppnar aldrig ett fönster',async()=>{
+ for(const full of [{headers:{}},{parts:[{contentType:'application/pdf',name:'faktura.pdf'}]},null]){
+  const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+  api.messages.getFull=async()=>{if(full===null)throw Error('offline');return full;};
+  assert.equal(await tick.settle(app.beforeMove(w.message,{key:'job'}),100),false);assert.equal(w.opened.length,0);assert.equal(e.fault,'window_error');
+ }
+});
+test('före: pausa medan kroppen hämtas lämnar mejlet utan fönster eller flytt',async()=>{
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+ const full=api.messages.getFull;api.messages.getFull=async()=>{e.epoch++;return full();};
+ await tick.settle(app.beforeMove(w.message,{key:'job'}),100);assert.equal(w.opened.length,0);
+});
+test('läsfönstrets kvitto binds till token, avsändarsida och exakt flik',async()=>{
+ const {app,api}=await loadBackground();windowApi(api,app);
+ app.readers.set('secret',{tabId:11,ready:false,closed:false,data:{parts:[]}});
+ const good={id:api.runtime.id,url:api.runtime.getURL('reader.html')+'#secret',tab:{id:11}};
+ for(const sender of [{...good,id:'other'}, {...good,url:'https://bad.invalid/'},{...good,tab:{id:12}}])await assert.rejects(app.readerRequest({type:'readerReady',token:'secret'},sender));
+ assert.equal(app.readers.get('secret').ready,false);assert.equal(await app.readerRequest({type:'readerReady',token:'secret'},good),true);
+});
+test('MIME-väljaren väljer textalternativ och visar inte HTML eller bilagor dubbelt',async()=>{
+ const {app}=await loadBackground();const payload=app.readerParts({parts:[{contentType:'multipart/alternative',parts:[{contentType:'text/plain',body:'Hej världen'},{contentType:'text/html',body:'<p>Hej världen</p>'}]},{contentType:'application/pdf',name:'faktura.pdf'}]});
+ assert.equal(payload.parts.length,1);assert.equal(payload.parts[0].body,'Hej världen');assert.equal(payload.attachments[0],'faktura.pdf');
+ assert.throws(()=>app.readerParts({contentType:'text/plain',body:'x'.repeat(2*1024*1024+1)}));
+});
+test('kvarvarande läsfönster efter omstart spärrar flytt tills användaren stänger',async()=>{
+ const {app,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
+ w.tabs.set(88,{id:88,type:'content',url:api.runtime.getURL('reader.html')+'#old-token'});
+ assert.equal(await app.windowOpen(w.message),true);w.tabs.clear();assert.equal(await app.windowOpen(w.message),false);
+});
+test('sen skapelse av läsfönstret efter timeout städas utan att godkänna flytt',async()=>{
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});
+ api.windows.create=()=>new Promise(resolve=>tick.setTimeout(()=>{w.tabs.set(55,{id:55,windowId:155});resolve({id:155,tabs:[{id:55}]});},12000));
+ await tick.settle(app.beforeMove(w.message,{key:'job'}),100);await tick.flush(30);assert.equal(w.tabs.size,0);assert.equal(app.beforeWindows.size,0);
+});
+test('uppgraderingen väljer Före en gång, bevarar övriga regler och senare egna val',async()=>{
+ const rule={id:'r1',name:'Mejl',enabled:true,source:'inbox',target:'fin',match:'any',conditions:[{field:'domain',op:'equals',value:'example.se'}],unreadAction:'window',openTiming:'after'};
+ const stored={config:{...C.defaults(),rules:[rule,{...rule,id:'keep',unreadAction:'keep'}]}};
+ const api=stubApi();api.storage.local.get=async()=>structuredClone(stored);api.storage.local.set=async data=>Object.assign(stored,structuredClone(data));
+ const {app}=await loadBackground(api);assert.equal(app.engine.config.rules[0].openTiming,'before');assert.equal(app.engine.config.rules[1].openTiming,'after');assert.equal(stored.beforeReaderMigration,1);
+ assert.equal(app.engine.config.rules[0].target,'fin');assert.equal(app.engine.config.rulesVersion,1);
+ stored.config.rules[0].openTiming='after';const again=await loadBackground(api);assert.equal(again.app.engine.config.rules[0].openTiming,'after');
+});
+test('återstart med dolda tabb-URL:er skyddas via egna MV2-dokument',async()=>{
+ const {app,api}=await loadBackground();const w=windowApi(api,app);unreadEngine(app);
+ api.extension.getViews=()=>[{location:{href:api.runtime.getURL('reader.html')+'#old'}}];
+ assert.equal(await app.windowOpen(w.message),true);api.extension.getViews=()=>[];assert.equal(await app.windowOpen(w.message),false);
+});
+test('flytt spärras även när läsfönstrets innehåll har visats men fönstret är öppet',async()=>{
+ const {app,tick,api}=await loadBackground();inboxAccount(api);const w=windowApi(api,app);w.message.folder.id='inbox';
+ const Engine=require('../addon/engine.js'),rule=C.validateRule({id:'r1',name:'Före',enabled:true,source:'inbox',target:'fin',match:'any',conditions:[{field:'domain',op:'equals',value:'example.se'}],readFilter:'unread',unreadAction:'window',openTiming:'before'});
+ const engine=new Engine(api,{...C.defaults(),dryRun:false,moveMode:'direct',rules:[rule]},{now:tick.now,persist:async()=>{},beforeMove:app.beforeMove,windowOpen:app.windowOpen,ackTimeout:5});app.engine=engine;
+ api.folders.get=async id=>({id,accountId:'a',name:id,specialUse:[]});api.folders.getFolderCapabilities=async()=>({canAddMessages:true,canDeleteMessages:true});
+ let moves=0;api.messages.move=async()=>{moves++;};
+ await engine.enqueue({...w.message});await tick.settle(engine.tick(),100);
+ for(let i=0;i<5;i++){tick.setTimeout(()=>{},3000);await tick.flush(20);await tick.settle(engine.tick(),100);}
+ assert.equal(moves,0);assert.equal(engine.pending.size,1);assert.equal(w.opened.length,1);assert(app.beforeWindows.values().next().value.confirmed);
 });

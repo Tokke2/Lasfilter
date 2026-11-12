@@ -82,6 +82,7 @@ globalThis.LasDemo=(()=>{
     if(!m.target||m.target===source)throw new LasCore.RuleError('choose_target');
     const rule=LasCore.ruleFromChoice({name:m.name,field:m.field,value:m.value,target:m.target,source,
      sourceAccount:m.sourceAccount||'demo',moveUnread:m.moveUnread!==false,openWindow:m.openWindow===true});
+    rule.openTiming='before';
     saveRules([...state.config.rules,rule]);
     const folder=folders.find(f=>f.id===m.target)||{};
     data={ruleId:rule.id,rule,condition:rule.conditions[0],target:{id:folder.id||m.target,name:folder.name||'',label:folder.label||''},snapshot:state};break;
@@ -179,6 +180,7 @@ globalThis.LasDemo=(()=>{
    case 'learnCreate':{
     const s=(state.learn?.suggestions||[]).find(x=>x.key===m.key);if(!s)throw new LasCore.RuleError('bad_id');
     const rule=LasCore.ruleFromChoice({name:s.domain,field:'domain',value:s.domain,target:s.target,source:s.source,sourceAccount:'demo',moveUnread:false});
+    rule.openTiming='before';
     saveRules([...state.config.rules,rule]);
     state.learn.suggestions=(state.learn.suggestions||[]).filter(x=>x.key!==m.key);
     data={ruleId:rule.id,rule,snapshot:state};break;

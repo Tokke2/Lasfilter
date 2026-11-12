@@ -9,7 +9,7 @@ const I18N={
   openTimingLabel:"När ska mejlfönstret öppnas?",
   openTimingAfter:"Efter verifierad flytt till målmappen",
   openTimingBefore:"Före flytten – vänta tills fönstret stängs",
-  openTimingHelp:"Före: öppnar ett mejl i taget i källmappen. Flytten väntar tills fönstret är stängt och mejlet inte längre visas i någon annan flik. Mejlet kan markeras läst när du öppnar det. Efter: öppnar först när rätt mejl har verifierats i målmappen. Ett fönster som inte visar rätt mejl stängs.",
+  openTimingHelp:"Före: hämtar mejltexten och visar ett mejl i taget i SortBros säkra textfönster. Originalet ligger kvar i källmappen. Flytten väntar tills fönstret är stängt och mejlet inte längre visas i någon annan flik. Mejlet ändras inte av textvisningen. Efter: öppnar först när rätt mejl har verifierats i målmappen. Ett fönster som inte visar rätt mejl stängs.",
   summaryOpenTiming:"Fönster: {timing}.",
   senderTitle:"Regel från avsändaren",
   senderHelp:"Välj en befintlig regel eller öppna ett nytt utkast. Målmappen visas vid varje regel.",
@@ -849,7 +849,7 @@ const I18N={
   openTimingLabel:"When should the message window open?",
   openTimingAfter:"After a verified move to the destination",
   openTimingBefore:"Before moving – wait until the window closes",
-  openTimingHelp:"Before: opens one message at a time in the source folder. The move waits until the window is closed and no other tab displays the message. Opening it may mark it read. After: opens only once the correct message is verified in the destination. A window that fails to display the correct message is closed.",
+  openTimingHelp:"Before: fetches the message body and displays one message at a time in SortBro’s safe text window. The original stays in the source folder. The move waits until the window is closed and no other tab displays the message. The text view does not change the message. After: opens only once the correct message is verified in the destination. A window that fails to display the correct message is closed.",
   summaryOpenTiming:"Window: {timing}.",
   senderTitle:"Rule from sender",
   senderHelp:"Choose an existing rule or open a new draft. Each rule shows its destination folder.",
@@ -2107,7 +2107,7 @@ function applyTemplate(key){
  if($('ruleReadFilter'))$('ruleReadFilter').value=template.readFilter||(($('quickMoveUnread')&&!$('quickMoveUnread').checked)?'read':'both');
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=($('quickOpenWindow')&&$('quickOpenWindow').checked)?'window':'keep';
  if($('ruleYearFolders'))$('ruleYearFolders').checked=template.yearFolders===true;
- $('ruleOpenTiming').value='after';
+ $('ruleOpenTiming').value='before';
  if(!$('source')?.value){const first=accounts()[0];if(first)accountOptions(first.id);}
  const auto=folders.find(f=>{const n=C.norm((f.name||'')+' '+(f.label||''));return template.hints.some(h=>n.includes(C.norm(h)));});
  if($('target'))targetOptions(auto?.id||$('target').value||'');
@@ -2915,7 +2915,7 @@ function loadRule(id='',presetAccount='',{openEditor=true}={}){
  $('match').value=rule?.match||'any';
  if($('ruleReadFilter'))$('ruleReadFilter').value=rule?.readFilter||'default';
  if($('ruleUnreadAction'))$('ruleUnreadAction').value=rule?.unreadAction||'default';
- $('ruleOpenTiming').value=rule?.openTiming||'after';
+ $('ruleOpenTiming').value=rule?(rule.openTiming||'after'):'before';
  if($('ruleYearFolders'))$('ruleYearFolders').checked=rule?.yearFolders===true;
  setTrialFields(rule);
  updateReadPolicy();

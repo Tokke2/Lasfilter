@@ -65,13 +65,14 @@ Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj
 
 I regelredigerarens steg 3 kan du välja **När ska mejlfönstret öppnas?** när regeln får behandla olästa mejl och fönsteröppning är på.
 
-- **Före flytten – vänta tills fönstret stängs:** öppnar mejlet i källmappen, ett källfönster åt gången. Flytten väntar tills det verifierade fönstret är stängt, mejlet inte visas i någon annan flik och två sekunder har gått. Thunderbird kan markera mejlet läst under visningen; det avbryter inte denna väntande flytt.
-- **Efter verifierad flytt till målmappen:** standard för nya och befintliga regler. SortBro kräver en entydig träff med rätt Message-ID och datum i målmappen, ingen träff kvar i källmappen och läsbart meddelandeinnehåll innan det öppnas. Källans gamla sessions-ID används inte för öppningen.
-- **Skydd mot tomma rutor:** öppningsanropet räcker inte som kvitto. SortBro kontrollerar vilket mejl den nya fliken rapporterar och stänger sin egen misslyckade visning. Om Thunderbirds vanliga visning blir tom försöker SortBro en gång med en lokal RFC822-kopia i minnet, utan export till Hämtade filer. Även den måste rapportera rätt meddelande. Andra, redan öppna fönster stängs aldrig av denna kontroll.
-- Om visningen misslyckas **före** flytten stoppas bevakningen och mejlet lämnas kvar i källmappen. Kontrollera mejlet och välj **Rensa spärr och fortsätt** för ett nytt försök. Efter en omstart krävs ett nytt visningskvitto; en sparad väntemarkering räcker inte för att flytta.
-- Testläge/provkörning öppnar inte dessa fönster. Automatisk efteröppning är begränsad vid svep och stora köer; högst tre egna efterfönster hålls öppna. Inställningar för att behålla oläst eller markera läst finns kvar.
+- **Före flytten – vänta tills fönstret stängs:** hämtar mejlkroppen från källmappen innan något fönster skapas. Texten visas i SortBros eget läsfönster, inte i Thunderbirds meddelandefönster som i vissa installationer blir vitt. Flytten kräver kvitto från den fyllda textsidan, stängt fönster samt två sekunder utan annan visning. Att bara öppna fönstret eller markera mejlet läst räcker inte.
+- **Säker textvisning:** vanlig text föredras. HTML-mejl omvandlas till text; skript, externa bilder och aktiva länkar körs inte. Bilagornas namn visas men själva bilagorna öppnas i Thunderbird. Textvisningen ändrar inte originalets läststatus. Innehållet hålls endast i minnet tills fönstret stängs, inte i logg, export eller lagring.
+- **Före är förvalt vid skapande i editorn och snabbregeln.** Vid första starten av 1.0.24 ställs befintliga regler med fönsteröppning om till Före. Källa, mål, villkor och övriga val bevaras. Det sker en gång; senare uttryckliga tidsval skrivs inte över. Importerade regelval bevaras.
+- **Efter verifierad flytt till målmappen:** finns kvar som uttryckligt alternativ. Här krävs en entydig träff med rätt Message-ID och datum i målmappen, ingen träff kvar i källmappen och läsbart innehåll. Den tidigare native-/RFC822-visningsvägen används endast för detta alternativ och kan fortfarande påverkas av Thunderbirds visningsproblem.
+- **Om texten inte kan visas:** inget flyttkvitto ges. Exempel är frånkopplad server, tom kropp, enbart bildinnehåll eller för stort innehåll (textgräns 2 097 152 tecken). Bevakningen stoppas och mejlet lämnas i källmappen. Kontrollera mejlet i Thunderbird och välj **Rensa spärr och fortsätt** för ett nytt försök. Att SortBro stänger en misslyckad visning ger aldrig klartecken för flytt.
+- **Omstart och andra visningar:** ett kvarvarande eget läsfönster spärrar flyttar tills det har stängts. En sparad väntemarkering ensam räcker inte som kvitto efter omstart. Testläge/provkörning öppnar inte läsfönster, och bara ett eget före-fönster öppnas åt gången.
 
-Kontrollerna använder Thunderbirds meddelande- och visnings-API. De kan inte garantera att varje HTML-mejl faktiskt målas korrekt på skärmen; vid kvarstående vit ruta behövs kontroll i din Thunderbird-installation.
+Textvisningen och stängningsspärren testas automatiskt, men din Thunderbird-/IMAP-installation behöver fortfarande kontrolleras med ett testmejl.
 
 ## Thunderbirds egna filter – läs in dem och skriv ut dina egna
 
@@ -518,6 +519,15 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.24
+
+- **Ny förevisning i eget läsfönster.** Rätt meddelandehuvud från Thunderbird visade sig inte räcka som bevis för att kroppen faktiskt syns. Nu hämtas kroppen först och visas som säker text i en egen sida, som kvitterar när texten har lagts ut.
+- **Flytta först efter stängning.** Ingen flytt medan fönstret är öppet. Misslyckad hämtning, tom text, fel sessionskvitto och paus under hämtning lämnar mejlet kvar.
+- **Befintliga fönsterregler får Före vid första starten.** Övriga regelinställningar bevaras. Nya regler i editorn, mallarna och snabbregeln får också Före. Senare egna val respekteras.
+- **Ingen aktiv mejl-HTML i tilläggssidan.** Text används i stället för körbar HTML. Inga fjärrbilder, skript eller externa anrop. Bilagor visas som namn och öppnas i Thunderbird. Inga nya tilläggsbehörigheter eller beroenden.
+
+Verifierat med **489 automatiska tester, 479 DOM-kontroller och 24 Chromium-layouter för läsfönstret** (SV/EN, 600/840/1280 px, 12/14/20/24 px, ljust/mörkt). Webbläsartestet kontrollerar också att inga externa resurser laddas och att kvitto ges först efter visad text. **Inte provat i riktig Thunderbird eller Windows här.** Installera ovanpå befintlig version utan att avinstallera.
 
 ## Nyheter i 1.0.23
 

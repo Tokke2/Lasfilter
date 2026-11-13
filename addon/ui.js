@@ -6,6 +6,11 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  saveLogAsBtn:"Spara logg som…",
+  saveLogAsHelp:"För en kopia i Dokument: klicka på Spara logg som… och välj Dokument → Lasfilter → logs i dialogen. Skapa mapparna där vid behov. Automatisk loggning fortsätter i Hämtade filer. Loggen kan innehålla regelnamn och domäner; granska den innan du delar den.",
+  saveLogAsStarted:"Loggexporten har startats till den plats du valde. Kopian uppdateras inte automatiskt.",
+  saveLogAsCancelled:"Sparandet avbröts. Ingen loggkopia exporterades.",
+  saveLogAsDemo:"Spara-dialogen finns när SortBro körs i Thunderbird. Ingen fil sparades i förhandsvisningen.",
   readerPauseTitle:"Pausa nya läsfönster",
   readerPauseDurationLabel:"Pausens längd",
   readerPause15:"15 minuter",
@@ -467,7 +472,7 @@ const I18N={
   newInboxDirectLabel:'Flytta nya matchande mejl direkt när de kommer till Inkorgen',
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
   fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/logs/lasfilter-logg.txt',
-  storageNote:'Allt SortBro skapar hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.',
+  storageNote:'Automatiska filer och vanliga exporter hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer. Med Spara logg som… under Aktivitet väljer du själv mapp för en manuell kopia.',
   fileLogNote:'Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.',
   autoBackupLabel:'Backa upp reglerna automatiskt en gång per vecka till Hämtade filer/Lasfilter/Regelbackuper/',
   brakeLabel:'Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl',
@@ -828,6 +833,8 @@ const I18N={
    no_match:'Ingen aktiv regel matchar det markerade meddelandet.',
    operation_running:'En flytt pågår. Vänta tills Thunderbird har svarat.',
    uncertain_move:'Ett flyttförsök fick osäkert svar. Klicka på "Rensa spärr och fortsätt" (eller under Inställningar) för att återuppta bevakningen.',
+   log_save_failed:'Loggkopian kunde inte exporteras. Ingen reservkopia har sparats till en annan mapp. Försök igen och välj en skrivbar mapp.',
+   log_save_unavailable:'Spara-dialogen är inte tillgänglig. Öppna SortBro i Thunderbird och försök igen.',
    storage_error:'Inställningarna kunde inte sparas. Motorn är stoppad i denna session.',
    invalid_storage:'Lagrade inställningar kunde inte läsas. Bevakningen är stoppad.',
    window_error:'Mejlfönstret kunde inte visa rätt mejl. Flytten har inte startat. Kontrollera mejlet i källmappen och välj Rensa spärr och fortsätt för ett nytt försök.',
@@ -858,6 +865,11 @@ const I18N={
   }
  },
  en:{
+  saveLogAsBtn:"Save log as…",
+  saveLogAsHelp:"For a copy in Documents: click Save log as… and choose Documents → Lasfilter → logs in the dialog. Create the folders there if needed. Automatic logging stays in Downloads. The log may contain rule names and domains; review it before sharing.",
+  saveLogAsStarted:"Log export started to the location you selected. This copy is not updated automatically.",
+  saveLogAsCancelled:"Saving was cancelled. No log copy was exported.",
+  saveLogAsDemo:"The save dialog is available when SortBro runs in Thunderbird. No file was saved in this preview.",
   readerPauseTitle:"Pause new reading windows",
   readerPauseDurationLabel:"Pause duration",
   readerPause15:"15 minutes",
@@ -1319,7 +1331,7 @@ const I18N={
   newInboxDirectLabel:'Move new matching emails immediately when they arrive in Inbox',
   verboseLabel:'Show detailed diagnostics in Activity Log',
   fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/logs/lasfilter-logg.txt',
-  storageNote:'Everything SortBro creates lands in subfolders of the app folder Downloads/Lasfilter/: logs (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads.',
+  storageNote:'Automatic files and regular exports land in subfolders of the app folder Downloads/Lasfilter/: logs (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads. Save log as… under Activity lets you choose a folder for a manual copy.',
   fileLogNote:'Also writes sortbro-fellogg.txt in the same folder: a combined error log for the last 30 days (up to 5,000 entries). No message bodies are stored. You can also save it under Activity.',
   autoBackupLabel:'Back up the rules automatically once a week to Downloads/Lasfilter/Regelbackuper/',
   brakeLabel:'Safety brake: stop a rule that suddenly matches an abnormal number of emails',
@@ -1680,6 +1692,8 @@ const I18N={
    no_match:'No active rule matches the selected message.',
    operation_running:'A move is currently in progress. Wait for Thunderbird to finish.',
    uncertain_move:'A move attempt returned an uncertain status. Click "Clear lock & resume" (or under Settings) to resume monitoring.',
+   log_save_failed:'The log copy could not be exported. No fallback copy was saved elsewhere. Try again and select a writable folder.',
+   log_save_unavailable:'The save dialog is unavailable. Open SortBro in Thunderbird and try again.',
    storage_error:'Settings could not be saved. Engine is stopped for this session.',
    invalid_storage:'Stored settings could not be read. Monitoring is stopped.',
    window_error:'The window could not display the correct message. The move has not started. Check the message in the source folder, then choose Clear lock & resume to try again.',
@@ -3029,6 +3043,21 @@ async function download(data,filename,mime='application/json',strict=false){
   }
  }finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
 }
+/* Explicit manual copy: always use the picker, never fall back to a silent
+   download in another folder. An accepted download ID is a start, not a promise
+   that the transfer is complete. No selected absolute path is kept by SortBro. */
+async function saveLogTextAs(text,filename){
+ const downloads=globalThis.browser?.downloads;
+ if(typeof downloads?.download!=='function')throw new C.RuleError('log_save_unavailable');
+ const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
+ try{
+  const id=await downloads.download({url,filename,saveAs:true,conflictAction:'uniquify'});
+  return Number.isSafeInteger(id)&&id>=0;
+ }catch(err){
+  if(/\bcancel(?:led|ed)?\b|NS_ERROR_ABORT/i.test(String(err?.message||err||'')))return false;
+  throw new C.RuleError('log_save_failed');
+ }finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
+}
 let rulePanel='list',editorVisited=false;
 function showView(view){
  if(!$('view-'+view))return;
@@ -3839,6 +3868,17 @@ async function exportRuleFile(rule){
  toast(T('toastSingleExported').replace('{path}',singleFile));
 }
 if($('exportSingleRule'))handle('exportSingleRule','click',()=>exportRuleFile(buildRule()));
+let savingLogAs=false;
+handle('saveLogAs','click',async()=>{
+ if(savingLogAs)return;
+ if(DEMO){toast(T('saveLogAsDemo'));return;}
+ savingLogAs=true;$('saveLogAs').disabled=true;
+ try{
+  const text=await rpc('exportTextLog');
+  const accepted=await saveLogTextAs(text,paths().logs+'sortbro-tekniklogg-'+new Date().toISOString().slice(0,10)+'.txt');
+  toast(T(accepted?'saveLogAsStarted':'saveLogAsCancelled'));
+ }finally{savingLogAs=false;$('saveLogAs').disabled=false;}
+});
 handle('exportErrorLog','click',async()=>{
  const file=paths().logs+'sortbro-fellogg.txt';
  await download(await rpc('exportErrorLog'),file,'text/plain',true);

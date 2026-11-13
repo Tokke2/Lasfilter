@@ -1823,3 +1823,24 @@ test('riktig motor: öppet mejl får avslutas under pausen, nästa mejl ligger k
  await app.setReaderPause('resume');await tick.settle(engine.tick(),100);assert.equal(w.opened.length,2);assert.equal(moves,1,'fortsätt är inte en flyttknapp');
  w.tabs.clear();app.windowClosed(12);await tick.settle(engine.tick(),100);tick.advance(2100);await tick.settle(engine.tick(),100);assert.equal(moves,2);
 });
+
+test('manuell fullständig textlogg fungerar med avstängd automatisk fillogg',async()=>{
+ const {app,api}=await loadBackground();const e=unreadEngine(app);e.config.fileLog=false;
+ api.runtime.getManifest=()=>({version:'1.2.3'});app.tbVersion='160.0';app.selfInfo.installType='normal';
+ app.logs=[C.event('queued',1),C.event('error',0,Date.now(),'motor_stoppad code=move_error'),C.event('debug',0,Date.now(),'fore flytt: vantar')];
+ let downloads=0,writes=0;api.downloads.download=async()=>downloads++;api.storage.local.set=async()=>writes++;
+ const config=JSON.stringify(e.config),text=await app.handle({type:'exportTextLog'});
+ assert.match(text,/Version: 1\.2\.3/);assert.match(text,/Thunderbird: 160\.0/);assert.match(text,/Installation: normal/);
+ assert.match(text,/\tqueued\tcount=1/);assert.match(text,/motor_stoppad code=move_error/);assert.match(text,/fore flytt: vantar/);
+ assert.match(text,/regelnamn och domäner/);assert(text.endsWith('\r\n'));
+ assert.equal(downloads,0);assert.equal(writes,0);assert.equal(JSON.stringify(e.config),config);
+});
+test('automatiska textloggen och manuell textkopia använder samma formattering',async()=>{
+ const {app,api}=await loadBackground();unreadEngine(app);app.engine.config.fileLog=true;
+ app.logs=[C.event('error',0,Date.now(),'window_error')];
+ let calls=0;const render=app.technicalLogText;app.technicalLogText=()=>{calls++;return render();};
+ const downloads=[];api.downloads.download=async args=>{downloads.push(args);return downloads.length;};
+ await app.handle({type:'exportTextLog'});await app.writeTextLog();assert.equal(calls,2);
+ const technical=downloads.find(x=>x.filename==='Lasfilter/logs/lasfilter-logg.txt');assert(technical);assert.equal(technical.saveAs,false);assert.equal(technical.conflictAction,'overwrite');
+ assert(downloads.some(x=>x.filename==='Lasfilter/logs/sortbro-fellogg.txt'));
+});

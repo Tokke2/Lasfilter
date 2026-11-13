@@ -524,6 +524,16 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - **Huvudet visar båda versionerna och installationstypen** (*Version:* tilläggets, *Thunderbird:* programmets, *Installation:* hur tillägget installerades), och den första raden efter en start är `thunderbird <version> sortbro <version> installation <typ>`.
 - **Den är det sista spåret om tillägget skulle försvinna** ur Thunderbird. Filen ligger kvar på disken även om tillägget tas bort, så de sista raderna visar när det hände och i vilken Thunderbird-version det senast kördes – till exempel om en uppdatering av Thunderbird kom strax innan.
 
+### Spara en loggkopia i Dokument
+
+1. Öppna **Aktivitet → Spara logg som…**.
+2. Välj **Dokument → Lasfilter → logs** i Thunderbirds spara-dialog. Skapa mapparna där om de saknas.
+3. Spara den föreslagna textfilen **sortbro-tekniklogg-ÅÅÅÅ-MM-DD.txt**.
+
+Detta är en **manuell ögonblickskopia**, inte en flytt av den automatiska loggen. Kopian innehåller både vanlig aktivitet, detaljrader och fel samt aktuella versionsuppgifter. Den kan sparas även när automatisk fillogg är avstängd. Loggen kan innehålla regelnamn och domäner – granska den innan du delar den.
+
+Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-filen installerades från. Du väljer platsen i dialogen; ingen absolut sökväg sparas av SortBro. Automatisk loggning fortsätter i **Hämtade filer/Lasfilter/logs/**. Vid Avbryt eller fel görs ingen tyst reservnedladdning till en annan mapp. Beskedet ”exporten har startats” betyder att Thunderbird har accepterat nedladdningen, inte att filskrivningen har verifierats färdig.
+
 ## Gränser som du bör känna till
 
 - Flytten bekräftas av Thunderbirds lokala flytthändelse, inte av en separat kvittens från din IMAP-server. Kontrollera mål- och källmapp i Thunderbird efter aktivering.
@@ -532,6 +542,15 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.26
+
+- **Spara logg som… under Aktivitet.** En manuell fullständig textlogg med spara-dialog, så att du kan välja Dokument → Lasfilter → logs.
+- **Tydlig skillnad mot automatisk loggning.** Den manuella kopian uppdateras inte automatiskt; bakgrundsloggningen och de befintliga exportknapparna behåller sina sökvägar under Hämtade filer.
+- **Avbryt utan reservfil.** Inga tysta nedladdningar till en annan mapp vid avbruten dialog eller skrivfel. Dubbelklick öppnar inte flera dialoger. Förhandsvisningen låtsas inte spara en fil.
+- **Samma loggformat.** Textkopian och bakgrundsfilen använder samma formattering och versionsuppgifter. Huvudet förklarar att detaljrader kan innehålla regelnamn och domäner.
+
+Verifierat med **513 automatiska tester, 498 DOM-kontroller och 24 Chromium-layouter** (SV/EN, 600/840/1280 px, 12/14/20/24 px, ljust/mörkt, tangentbord och simulerade svar för start/Avbryt/fel). Den riktiga Thunderbird-/Windows-dialogen är **inte testad här**. Inga nya behörigheter eller tilläggsberoenden. Flyttmotorn, läsfönsterpausen, uppdateringen och veckobackupen är oförändrade.
 
 ## Nyheter i 1.0.25
 

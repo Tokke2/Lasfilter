@@ -73,6 +73,11 @@ App.installLogNote=()=>{
 App.startDetail=()=>'thunderbird '+(App.tbVersion||'okand')+' sortbro '+String(B.runtime.getManifest()?.version||'okand')+
  ' installation '+(App.selfInfo.installType||'okand');
 App.errorLogText=()=>C.errorLogText(App.errorLogs,{version:B.runtime.getManifest().version,tbVersion:App.tbVersion,installType:App.selfInfo.installType});
+App.technicalLogText=()=>{
+ const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Installation: '+(App.selfInfo.installType||'okand'),'Sekretess: ingen mejltext sparas. Detaljrader kan innehålla regelnamn och domäner.',''];
+ for(const x of C.cleanLogs(App.logs))lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
+ return lines.join('\r\n')+'\r\n';
+};
 App.fileWriteChain=Promise.resolve();
 App.writeTextLog=()=>{
  const task=App.fileWriteChain.then(()=>App.writeLogFiles());
@@ -80,9 +85,7 @@ App.writeTextLog=()=>{
 };
 App.writeLogFiles=async()=>{
  if(!App.engine?.config.fileLog)return;
- const lines=['LÄSFILTER TEKNISK LOGG','Skapad: '+new Date().toISOString(),'Version: '+B.runtime.getManifest().version,'Thunderbird: '+(App.tbVersion||'okand'),'Installation: '+(App.selfInfo.installType||'okand'),'Sekretess: inga ämnesrader, adresser eller mejltexter skrivs.',''];
- for(const x of App.logs)lines.push([x.time,x.level,x.event,'count='+x.data.count,x.data.detail||''].join('\t'));
- const url=URL.createObjectURL(new Blob([lines.join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'}));
+ const url=URL.createObjectURL(new Blob([App.technicalLogText()],{type:'text/plain;charset=utf-8'}));
  try{await B.downloads.download({url,filename:App.paths.logs+'lasfilter-logg.txt',saveAs:false,conflictAction:'overwrite'});}
  catch{App.log('error',0,'teknisk_logg_skrivfel',false);}
  finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
@@ -1191,6 +1194,7 @@ App.handle=async msg=>{
    return {format:'lasfilter-rules',app:'SortBro',version:1,exported:new Date().toISOString(),rules:e.config.rules,folders:folderHints};
   }
   case 'exportErrorLog':return App.errorLogText();
+  case 'exportTextLog':return App.technicalLogText();
   case 'reportUiError':{
    /* Bara kända felkoder. Aldrig exception.message/stack eller mejlinnehåll. */
    const codes=['storage_error','display_error','move_error','sweep_error','uncertain_move','internal_error','invalid_storage','javascript_error','unhandled_rejection'];

@@ -1135,6 +1135,7 @@ order@fortnox.se, nyheter@klarna.se"
                   Inga ämnesrader, avsändaradresser eller mejltexter sparas här.
                 </p>
               </div>
+              <button id="saveLogAs" type="button" class="button secondary" data-i18n="saveLogAsBtn" aria-describedby="saveLogAsHelp">Spara logg som…</button>
               <button
                 id="exportErrorLog"
                 class="button secondary"
@@ -1150,6 +1151,7 @@ order@fortnox.se, nyheter@klarna.se"
                 Exportera logg
               </button>
             </div>
+            <p id="saveLogAsHelp" class="manual-log-help" data-i18n="saveLogAsHelp">För en kopia i Dokument: klicka på Spara logg som… och välj Dokument → Lasfilter → logs i dialogen. Skapa mapparna där vid behov. Automatisk loggning fortsätter i Hämtade filer. Loggen kan innehålla regelnamn och domäner; granska den innan du delar den.</p>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1395,10 +1397,10 @@ order@fortnox.se, nyheter@klarna.se"
                   >
                 </label>
                 <p class="muted storage-note" data-i18n="storageNote">
-                  Allt SortBro skapar hamnar i undermappar till appmappen
+                  Automatiska filer och vanliga exporter hamnar i undermappar till appmappen
                   Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper
                   (säkerhetskopiorna), Regler (dina exporter) och Filterfiler
-                  (msgFilterRules.dat). Inget hamnar löst i Hämtade filer.
+                  (msgFilterRules.dat). Inget hamnar löst i Hämtade filer. Med Spara logg som… under Aktivitet väljer du själv mapp för en manuell kopia.
                 </p>
                 <label class="toggle-label">
                   <input id="fileLog" type="checkbox" checked="" />

@@ -2967,3 +2967,5 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .reader-pause-banner, .reader-pause-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
 .reader-pause-banner > span { flex: 1 1 18rem; }
 .reader-pause-settings { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+
+.manual-log-help { margin: 0 var(--card-padding) 1rem; color: var(--muted); line-height: var(--reading-leading); overflow-wrap: anywhere; }

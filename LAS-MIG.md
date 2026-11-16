@@ -179,7 +179,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
 - **Ljust och mörkt läge** samt **årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
-- **Stöd SortBro** finns i gränssnittet: 100 % lokalt genererad Swish-QR (ISO/IEC 18004-verifierad, `C0721817177;…` samt kameravy med `swish://`), PayPal och Ko-fi. Inget låses upp av en gåva.
+- **Hjälp → Donationer** öppnar en egen dialog i appen. Endast lokalt genererad **Swish standard-QR** till **0721817177**; ingen separat stödsida, PayPal, Ko-fi eller kameravy. Beloppet är valfritt och mottagaren kan inte ändras i appens inställningar. Inget låses upp av en gåva.
 
 ## Säkerhetsbromsen – när en regel plötsligt matchar för mycket
 
@@ -542,6 +542,15 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.27
+
+- **Donationer under Hjälp.** En egen dialogruta ersätter stödfliken och den långa stödsidan. Varm, kort text om frivilligt stöd till utveckling, felsökning och Thunderbird-kompatibilitet – inga nivåer, påhittade siffror eller betalväggar.
+- **Bara Swish standard-QR.** Fast mottagare **0721817177**, meddelandet **SortBro**, knappar för 25/50/100/200 kr och eget helt belopp 1–99 999 kr. Belopp och meddelande kan ändras i Swish. Kontrollera alltid mottagare och belopp i Swish före godkännande.
+- **Lokalt och utan betalningsspårning.** QR-bilden skapas i tillägget utan externa tjänster. Ingen betalning utförs av SortBro och ingen betalningsbekräftelse visas. Ogiltigt belopp döljer QR-koden så att en gammal summa inte råkar användas. PayPal, Ko-fi och mobilkamera-läget är borttagna.
+- **Lätt att öppna och stänga.** Tangentbordsfokus stannar i dialogen. Stäng, Escape eller klick utanför återgår till Hjälp. Regler, osparade utkast och inställningar påverkas inte. Svensk/engelsk text och ljust/mörkt tema.
+
+Verifierat med **521 automatiska tester och 518 DOM-kontroller**. En oberoende QR-avkodare läser mottagare, belopp och Swish-format ur de genererade QR-bilderna. **48 Chromium-layouter** har kontrollerats (SV/EN, ljust/mörkt, 400/840/1280 px, 12/14/20/24 px). Ingen verklig betalning eller skanning med Swish-appen har testats här. Inga nya tilläggsbehörigheter eller körberoenden; QR-avkodaren är endast ett utvecklingstest. Licensvalet är fortfarande öppet och ingen LICENSE-fil har lagts till. Flyttmotor, uppdatering och veckobackup är oförändrade.
 
 ## Nyheter i 1.0.26
 

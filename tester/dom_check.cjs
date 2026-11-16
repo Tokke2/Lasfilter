@@ -67,7 +67,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
 
  /* --- En uppgift per flik; navigering får aldrig spara eller kasta utkast. --- */
  check(!el('rulesLibrary').hidden&&el('ruleEditor').hidden,'starten visar bara regellistan, inte en tom editor');
- check(doc.querySelectorAll('.app-tabs [role="tab"]').length===6,'sex namngivna flikar i stället för en ikonmeny');
+ check(doc.querySelectorAll('.app-tabs [role="tab"]').length===5,'fem namngivna flikar i stället för en ikonmeny');
  check(el('quickRuleBox').closest('.view')===el('view-suggestions')&&el('quickChips').closest('.view')===el('view-suggestions'),'snabbregel och Inkorgschips hör bara till Föreslagna regler');
  check(el('learnBar').closest('.view')===el('view-suggestions')&&el('templateBar').closest('.view')===el('view-suggestions'),'inlärda förslag och mallar har samma egna flik');
  check(el('quickHintsBtn')?.closest('.view')===el('view-suggestions'),'Läs Inkorgen igen finns kvar som riktig knapp');
@@ -80,12 +80,48 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  el('ruleName').value='Osparat flikutkast åäö';fire(el('ruleName'),'input');
  const navigationCondition=el('conditions').firstElementChild;
  const navigationDraft=w.eval('JSON.stringify(draft())');
- for(const view of ['suggestions','activity','settings','help','support','rules']){
+ for(const view of ['suggestions','activity','settings','help','rules']){
   el('tab-'+view).click();
   check(!el('view-'+view).hidden&&[...doc.querySelectorAll('.view')].filter(n=>!n.hidden).length===1,'endast rätt panel syns: '+view);
   check(el('tab-'+view).getAttribute('aria-selected')==='true'&&doc.querySelectorAll('.app-tabs [aria-selected="true"]').length===1,'entydigt vald flik: '+view);
   check(!el('pause').closest('[hidden]')&&!el('mode').closest('[hidden]')&&!el('runTitle').closest('[hidden]'),'paus, flyttläge och status tillgängliga i '+view);
  }
+
+ el('tab-help').click();el('donationOpen').focus();el('donationOpen').click();
+ check(!el('donationModal').hidden&&doc.querySelector('.shell').inert,'Donationer öppnas som modal under Hjälp och blockerar bakgrunden');
+ check(el('donationOpen').closest('.view')===el('view-help')&&!el('view-support')&&!el('footerSupportBtn'),'ingen separat stödsida eller stödflik finns kvar');
+ check(doc.activeElement===el('donationClose'),'fokus placeras på Stäng när dialogen öppnas');
+ check(el('donationModal').querySelector('[role="dialog"]').getAttribute('aria-labelledby')==='donationTitle','dialogen har tillgängligt namn');
+ const donationConfig=JSON.stringify(w.LasDemo.setState({}).config);
+ check(w.eval('currentSwishQrPayload()')==='C0721817177;50;SortBro;6'&&el('qrSvgWrap').querySelector('svg'),'standard-Swish med fast mottagare och lokal SVG');
+ check(!el('qrModeCam')&&!doc.querySelector('a[href*="paypal"],a[href*="ko-fi"]'),'inga PayPal-/Ko-fi-länkar eller kameraval');
+ const donationFirst=el('beloppsrad').querySelector('button');
+ el('donationClose').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+ check(doc.activeElement===donationFirst,'Tab på sista kontrollen stannar i donationer');
+ donationFirst.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
+ check(doc.activeElement===el('donationClose'),'Shift+Tab stannar i donationer');
+ el('tab-help').focus();check(doc.activeElement===el('donationClose'),'fokus kan inte lämna donationsdialogen');
+ el('beloppsrad').querySelector('[data-kr="100"]').click();
+ check(w.eval('currentSwishQrPayload()')==='C0721817177;100;SortBro;6'&&el('beloppsrad').querySelector('[data-kr="100"]').getAttribute('aria-pressed')==='true','beloppsknappar uppdaterar QR och tillgängligt valt tillstånd');
+ for(const amount of ['', '0', '-1', '1.5', '100000']){
+  el('donateCustomKr').value=amount;fire(el('donateCustomKr'),'input');
+  check(el('qrbox').hidden&&!el('qrSvgWrap').querySelector('svg')&&el('donateCustomKr').getAttribute('aria-invalid')==='true','ogiltigt belopp visar ingen gammal QR: '+amount);
+ }
+ el('donateCustomKr').value='75';fire(el('donateCustomKr'),'input');
+ check(!el('qrbox').hidden&&w.eval('currentSwishQrPayload()')==='C0721817177;75;SortBro;6','eget giltigt belopp visar ny QR');
+ await w.refresh();check(el('donateCustomKr').value==='75'&&w.eval('currentSwishQrPayload()').includes(';75;'),'statusuppdatering behåller donationsbelopp');
+ w.eval('applyLanguage("en");updateDonationView()');
+ check(txt('donationTitle')==='Support SortBro'&&txt('donateAmountInfo').includes('75 SEK')&&txt('donationClose')==='Close','donationsdialogen är översatt till engelska');
+ w.eval('applyLanguage("sv");updateDonationView()');
+ check(w.eval('openSenderModal({})')===false,'avsändardialog får inte öppnas ovanpå donationer');
+ el('donationModal').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+ check(el('donationModal').hidden&&!doc.querySelector('.shell').inert&&doc.activeElement===el('donationOpen'),'Escape stänger och återställer fokus och bakgrund');
+ el('donationOpen').click();el('donationModal').click();
+ check(el('donationModal').hidden&&doc.activeElement===el('donationOpen'),'klick utanför stänger dialogen');
+ el('donationOpen').click();el('donationClose').click();
+ check(el('donationModal').hidden&&!doc.querySelector('.shell').inert,'Stäng-knappen återställer bakgrunden');
+ check(JSON.stringify(w.LasDemo.setState({}).config)===donationConfig,'donationsdialogen skriver inte regler eller konfiguration');
+ el('tab-rules').click();
  check(w.eval('JSON.stringify(draft())')===navigationDraft&&w.eval('dirty'),'alla flikbyten bevarar osparat utkast');
  check(el('conditions').firstElementChild===navigationCondition,'flikbyte bygger inte om villkorsraderna');
  el('backToRules').click();check(!el('rulesLibrary').hidden&&el('ruleEditor').hidden&&!el('resumeEditor').hidden,'Alla regler visar listan med Fortsätt redigera');
@@ -110,9 +146,9 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(JSON.stringify(w.LasDemo.setState({}).config)===navigationConfig,'navigering och avbrutna förslag ändrar aldrig sparade regler');
  el('tab-rules').focus();el('tab-rules').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
  check(doc.activeElement===el('tab-suggestions')&&!el('view-suggestions').hidden,'högerpil väljer nästa flik och flyttar fokus');
- doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));check(doc.activeElement===el('tab-support'),'End väljer sista fliken');
+ doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));check(doc.activeElement===el('tab-help'),'End väljer sista fliken');
  doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));check(doc.activeElement===el('tab-rules'),'piltangenter sveper runt från sista till första fliken');
- doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));check(doc.activeElement===el('tab-support'),'vänsterpil sveper runt till sista fliken');
+ doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));check(doc.activeElement===el('tab-help'),'vänsterpil sveper runt till sista fliken');
  doc.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Home',bubbles:true}));check(doc.activeElement===el('tab-rules'),'Home väljer första fliken');
  w.eval('applyLanguage("en")');check(txt('tab-suggestions').includes('Suggested rules')&&txt('tab-settings').trim().includes('Settings'),'de nya flikarna översätts till engelska');
  check(w.eval('JSON.stringify(draft())')===navigationDraft,'språkbyte behåller utkastet');

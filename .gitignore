@@ -3,3 +3,6 @@ tester/node_modules/
 
 # Zippen byggs vid varje släpp i stället för att versionshanteras
 dist/
+
+# Tillfälliga verktyg och visuella testresultat
+.cache/

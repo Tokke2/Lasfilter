@@ -155,21 +155,6 @@
             <span aria-hidden="true">?</span>
             <span data-i18n="navHelp">Hjälp</span>
           </button>
-          <button
-            aria-label="Stöd SortBro"
-            data-i18n-aria="navSupport"
-            data-view="support"
-            class="nav"
-            id="tab-support"
-            role="tab"
-            aria-controls="view-support"
-            aria-selected="false"
-            tabindex="-1"
-            type="button"
-          >
-            <span aria-hidden="true">💚</span>
-            <span data-i18n="navSupport">Stöd SortBro</span>
-          </button>
         </nav>
 
         <div id="readerPauseNotice" class="notice reader-pause-banner" hidden>
@@ -1551,6 +1536,7 @@ order@fortnox.se, nyheter@klarna.se"
             <p data-i18n="helpPageHelp">
               Kom igång och förstå hur SortBro flyttar dina mejl.
             </p>
+            <button id="donationOpen" type="button" class="button secondary" aria-haspopup="dialog" aria-controls="donationModal" data-i18n="donationOpen">💚 Donationer</button>
           </header>
           <section class="intro hero-card" id="introCard">
             <div class="hero-copy">
@@ -1686,296 +1672,9 @@ order@fortnox.se, nyheter@klarna.se"
           </div>
         </section>
 
-        <section
-          id="view-support"
-          class="view"
-          hidden=""
-          role="tabpanel"
-          aria-labelledby="tab-support"
-        >
-          <header class="view-heading">
-            <h1 data-i18n="supportPageTitle">Stöd SortBro</h1>
-            <p data-i18n="supportPageHelp">
-              Frivilligt stöd till fortsatt utveckling. Alla funktioner är
-              alltid fria.
-            </p>
-          </header>
-          <div class="support-hero">
-            <img
-              id="supportLogo"
-              src="icon.svg"
-              class="support-logo"
-              width="76"
-              height="76"
-              alt="SortBro"
-            />
-            <div>
-              <span class="support-eyebrow" data-i18n="supEyebrow"
-                >💚 100 % GRATIS • LOKALT I THUNDERBIRD • ÖPPEN KÄLLKOD</span
-              >
-            </div>
-            <h2 data-i18n="supHeroTitle">
-              Stöd SortBro – för en lugnare inkorg i Thunderbird
-            </h2>
-            <p data-i18n="supHeroSub">
-              SortBro är helt gratis, reklamfritt och körs 100 % lokalt i din
-              dator utan molntjänster. Din gåva stöttar fortsatt utveckling,
-              stöd för nya Thunderbird-versioner och nya smarta
-              filterfunktioner. Inget låses upp – alla funktioner är alltid fria
-              för alla.
-            </p>
-            <div class="support-hstats">
-              <span class="support-hstat" id="supStatRules"
-                >▤ 0 aktiva regler</span
-              >
-              <span class="support-hstat" id="supStatMoved"
-                >↗ 0 flyttade mejl</span
-              >
-              <span class="support-hstat" data-i18n="supStatLocal"
-                >🔒 100 % lokal behandling</span
-              >
-              <span class="support-hstat" data-i18n="supStatFree"
-                >💚 100 % gratis – alltid</span
-              >
-            </div>
-            <div class="support-ctas">
-              <button
-                type="button"
-                class="btn-donate btn-swish"
-                id="swishBtnHero"
-                data-i18n="supSwishQuick"
-              >
-                💚 Swish (QR)
-              </button>
-              <a
-                class="btn-donate btn-paypal"
-                id="paypalBtnHero"
-                href="https://paypal.me/Rickard3dPrint/50SEK"
-                target="_blank"
-                rel="noopener"
-                >💙 PayPal</a
-              >
-              <a
-                class="btn-donate btn-kofi"
-                href="https://ko-fi.com/tokke2"
-                target="_blank"
-                rel="noopener"
-                >☕ Ko-fi</a
-              >
-              <a
-                class="btn-donate btn-gh"
-                href="https://github.com/Tokke2/Lasfilter"
-                target="_blank"
-                rel="noopener"
-                data-i18n="supGithubBtn"
-                >⭐ GitHub</a
-              >
-            </div>
-          </div>
-
-          <div class="card support-card" style="--tc: #27ae60">
-            <p class="support-kicker" data-i18n="supPickKicker">
-              Valfritt belopp – inga nivåer, inga krav
-            </p>
-            <h2 data-i18n="supPickTitle">Välj belopp eller skriv ett eget</h2>
-            <p class="muted" data-i18n="supPickSub">
-              Beloppet följer med till Swish-QR och PayPal (och kan alltid
-              ändras i Swish-appen). Varje krona gör direkt skillnad.
-            </p>
-            <div class="beloppsrad" id="beloppsrad">
-              <button type="button" class="bchip" data-kr="25">25 kr</button>
-              <button type="button" class="bchip vald" data-kr="50">
-                50 kr
-              </button>
-              <button type="button" class="bchip" data-kr="100">100 kr</button>
-              <button type="button" class="bchip" data-kr="200">200 kr</button>
-              <label class="eget-belopp">
-                <input
-                  id="donateCustomKr"
-                  type="number"
-                  min="1"
-                  max="99999"
-                  inputmode="numeric"
-                  placeholder="Eget…"
-                />
-                <b>kr</b>
-              </label>
-            </div>
-            <div id="donateAmountInfo" class="belopp-info">
-              Valt: 50 kr – tack för att du stöttar SortBro! 💚
-            </div>
-            <div class="support-ctas" style="justify-content: flex-start">
-              <button
-                type="button"
-                class="btn-donate btn-swish"
-                id="swishBtnMain"
-                data-i18n="supSwishMain"
-              >
-                💚 Visa Swish-QR för beloppet
-              </button>
-              <a
-                class="btn-donate btn-paypal"
-                id="paypalBtnMain"
-                href="https://paypal.me/Rickard3dPrint/50SEK"
-                target="_blank"
-                rel="noopener"
-                data-i18n="supPaypalMain"
-                >💙 PayPal – valt belopp</a
-              >
-              <a
-                class="btn-donate btn-kofi"
-                href="https://ko-fi.com/tokke2"
-                target="_blank"
-                rel="noopener"
-                data-i18n="supKofiMain"
-                >☕ Ko-fi – engångs / månadsvis</a
-              >
-            </div>
-            <div id="qrbox" class="qrbox" hidden="">
-              <p
-                style="font-weight: 800; color: var(--accent); margin: 0 0 8px"
-                data-i18n="supQrTitle"
-              >
-                💚 Skanna med Swish-appen på mobilen
-              </p>
-              <div style="display: inline-flex; gap: 6px; margin-bottom: 10px">
-                <button
-                  type="button"
-                  id="qrModeSwish"
-                  class="chip active"
-                  data-i18n="supQrModeSwish"
-                >
-                  Swish-appen (Standard)
-                </button>
-                <button
-                  type="button"
-                  id="qrModeCam"
-                  class="chip"
-                  data-i18n="supQrModeCam"
-                >
-                  Vanlig mobilkamera
-                </button>
-              </div>
-              <div id="qrSvgWrap"></div>
-              <p
-                class="muted"
-                style="margin: 8px 0 0"
-                id="supQrSubText"
-                data-i18n="supQrSub"
-              >
-                Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande
-                (SortBro) är förifyllda och kan ändras fritt.
-              </p>
-            </div>
-          </div>
-
-          <div class="card support-card" style="--tc: #175c53">
-            <p class="support-kicker" data-i18n="supWhyKicker">
-              Varför ditt stöd gör skillnad
-            </p>
-            <h2 data-i18n="supWhyTitle">
-              Du stöttar en oberoende svensk utvecklare – inte ett bolag 🛠️
-            </h2>
-            <p class="muted" data-i18n="supWhySub">
-              SortBro byggdes för att lösa ett verkligt problem i Thunderbird:
-              att kunna läsa sina mejl i lugn och ro innan de sorteras bort,
-              eller styra per filter vilka olästa och lästa mejl som ska
-              flyttas. Ditt stöd håller tillägget uppdaterat och reklamfritt.
-            </p>
-            <div class="impact-grid">
-              <div class="impact-item">
-                <div class="impact-ico">📬</div>
-                <div>
-                  <h4 data-i18n="supImp1Title">Thunderbird-kompatibilitet</h4>
-                  <p data-i18n="supImp1Body">
-                    Löpande uppdateringar och IMAP-tester när Thunderbird
-                    släpper nya versioner.
-                  </p>
-                </div>
-              </div>
-              <div class="impact-item">
-                <div class="impact-ico">⚡</div>
-                <div>
-                  <h4 data-i18n="supImp2Title">Nya smarta filterfunktioner</h4>
-                  <p data-i18n="supImp2Body">
-                    Utveckling av nya regelvillkor, fönsterhantering och
-                    förenklingar efter användarönskemål.
-                  </p>
-                </div>
-              </div>
-              <div class="impact-item">
-                <div class="impact-ico">🔒</div>
-                <div>
-                  <h4 data-i18n="supImp3Title">100 % privat &amp; lokalt</h4>
-                  <p data-i18n="supImp3Body">
-                    Inga molntjänster, ingen spårning och inga låsta
-                    betalversioner – någonsin.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div class="trust-pills">
-              <span data-i18n="supTrust1"
-                >🔒 Swish, PayPal &amp; Ko-fi – tryggt &amp; krypterat</span
-              >
-              <span data-i18n="supTrust2"
-                >🕊️ Ingen spårning i tillägget (connect-src 'none')</span
-              >
-              <span data-i18n="supTrust3">🇸🇪 Svensk öppen källkod</span>
-            </div>
-          </div>
-
-          <div class="card support-card support-faq" style="--tc: #8e44ad">
-            <p class="support-kicker" data-i18n="supFaqKicker">
-              Vanliga frågor – lugnt &amp; tryggt
-            </p>
-            <details open="">
-              <summary data-i18n="supFaq1Q">
-                💚 Hur fungerar Swish-QR-koden här i Thunderbird?
-              </summary>
-              <p data-i18n="supFaq1A">
-                QR-koden skapas 100 % lokalt direkt i tillägget utan att
-                kontakta någon extern server. Öppna Swish-appen på din mobil,
-                välj Skanna och rikta kameran mot koden så fylls mottagare, valt
-                belopp och meddelandet "SortBro" i automatiskt.
-              </p>
-            </details>
-            <details>
-              <summary data-i18n="supFaq2Q">
-                🔒 Läser eller skickar SortBro några betal- eller mejluppgifter?
-              </summary>
-              <p data-i18n="supFaq2A">
-                Aldrig. SortBro har en strikt säkerhetspolicy (connect-src
-                'none') som blockerar all nätverkstrafik från tillägget.
-                Betalning sker helt i din egen Swish-app eller i webbläsaren via
-                PayPal/Ko-fi.
-              </p>
-            </details>
-            <details>
-              <summary data-i18n="supFaq3Q">
-                🎁 Låser en donation upp några extra funktioner?
-              </summary>
-              <p data-i18n="supFaq3A">
-                Nej – alla funktioner i SortBro är 100 % gratis för alla,
-                alltid. En gåva är helt frivillig och ett varmt tack som gör det
-                möjligt att fortsätta utveckla och underhålla tillägget.
-              </p>
-            </details>
-          </div>
-        </section>
-
         <footer>
           <span id="lastCheck">Bevakningen startar med Thunderbird.</span>
           <span>
-            <button
-              id="footerSupportBtn"
-              type="button"
-              class="text-button"
-              style="padding: 0; margin-right: 10px"
-              data-i18n="footerSupportLink"
-            >
-              💚 Stöd SortBro
-            </button>
             <span data-i18n="footerRight"
               >SortBro · Inga ändringar i msgFilterRules.dat</span
             >
@@ -1988,6 +1687,41 @@ order@fortnox.se, nyheter@klarna.se"
       </main>
     </div>
     <div id="toast" class="toast" role="status" hidden=""></div>
+
+    <div id="donationModal" class="modal" hidden>
+      <section class="modal-card donation-dialog" role="dialog" aria-modal="true" aria-labelledby="donationTitle" aria-describedby="donationIntro" tabindex="-1">
+        <header class="donation-heading">
+          <span class="donation-heart" aria-hidden="true">♡</span>
+          <div><p class="donation-eyebrow" data-i18n="donationEyebrow">EN FRIVILLIG GÅVA</p>
+          <h2 id="donationTitle" data-i18n="donationTitle">Stöd SortBro</h2></div>
+        </header>
+        <div class="donation-body">
+          <p id="donationIntro" data-i18n="donationIntro">En lugnare inkorg, lite mer tid över. Om SortBro gör din vardag enklare får du gärna stödja arbetet bakom appen. Din gåva hjälper mig att lägga tid på förbättringar, felsökning och stöd för nya Thunderbird-versioner. Tack för att du använder SortBro!</p>
+          <p class="donation-note" data-i18n="donationFree">Alla funktioner är gratis. Donationer är helt frivilliga – inga nivåer, inga extra funktioner och inga krav.</p>
+          <fieldset class="donation-amounts">
+            <legend data-i18n="donationAmount">Välj belopp (SEK)</legend>
+            <div class="beloppsrad" id="beloppsrad">
+              <button type="button" class="bchip" data-kr="25" aria-pressed="false">25 kr</button>
+              <button type="button" class="bchip vald" data-kr="50" aria-pressed="true">50 kr</button>
+              <button type="button" class="bchip" data-kr="100" aria-pressed="false">100 kr</button>
+              <button type="button" class="bchip" data-kr="200" aria-pressed="false">200 kr</button>
+            </div>
+            <label class="donation-custom"><span data-i18n="donationCustom">Eget belopp (hela kronor)</span>
+              <input id="donateCustomKr" type="number" min="1" max="99999" step="1" inputmode="numeric" aria-describedby="donateAmountInfo">
+            </label>
+          </fieldset>
+          <p id="donateAmountInfo" class="belopp-info" role="status"></p>
+          <div id="qrbox" class="qrbox">
+            <h3 data-i18n="donationQrTitle">Skanna med Swish-appen</h3>
+            <div id="qrSvgWrap" role="img" aria-label="Swish-QR för valt belopp till 0721817177" data-i18n-aria="donationQrAlt"></div>
+            <p class="donation-recipient">Swish · <strong>0721817177</strong></p>
+            <p class="muted" data-i18n="donationScan">Öppna Swish på mobilen och välj Skanna. Kontrollera mottagare och belopp i Swish innan du godkänner. Belopp och meddelandet SortBro kan ändras där.</p>
+          </div>
+          <p class="muted donation-privacy" data-i18n="donationPrivacy">QR-koden skapas lokalt. Mottagaren är fast och kan inte ändras i appens inställningar. Betalningen görs i Swish; SortBro tar inte emot betaluppgifter och kan inte se om en gåva har betalats.</p>
+        </div>
+        <div class="modal-actions"><button id="donationClose" type="button" class="button secondary" data-i18n="donationClose">Stäng</button><span>© Rickard Längkvist</span></div>
+      </section>
+    </div>
 
     <div id="folderModal" class="modal" hidden="">
       <div

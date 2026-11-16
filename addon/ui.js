@@ -109,8 +109,6 @@ const I18N={
   settingsPageHelp:"Öppna den grupp du vill ändra. Inställningar sparas direkt.",
   helpPageTitle:"Hjälp",
   helpPageHelp:"Kom igång och förstå hur SortBro flyttar dina mejl.",
-  supportPageTitle:"Stöd SortBro",
-  supportPageHelp:"Frivilligt stöd till fortsatt utveckling. Alla funktioner är alltid fria.",
   statusDetails:"Detaljer om sorteringen",
   inboxIdeasTitle:"Från din Inkorg",
   inboxIdeasHelp:"Välj en avsändare eller ett ämnesord att utgå från.",
@@ -131,45 +129,20 @@ const I18N={
   navActivity:'Aktivitet',
   navSettings:'Inställningar',
   navHelp:'Hjälp',
-  navSupport:'Stöd SortBro',
-  footerSupportLink:'💚 Stöd SortBro',
-  supEyebrow:'💚 100 % GRATIS • LOKALT I THUNDERBIRD • ÖPPEN KÄLLKOD',
-  supHeroTitle:'Stöd SortBro – för en lugnare inkorg i Thunderbird',
-  supHeroSub:'SortBro är helt gratis, reklamfritt och körs 100 % lokalt i din dator utan molntjänster. Din gåva stöttar fortsatt utveckling, stöd för nya Thunderbird-versioner och nya smarta filterfunktioner. Inget låses upp – alla funktioner är alltid fria för alla.',
-  supStatLocal:'🔒 100 % lokal behandling',
-  supStatFree:'💚 100 % gratis – alltid',
-  supSwishQuick:'💚 Swish (QR)',
-  supGithubBtn:'⭐ GitHub',
-  supPickKicker:'Valfritt belopp – inga nivåer, inga krav',
-  supPickTitle:'Välj belopp eller skriv ett eget',
-  supPickSub:'Beloppet följer med till Swish-QR och PayPal (och kan alltid ändras i Swish-appen). Varje krona gör direkt skillnad.',
-  supSwishMain:'💚 Visa Swish-QR för beloppet',
-  supPaypalMain:'💙 PayPal – valt belopp',
-  supKofiMain:'☕ Ko-fi – engångs / månadsvis',
-  supQrTitle:'💚 Skanna med Swish-appen på mobilen',
-  supQrModeSwish:'Swish-appen (Standard)',
-  supQrModeCam:'Vanlig mobilkamera',
-  supQrSub:'Öppna Swish i mobilen → Skanna QR-kod. Belopp och meddelande (SortBro) är förifyllda och kan ändras fritt.',
-  supQrSubCam:'Rikta mobilens vanliga kamera mot QR-koden för att öppna Swish via direktlänk (swish://).',
-  supWhyKicker:'Varför ditt stöd gör skillnad',
-  supWhyTitle:'Du stöttar en oberoende svensk utvecklare – inte ett bolag 🛠️',
-  supWhySub:'SortBro byggdes för att lösa ett verkligt problem i Thunderbird: att kunna läsa sina mejl i lugn och ro innan de sorteras bort, eller styra per filter vilka olästa och lästa mejl som ska flyttas. Ditt stöd håller tillägget uppdaterat och reklamfritt.',
-  supImp1Title:'Thunderbird-kompatibilitet',
-  supImp1Body:'Löpande uppdateringar och IMAP-tester när Thunderbird släpper nya versioner.',
-  supImp2Title:'Nya smarta filterfunktioner',
-  supImp2Body:'Utveckling av nya regelvillkor, fönsterhantering och förenklingar efter användarönskemål.',
-  supImp3Title:'100 % privat & lokalt',
-  supImp3Body:'Inga molntjänster, ingen spårning och inga låsta betalversioner – någonsin.',
-  supTrust1:'🔒 Swish, PayPal & Ko-fi – tryggt & krypterat',
-  supTrust2:'🕊️ Ingen spårning i tillägget (connect-src \'none\')',
-  supTrust3:'🇸🇪 Svensk öppen källkod',
-  supFaqKicker:'Vanliga frågor – lugnt & tryggt',
-  supFaq1Q:'💚 Hur fungerar Swish-QR-koden här i Thunderbird?',
-  supFaq1A:'QR-koden skapas 100 % lokalt direkt i tillägget utan att kontakta någon extern server. Öppna Swish-appen på din mobil, välj Skanna och rikta kameran mot koden så fylls mottagare, valt belopp och meddelandet "SortBro" i automatiskt.',
-  supFaq2Q:'🔒 Läser eller skickar SortBro några betal- eller mejluppgifter?',
-  supFaq2A:'Aldrig. SortBro har en strikt säkerhetspolicy (connect-src \'none\') som blockerar all nätverkstrafik från tillägget. Betalning sker helt i din egen Swish-app eller i webbläsaren via PayPal/Ko-fi.',
-  supFaq3Q:'🎁 Låser en donation upp några extra funktioner?',
-  supFaq3A:'Nej – alla funktioner i SortBro är 100 % gratis för alla, alltid. En gåva är helt frivillig och ett varmt tack som gör det möjligt att fortsätta utveckla och underhålla tillägget.',
+  donationOpen:"💚 Donationer",
+  donationEyebrow:"EN FRIVILLIG GÅVA",
+  donationTitle:"Stöd SortBro",
+  donationIntro:"En lugnare inkorg, lite mer tid över. Om SortBro gör din vardag enklare får du gärna stödja arbetet bakom appen. Din gåva hjälper mig att lägga tid på förbättringar, felsökning och stöd för nya Thunderbird-versioner. Tack för att du använder SortBro!",
+  donationFree:"Alla funktioner är gratis. Donationer är helt frivilliga – inga nivåer, inga extra funktioner och inga krav.",
+  donationAmount:"Välj belopp (SEK)",
+  donationCustom:"Eget belopp (hela kronor)",
+  donationQrTitle:"Skanna med Swish-appen",
+  donationQrAlt:"Swish-QR för valt belopp till 0721817177",
+  donationScan:"Öppna Swish på mobilen och välj Skanna. Kontrollera mottagare och belopp i Swish innan du godkänner. Belopp och meddelandet SortBro kan ändras där.",
+  donationPrivacy:"QR-koden skapas lokalt. Mottagaren är fast och kan inte ändras i appens inställningar. Betalningen görs i Swish; SortBro tar inte emot betaluppgifter och kan inte se om en gåva har betalats.",
+  donationClose:"Stäng",
+  donationSelected:"Valt: {amount} kr – tack för ditt stöd! 💚",
+  donationInvalid:"Ange ett helt belopp mellan 1 och 99 999 kr för att visa QR-koden.",
   sidebarNoteTitle:'Du läser i lugn och ro.',
   sidebarNoteBody:'Lästa mejl stannar kvar medan de visas i en mejlflik eller ett fönster.',
   versionText:'Lokal behandling · v1.0.26 · Inga molntjänster',
@@ -968,8 +941,6 @@ const I18N={
   settingsPageHelp:"Open the group you want to change. Settings are saved immediately.",
   helpPageTitle:"Help",
   helpPageHelp:"Get started and understand how SortBro moves your emails.",
-  supportPageTitle:"Support SortBro",
-  supportPageHelp:"Optional support for continued development. All features remain free.",
   statusDetails:"Sorting details",
   inboxIdeasTitle:"From your Inbox",
   inboxIdeasHelp:"Choose a sender or a subject word as your starting point.",
@@ -990,45 +961,20 @@ const I18N={
   navActivity:'Activity',
   navSettings:'Settings',
   navHelp:'Help',
-  navSupport:'Support SortBro',
-  footerSupportLink:'💚 Support SortBro',
-  supEyebrow:'💚 100% FREE • LOCAL IN THUNDERBIRD • OPEN SOURCE',
-  supHeroTitle:'Support SortBro – for a calmer Thunderbird inbox',
-  supHeroSub:'SortBro is completely free, ad-free and runs 100% locally on your computer with zero cloud services. Your gift supports continued development, compatibility with new Thunderbird releases and new smart filter features. Nothing is paywalled – all features are free for everyone.',
-  supStatLocal:'🔒 100% local processing',
-  supStatFree:'💚 100% free – always',
-  supSwishQuick:'💚 Swish (QR)',
-  supGithubBtn:'⭐ GitHub',
-  supPickKicker:'Any amount – no tiers, no paywalls',
-  supPickTitle:'Choose an amount or enter your own',
-  supPickSub:'The selected amount is pre-filled in the Swish QR code and PayPal link (and can always be changed). Every contribution makes a difference.',
-  supSwishMain:'💚 Show Swish QR for amount',
-  supPaypalMain:'💙 PayPal – selected amount',
-  supKofiMain:'☕ Ko-fi – one-time / monthly',
-  supQrTitle:'💚 Scan with the Swish app on your phone',
-  supQrModeSwish:'Swish scanner (Default)',
-  supQrModeCam:'Phone camera app',
-  supQrSub:'Open Swish on your phone → Scan QR code. Amount and message (SortBro) are pre-filled and editable.',
-  supQrSubCam:'Point your phone\'s camera app at the QR code to open Swish via deep link (swish://).',
-  supWhyKicker:'Why your support matters',
-  supWhyTitle:'You support an independent Swedish developer – not a corporation 🛠️',
-  supWhySub:'SortBro was built to solve a real pain point in Thunderbird: reading emails at your own pace before they are sorted, or controlling per filter which unread and read emails move. Your support keeps the add-on maintained and ad-free.',
-  supImp1Title:'Thunderbird compatibility',
-  supImp1Body:'Ongoing updates and IMAP testing as Thunderbird releases new versions.',
-  supImp2Title:'New smart filter features',
-  supImp2Body:'New rule conditions, window controls and workflow improvements based on user feedback.',
-  supImp3Title:'100% private & local',
-  supImp3Body:'No cloud services, no telemetry and no locked Pro tiers – ever.',
-  supTrust1:'🔒 Swish, PayPal & Ko-fi – encrypted & secure',
-  supTrust2:'🕊️ Zero tracking in the add-on (connect-src \'none\')',
-  supTrust3:'🇸🇪 Swedish open-source project',
-  supFaqKicker:'Frequently asked questions',
-  supFaq1Q:'💚 How does the Swish QR code work inside Thunderbird?',
-  supFaq1A:'The QR code is generated 100% locally inside the add-on without contacting any external server. Open the Swish app on your phone, tap Scan and point the camera at the QR code to pre-fill recipient, amount and the message "SortBro".',
-  supFaq2Q:'🔒 Does SortBro read or send any payment or email data?',
-  supFaq2A:'Never. SortBro enforces a strict security policy (connect-src \'none\') blocking all network traffic from the add-on. Payments happen entirely in your own Swish app or browser via PayPal/Ko-fi.',
-  supFaq3Q:'🎁 Does donating unlock any extra features?',
-  supFaq3A:'No – all features in SortBro are 100% free for everyone, always. Donating is completely voluntary and helps keep development going.',
+  donationOpen:"💚 Donations",
+  donationEyebrow:"A VOLUNTARY GIFT",
+  donationTitle:"Support SortBro",
+  donationIntro:"A calmer inbox, a little more time to spare. If SortBro makes your day easier, you are welcome to support the work behind the app. Your gift helps me spend time on improvements, troubleshooting and compatibility with new Thunderbird releases. Thank you for using SortBro!",
+  donationFree:"All features are free. Donations are entirely optional – no tiers, no extra features and no obligations.",
+  donationAmount:"Choose an amount (SEK)",
+  donationCustom:"Custom amount (whole SEK)",
+  donationQrTitle:"Scan with the Swish app",
+  donationQrAlt:"Swish QR for the selected amount to 0721817177",
+  donationScan:"Open Swish on your phone and select Scan. Check the recipient and amount in Swish before approving. You can change the amount and the message SortBro there.",
+  donationPrivacy:"The QR code is generated locally. The recipient is fixed and cannot be changed in the app settings. Payment takes place in Swish; SortBro receives no payment details and cannot tell whether a gift has been paid.",
+  donationClose:"Close",
+  donationSelected:"Selected: {amount} SEK – thank you for your support! 💚",
+  donationInvalid:"Enter a whole amount between 1 and 99,999 SEK to show the QR code.",
   sidebarNoteTitle:'Read at your own pace.',
   sidebarNoteBody:'Read messages stay put while open in any mail tab or message window.',
   versionText:'Local processing · v1.0.26 · No cloud services',
@@ -1849,7 +1795,7 @@ function applyLanguage(lang){
  for(const select of document.querySelectorAll('#folderModal .folder-choice, #tbImportReview .folder-choice'))folderPicker(select,select.value);
  updateReadPolicy();updateMatchHelp();if(folderTreeSession)renderFolderTree();if(senderSession)renderSenderPreview();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
- if(state){applySeason(state.prefs);renderReaderPause();}
+ if(state){applySeason(state.prefs);renderReaderPause();updateDonationView();}
  repaint();
 }
 
@@ -1922,7 +1868,7 @@ function applySeason(prefs){
  root.dataset.seasonMode=SEASON_CHOICES.includes(prefs?.season)?prefs.season:'auto';
  if($('seasonHeroArt'))$('seasonHeroArt').innerHTML=seasonArt(season);
  if($('seasonGreeting'))$('seasonGreeting').textContent=T(SEASON_KEY_NAMES[season]||'seasonGreetingAutumn');
- const logos=[['brandLogo','64'],['supportLogo','128']];
+ const logos=[['brandLogo','64']];
  for(const [id,size] of logos){
   const img=$(id);if(!img)continue;
   img.src='season-'+season+'-'+size+'.png';
@@ -2194,7 +2140,7 @@ async function createFolderFromModal(){
 let senderSession=null,prefillLoading=false,prefillWaiting=false;
 function retrySenderPrefill(){if(prefillWaiting)queueMicrotask(()=>applyPrefill().catch(alertError));}
 function openSenderModal(data){
- if(senderSession||!$('folderModal').hidden||folderTreeSession)return false;
+ if(senderSession||!$('folderModal').hidden||folderTreeSession||!$('donationModal').hidden)return false;
  senderSession={data:structuredClone(data),rules:structuredClone(state.config.rules),revision:state.config.revision,focus:document.activeElement,busy:false,stale:false};
  $('senderType').value='address';
  const options=[el('option','',T('senderNew'))];options[0].value='';
@@ -2292,7 +2238,7 @@ document.addEventListener('focusin',event=>{if(senderSession&&!$('senderModal').
  const target=modalFocusItems($('senderModal'))[0]||$('senderModal').querySelector('[role="dialog"]');target.focus();
 }});
 async function applyPrefill(){
- if(!live||DEMO||prefillLoading||senderSession||folderTreeSession||!$('folderModal').hidden)return false;
+ if(!live||DEMO||prefillLoading||senderSession||folderTreeSession||!$('folderModal').hidden||!$('donationModal').hidden)return false;
  prefillLoading=true;prefillWaiting=false;
  try{
   const data=await rpc('pendingPrefill');if(!data){retrySenderPrefill();return false;}
@@ -2435,8 +2381,6 @@ function renderStatus(next){
  }
  if($('runAllRulesBtn'))$('runAllRulesBtn').textContent=state.config.rules.length?T('runAllRulesCount').replace('{n}',state.config.rules.length):T('runAllRulesBtn');
  if(editToken===currentToken())editRevision=cfg.revision;
- if($('supStatRules'))$('supStatRules').textContent='▤ '+active+' '+T('statRules');
- if($('supStatMoved'))$('supStatMoved').textContent='↗ '+state.stats.moved+' '+T('statMoved');
  updateDonationView();
  if($('learnOn'))$('learnOn').checked=!(state.learn&&state.learn.off);
  renderTrialBar();renderLearnBar();
@@ -3089,10 +3033,9 @@ for(const tab of document.querySelectorAll('.app-tabs [role="tab"]'))tab.addEven
  event.preventDefault();showView(next.dataset.view);next.focus();
 });
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
-handle('footerSupportBtn','click',()=>showView('support'));
 
-/* ===== Stöd / Donation (100 % lokal, ISO/IEC 18004-verifierad Swish-QR + PayPal + Ko-fi) ===== */
-let donateKr=50,qrMode='swish';
+/* ===== Donationer: endast lokal Swish standard-QR, ingen betalningsstatus ===== */
+let donateKr=50,donationFocus=null;
 function makeQrSvg(text){
  const bytes=Array.from(new TextEncoder().encode(text));
  const VERSIONS_M=[null,[1,16,10,1,16,0,0,[]],[2,28,16,1,28,0,0,[6,18]],[3,44,26,1,44,0,0,[6,22]],[4,64,18,2,32,0,0,[6,26]]];
@@ -3137,52 +3080,56 @@ function makeQrSvg(text){
  svg.append(rect,path);return svg;
 }
 function currentSwishQrPayload(){
- if(qrMode==='cam'){
-  const data=JSON.stringify({version:1,payee:{value:'0721817177',editable:false},amount:{value:donateKr,editable:true},message:{value:'SortBro',editable:true}});
-  return 'swish://payment?data='+encodeURIComponent(data);
- }
- return `C0721817177;${donateKr};SortBro;6`;
+ return Number.isInteger(donateKr)&&donateKr>=1&&donateKr<=99999?`C0721817177;${donateKr};SortBro;6`:'';
 }
 function updateDonationView(){
- if($('donateAmountInfo'))$('donateAmountInfo').textContent=currentLang==='en'?`Selected: ${donateKr} SEK – thank you for supporting SortBro! 💚`:`Valt: ${donateKr} kr – tack för att du stöttar SortBro! 💚`;
- const pp=`https://paypal.me/Rickard3dPrint/${donateKr}SEK`;
- if($('paypalBtnHero'))$('paypalBtnHero').href=pp;
- if($('paypalBtnMain'))$('paypalBtnMain').href=pp;
- if($('qrModeSwish'))$('qrModeSwish').classList.toggle('active',qrMode==='swish');
- if($('qrModeCam'))$('qrModeCam').classList.toggle('active',qrMode==='cam');
- if($('supQrSubText'))$('supQrSubText').textContent=qrMode==='cam'?T('supQrSubCam'):T('supQrSub');
- if($('qrbox')&&!$('qrbox').hidden&&$('qrSvgWrap')){
-  $('qrSvgWrap').replaceChildren(makeQrSvg(currentSwishQrPayload()));
+ if($('donationModal').hidden)return;
+ const payload=currentSwishQrPayload(),valid=Boolean(payload),wrap=$('qrSvgWrap');
+ $('donateAmountInfo').textContent=valid?T('donationSelected').replace('{amount}',donateKr):T('donationInvalid');
+ $('donateCustomKr').setAttribute('aria-invalid',String(!valid));
+ $('qrbox').hidden=!valid;
+ for(const c of document.querySelectorAll('#beloppsrad .bchip')){
+  const selected=Number(c.dataset.kr)===donateKr&&$('donateCustomKr').value==='';
+  c.classList.toggle('vald',selected);c.setAttribute('aria-pressed',String(selected));
+  c.textContent=c.dataset.kr+(currentLang==='en'?' SEK':' kr');
+ }
+ if(wrap.dataset.payload!==payload){
+  wrap.replaceChildren(...(valid?[makeQrSvg(payload)]:[]));wrap.dataset.payload=payload;
  }
 }
-for(const chip of document.querySelectorAll('#beloppsrad .bchip')){
- chip.addEventListener('click',()=>{
-  for(const c of document.querySelectorAll('#beloppsrad .bchip'))c.classList.remove('vald');
-  chip.classList.add('vald');
-  if($('donateCustomKr'))$('donateCustomKr').value='';
-  donateKr=parseInt(chip.dataset.kr,10)||50;
-  updateDonationView();
- });
+function openDonation(){
+ if(!$('donationModal').hidden||document.querySelector('.shell').inert)return;
+ donationFocus=document.activeElement;
+ document.querySelector('.shell').inert=true;$('donationModal').hidden=false;
+ updateDonationView();$('donationClose').focus();$('donationModal').querySelector('.donation-body').scrollTop=0;
 }
-if($('donateCustomKr')){
- $('donateCustomKr').addEventListener('input',e=>{
-  const v=parseInt(e.target.value,10);
-  if(v>0&&v<100000){
-   for(const c of document.querySelectorAll('#beloppsrad .bchip'))c.classList.remove('vald');
-   donateKr=v;updateDonationView();
-  }
- });
+function closeDonation(){
+ if($('donationModal').hidden)return;
+ $('donationModal').hidden=true;document.querySelector('.shell').inert=false;
+ const focus=donationFocus;donationFocus=null;
+ if(focus?.isConnected&&!focus.closest('[hidden],[inert]'))focus.focus();
+ else $('donationOpen').focus();
+ retrySenderPrefill();
 }
-function showSwishQr(){
- if(!$('qrbox')||!$('qrSvgWrap'))return;
- $('qrbox').hidden=false;
- updateDonationView();
- $('qrbox').scrollIntoView({behavior:'smooth',block:'center'});
-}
-handle('swishBtnHero','click',showSwishQr);
-handle('swishBtnMain','click',showSwishQr);
-if($('qrModeSwish'))handle('qrModeSwish','click',()=>{qrMode='swish';updateDonationView();});
-if($('qrModeCam'))handle('qrModeCam','click',()=>{qrMode='cam';updateDonationView();});
+for(const chip of document.querySelectorAll('#beloppsrad .bchip'))chip.addEventListener('click',()=>{
+ $('donateCustomKr').value='';donateKr=Number(chip.dataset.kr);updateDonationView();
+});
+handle('donateCustomKr','input',()=>{
+ const input=$('donateCustomKr');donateKr=input.value!==''&&input.validity.valid?input.valueAsNumber:null;updateDonationView();
+});
+handle('donationOpen','click',openDonation);
+handle('donationClose','click',closeDonation);
+handle('donationModal','click',event=>{if(event.target===$('donationModal'))closeDonation();});
+handle('donationModal','keydown',event=>{
+ if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeDonation();return;}
+ if(event.key!=='Tab')return;
+ const items=modalFocusItems($('donationModal')),first=items[0],last=items.at(-1);
+ if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
+document.addEventListener('focusin',event=>{
+ if(!$('donationModal').hidden&&!$('donationModal').contains(event.target))$('donationClose').focus();
+});
 $('ruleForm').addEventListener('input',()=>{updateRuleExplanation();dirty=true;if($('duplicate'))$('duplicate').disabled=false;});
 $('ruleForm').addEventListener('change',e=>{
  dirty=true;if($('duplicate'))$('duplicate').disabled=false;

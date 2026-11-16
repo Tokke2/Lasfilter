@@ -179,7 +179,7 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
 - **Ljust och mörkt läge** samt **årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
-- **Hjälp → Donationer** öppnar en egen dialog i appen. Endast lokalt genererad **Swish standard-QR** till **0721817177**; ingen separat stödsida, PayPal, Ko-fi eller kameravy. Beloppet är valfritt och mottagaren kan inte ändras i appens inställningar. Inget låses upp av en gåva.
+- **Hjälp → Donationer** öppnar en egen dialog i appen med **Swish standard-QR** till **0721817177** samt knappar och lokalt genererade QR-länkar till **paypal.me/Rickard3dPrint** och **ko-fi.com/tokke2**. Ingen separat stödsida. Mottagaruppgifterna är fasta i appen och gåvor är frivilliga; inget låses upp. Swish-beloppet gäller bara Swish. För PayPal/Ko-fi väljs beloppet hos tjänsten.
 
 ## Säkerhetsbromsen – när en regel plötsligt matchar för mycket
 
@@ -542,6 +542,15 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.28
+
+- **Swish, PayPal och Ko-fi i samma donationsdialog.** Under **Hjälp → Donationer** finns nu också knappar till **https://paypal.me/Rickard3dPrint** och **https://ko-fi.com/tokke2**. Den korta, personliga texten om frivilligt stöd och gratis funktioner är kvar.
+- **Knapp eller QR-länk.** Öppna PayPal/Ko-fi med knappen eller välj **Visa QR-kod** och skanna med mobilkameran. QR-koderna genereras lokalt utan någon extern QR-tjänst. Knapparna och QR-koderna leder till samma fasta adresser. Länkar öppnas separat med skydd mot åtkomst till ursprungsfönstret och utan referrer.
+- **Swish standard är oförändrat.** **0721817177**, valfritt helt belopp och meddelandet **SortBro**. Skanna denna kod med **Swish-appen**, inte PayPal-/Ko-fi-koderna. Swish-beloppet följer inte med till de andra tjänsterna – där väljs beloppet separat.
+- **Ingen betalningshantering i tillägget.** Kontrollera mottagaren hos tjänsten innan du betalar. SortBro ser inte betaluppgifter eller betalningsstatus. Externa tjänster har egna villkor och integritetspolicyer. Mottagaruppgifterna kan inte redigeras i appens inställningar.
+
+Verifierat med **523 automatiska tester, 530 DOM-kontroller och 48 Chromium-layouter** (SV/EN, ljust/mörkt, 400/840/1280 px, 12/14/20/24 px). Swish- och länk-QR avkodas med en oberoende testavkodare. Webbläsartesterna kontrollerar länkaktivering med simulerade externa svar; inga verkliga betalningar, mottagarkonton eller skanningar i betalappar har verifierats. Inga nya tilläggsbehörigheter eller körberoenden. Licensen, flyttmotorn, uppdateringen och veckobackupen är oförändrade.
 
 ## Nyheter i 1.0.27
 

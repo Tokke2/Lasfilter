@@ -134,13 +134,24 @@ const I18N={
   donationTitle:"Stöd SortBro",
   donationIntro:"En lugnare inkorg, lite mer tid över. Om SortBro gör din vardag enklare får du gärna stödja arbetet bakom appen. Din gåva hjälper mig att lägga tid på förbättringar, felsökning och stöd för nya Thunderbird-versioner. Tack för att du använder SortBro!",
   donationFree:"Alla funktioner är gratis. Donationer är helt frivilliga – inga nivåer, inga extra funktioner och inga krav.",
-  donationAmount:"Välj belopp (SEK)",
+  donationAmount:"Swish – välj belopp (SEK)",
   donationCustom:"Eget belopp (hela kronor)",
   donationQrTitle:"Skanna med Swish-appen",
   donationQrAlt:"Swish-QR för valt belopp till 0721817177",
   donationScan:"Öppna Swish på mobilen och välj Skanna. Kontrollera mottagare och belopp i Swish innan du godkänner. Belopp och meddelandet SortBro kan ändras där.",
-  donationPrivacy:"QR-koden skapas lokalt. Mottagaren är fast och kan inte ändras i appens inställningar. Betalningen görs i Swish; SortBro tar inte emot betaluppgifter och kan inte se om en gåva har betalats.",
+  donationPrivacy:"QR-koderna skapas lokalt. Mottagare och länkar är fasta i appen. Betalningen görs hos Swish, PayPal eller Ko-fi; SortBro tar inte emot betaluppgifter och kan inte se om en gåva har betalats. Externa tjänster har egna villkor och integritetspolicyer.",
   donationClose:"Stäng",
+  donationOther:"Andra sätt att stödja",
+  donationExternal:"Öppna en tjänst med knappen eller skanna dess QR-kod med mobilkameran. Belopp väljer du hos PayPal eller Ko-fi – Swish-beloppet nedan följer inte med.",
+  donationPaypal:"Öppna PayPal ↗",
+  donationKofi:"Öppna Ko-fi ↗",
+  donationShowQr:"Visa QR-kod",
+  donationHideQr:"Dölj QR-kod",
+  donationPaypalQr:"Visa eller dölj QR-koden till PayPal",
+  donationKofiQr:"Visa eller dölj QR-koden till Ko-fi",
+  donationPaypalAlt:"QR-länk till paypal.me/Rickard3dPrint",
+  donationKofiAlt:"QR-länk till ko-fi.com/tokke2",
+  donationCamera:"Skanna med mobilkameran för att öppna länken. Kontrollera mottagaren hos tjänsten innan du betalar.",
   donationSelected:"Valt: {amount} kr – tack för ditt stöd! 💚",
   donationInvalid:"Ange ett helt belopp mellan 1 och 99 999 kr för att visa QR-koden.",
   sidebarNoteTitle:'Du läser i lugn och ro.',
@@ -966,13 +977,24 @@ const I18N={
   donationTitle:"Support SortBro",
   donationIntro:"A calmer inbox, a little more time to spare. If SortBro makes your day easier, you are welcome to support the work behind the app. Your gift helps me spend time on improvements, troubleshooting and compatibility with new Thunderbird releases. Thank you for using SortBro!",
   donationFree:"All features are free. Donations are entirely optional – no tiers, no extra features and no obligations.",
-  donationAmount:"Choose an amount (SEK)",
+  donationAmount:"Swish – choose an amount (SEK)",
   donationCustom:"Custom amount (whole SEK)",
   donationQrTitle:"Scan with the Swish app",
   donationQrAlt:"Swish QR for the selected amount to 0721817177",
   donationScan:"Open Swish on your phone and select Scan. Check the recipient and amount in Swish before approving. You can change the amount and the message SortBro there.",
-  donationPrivacy:"The QR code is generated locally. The recipient is fixed and cannot be changed in the app settings. Payment takes place in Swish; SortBro receives no payment details and cannot tell whether a gift has been paid.",
+  donationPrivacy:"QR codes are generated locally. Recipients and links are fixed in the app. Payment takes place with Swish, PayPal or Ko-fi; SortBro receives no payment details and cannot tell whether a gift has been paid. External services have their own terms and privacy policies.",
   donationClose:"Close",
+  donationOther:"More ways to support",
+  donationExternal:"Open a service using its button or scan its QR code with your phone camera. Choose the amount on PayPal or Ko-fi – the Swish amount below is not carried over.",
+  donationPaypal:"Open PayPal ↗",
+  donationKofi:"Open Ko-fi ↗",
+  donationShowQr:"Show QR code",
+  donationHideQr:"Hide QR code",
+  donationPaypalQr:"Show or hide the PayPal QR code",
+  donationKofiQr:"Show or hide the Ko-fi QR code",
+  donationPaypalAlt:"QR link to paypal.me/Rickard3dPrint",
+  donationKofiAlt:"QR link to ko-fi.com/tokke2",
+  donationCamera:"Scan with your phone camera to open the link. Check the recipient on the service before paying.",
   donationSelected:"Selected: {amount} SEK – thank you for your support! 💚",
   donationInvalid:"Enter a whole amount between 1 and 99,999 SEK to show the QR code.",
   sidebarNoteTitle:'Read at your own pace.',
@@ -3034,7 +3056,7 @@ for(const tab of document.querySelectorAll('.app-tabs [role="tab"]'))tab.addEven
 });
 for(const nav of document.querySelectorAll('[data-view]'))nav.addEventListener('click',()=>showView(nav.dataset.view));
 
-/* ===== Donationer: endast lokal Swish standard-QR, ingen betalningsstatus ===== */
+/* ===== Donationer: lokala QR-koder och fasta länkar, ingen betalningsstatus ===== */
 let donateKr=50,donationFocus=null;
 function makeQrSvg(text){
  const bytes=Array.from(new TextEncoder().encode(text));
@@ -3084,6 +3106,10 @@ function currentSwishQrPayload(){
 }
 function updateDonationView(){
  if($('donationModal').hidden)return;
+ for(const service of ['Paypal','Kofi']){
+  const shown=!$('donation'+service+'Code').hidden;
+  $('donation'+service+'Toggle').textContent=T(shown?'donationHideQr':'donationShowQr');
+ }
  const payload=currentSwishQrPayload(),valid=Boolean(payload),wrap=$('qrSvgWrap');
  $('donateAmountInfo').textContent=valid?T('donationSelected').replace('{amount}',donateKr):T('donationInvalid');
  $('donateCustomKr').setAttribute('aria-invalid',String(!valid));
@@ -3116,6 +3142,12 @@ for(const chip of document.querySelectorAll('#beloppsrad .bchip'))chip.addEventL
 });
 handle('donateCustomKr','input',()=>{
  const input=$('donateCustomKr');donateKr=input.value!==''&&input.validity.valid?input.valueAsNumber:null;updateDonationView();
+});
+for(const service of ['Paypal','Kofi'])handle('donation'+service+'Toggle','click',()=>{
+ const box=$('donation'+service+'Code'),button=$('donation'+service+'Toggle');
+ if(box.hidden&&!box.firstElementChild)box.append(makeQrSvg($('donation'+service+'Link').href));
+ box.hidden=!box.hidden;button.setAttribute('aria-expanded',String(!box.hidden));
+ updateDonationView();
 });
 handle('donationOpen','click',openDonation);
 handle('donationClose','click',closeDonation);
@@ -3898,7 +3930,7 @@ if($('folderModal')){
  });
  document.addEventListener('focusin',e=>{if(!folderTreeSession&&!$('folderModal').hidden&&!$('folderModal').contains(e.target))$('folderName').focus();});
 }
-function modalFocusItems(modal){return [...modal.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')].filter(n=>!n.closest('[hidden],[inert]'));}
+function modalFocusItems(modal){return [...modal.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')].filter(n=>!n.closest('[hidden],[inert]'));}
 handle('folderTreeAccount','change',()=>{const s=folderTreeSession;if(!s)return;s.accountId=$('folderTreeAccount').value;s.pending='';s.active='';s.expanded.clear();$('folderTreeSearch').value='';renderFolderTree(true);});
 handle('folderTreeSearch','input',()=>renderFolderTree());
 handle('folderTreeSearch','keydown',event=>{if(event.key==='Enter'||event.key==='ArrowDown'){event.preventDefault();focusTreeRow(folderTreeSession?.active);}});

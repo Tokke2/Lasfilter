@@ -1844,3 +1844,13 @@ test('automatiska textloggen och manuell textkopia använder samma formattering'
  const technical=downloads.find(x=>x.filename==='Lasfilter/logs/lasfilter-logg.txt');assert(technical);assert.equal(technical.saveAs,false);assert.equal(technical.conflictAction,'overwrite');
  assert(downloads.some(x=>x.filename==='Lasfilter/logs/sortbro-fellogg.txt'));
 });
+
+test('kopiering/export av fellogg hämtar felarkivet även utan synliga fel eller fillogg',async()=>{
+ const {app,api}=await loadBackground();unreadEngine(app);app.engine.config.fileLog=false;
+ app.logs=[C.event('moved',1)];app.errorLogs=[C.event('error',0,Date.now(),'motor_stoppad code=window_error'),C.event('error',0,Date.now(),'motor_stoppad code=move_error')];
+ api.runtime.getManifest=()=>({version:'1.2.3'});app.tbVersion='160.0';
+ let downloads=0,writes=0;api.downloads.download=async()=>downloads++;api.storage.local.set=async()=>writes++;
+ const text=await app.handle({type:'exportErrorLog'});
+ assert.match(text,/window_error/);assert.match(text,/move_error/);assert.match(text,/Antal felposter: 2/);assert.match(text,/1\.2\.3/);assert.match(text,/160\.0/);
+ assert.doesNotMatch(text,/\tmoved\t/);assert.equal(downloads,0);assert.equal(writes,0);assert.equal(app.errorLogs.length,2);
+});

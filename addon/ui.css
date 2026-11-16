@@ -2717,3 +2717,9 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .donation-link-qr svg { display: block; width: min(220px, 100%); height: auto; margin: auto; background: #fff; }
 .donation-camera { font-size: var(--text-small); margin-bottom: 0; }
 @media (max-width: 540px) { .donation-services { grid-template-columns: 1fr; } }
+
+.copy-errors-fallback { margin: 0 var(--card-padding) 1.5rem; padding: 16px; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; }
+.copy-errors-fallback h3 { margin-top: 0; }
+.copy-errors-fallback textarea { display: block; width: 100%; min-height: 180px; max-height: 50vh; resize: vertical; font-family: ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.log-copy-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.log-location { border-block: 1px solid var(--line); padding: 12px 0 20px; margin-bottom: 20px; }

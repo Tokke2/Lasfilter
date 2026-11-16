@@ -1120,6 +1120,8 @@ order@fortnox.se, nyheter@klarna.se"
                   Inga ämnesrader, avsändaradresser eller mejltexter sparas här.
                 </p>
               </div>
+              <button id="copyErrors" type="button" class="button secondary" data-i18n="copyErrorsBtn" aria-describedby="copyErrorsHelp">Kopiera alla fel</button>
+              <button id="saveErrorAs" type="button" class="button secondary" data-i18n="saveErrorAsBtn" aria-describedby="saveLogAsHelp">Spara fellogg som…</button>
               <button id="saveLogAs" type="button" class="button secondary" data-i18n="saveLogAsBtn" aria-describedby="saveLogAsHelp">Spara logg som…</button>
               <button
                 id="exportErrorLog"
@@ -1137,6 +1139,16 @@ order@fortnox.se, nyheter@klarna.se"
               </button>
             </div>
             <p id="saveLogAsHelp" class="manual-log-help" data-i18n="saveLogAsHelp">För en kopia i Dokument: klicka på Spara logg som… och välj Dokument → Lasfilter → logs i dialogen. Skapa mapparna där vid behov. Automatisk loggning fortsätter i Hämtade filer. Loggen kan innehålla regelnamn och domäner; granska den innan du delar den.</p>
+            <p id="copyErrorsHelp" class="manual-log-help" data-i18n="copyErrorsHelp">Kopierar hela SortBros sparade fellogg: högst 5 000 fel från de senaste 30 dagarna, med tidsstämplar, felkoder och versionsuppgifter. Inga mejltexter. Granska loggen innan du delar den – detaljer kan innehålla regelnamn och domäner.</p>
+            <section id="copyErrorsFallback" class="copy-errors-fallback" hidden aria-labelledby="copyErrorsTitle">
+              <h3 id="copyErrorsTitle" data-i18n="copyErrorsTitle">Fellogg att kopiera</h3>
+              <p id="copyErrorsFallbackHelp" data-i18n="copyErrorsFallbackHelp">Markera hela texten och tryck Ctrl+C (Mac: ⌘C). Klistra sedan in den i chatten. Texten är en ögonblickskopia och uppdateras inte medan du kopierar.</p>
+              <textarea id="copyErrorsText" readonly rows="12" spellcheck="false" aria-labelledby="copyErrorsTitle" aria-describedby="copyErrorsFallbackHelp"></textarea>
+              <div class="log-copy-actions">
+                <button id="copyErrorsSelect" type="button" class="button secondary" data-i18n="copyErrorsSelect">Markera hela felloggen</button>
+                <button id="copyErrorsHide" type="button" class="button secondary" data-i18n="copyErrorsHide">Stäng texten</button>
+              </div>
+            </section>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1399,6 +1411,14 @@ order@fortnox.se, nyheter@klarna.se"
                   fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen
                   mejltext sparas. Du kan också spara felloggen under Aktivitet.
                 </p>
+                <section class="log-location" aria-labelledby="logLocationTitle">
+                  <h3 id="logLocationTitle" data-i18n="logLocationTitle">Välj plats för en loggkopia</h3>
+                  <p id="logLocationHelp" class="muted" data-i18n="logLocationHelp">Välj mapp och filnamn i spara-dialogen, till exempel Dokument → Lasfilter → logs. Detta gäller bara den manuella kopian. Automatisk loggning fortsätter i Thunderbirds hämtningsmapp under Lasfilter/logs. En valfri permanent automatisk loggmapp kan inte väljas i detta tillägg.</p>
+                  <div class="log-copy-actions">
+                    <button id="saveErrorAsSettings" type="button" class="button secondary" data-i18n="saveErrorAsBtn" aria-describedby="logLocationHelp">Spara fellogg som…</button>
+                    <button id="saveLogAsSettings" type="button" class="button secondary" data-i18n="saveLogAsBtn" aria-describedby="logLocationHelp">Spara logg som…</button>
+                  </div>
+                </section>
                 <label class="toggle-label">
                   <input id="autoBackup" type="checkbox" checked="" />
                   <span data-i18n="autoBackupLabel"

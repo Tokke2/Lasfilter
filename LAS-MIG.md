@@ -524,6 +524,20 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 - **Huvudet visar båda versionerna och installationstypen** (*Version:* tilläggets, *Thunderbird:* programmets, *Installation:* hur tillägget installerades), och den första raden efter en start är `thunderbird <version> sortbro <version> installation <typ>`.
 - **Den är det sista spåret om tillägget skulle försvinna** ur Thunderbird. Filen ligger kvar på disken även om tillägget tas bort, så de sista raderna visar när det hände och i vilken Thunderbird-version det senast kördes – till exempel om en uppdatering av Thunderbird kom strax innan.
 
+### Kopiera alla fel till en chatt
+
+Öppna **Aktivitet → Kopiera alla fel**. När kopieringen bekräftas kan du klistra in med **Ctrl+V** (Mac: **⌘V**). Det är hela den sparade, separata felloggen – högst **5 000 fel från de senaste 30 dagarna**, inte bara de rader som syns i aktivitetstabellen. Tidsstämplar, felkoder, antal och versionsuppgifter följer med. Vanlig aktivitet och mejltexter ingår inte.
+
+Om Thunderbird nekar urklippsåtkomst visas i stället en skrivskyddad textruta. Välj **Markera hela felloggen**, tryck **Ctrl+C** (Mac: **⌘C**) och klistra sedan in texten här i chatten. Inga extra behörigheter krävs. Texten ändras inte när aktivitetstabellen uppdateras och **Stäng texten** tömmer bara kopieringsrutan, inte felarkivet. Förhandsvisningens kopior är märkta som exempeldata.
+
+Granska loggen innan du delar den: detaljrader kan innehålla regelnamn och domäner. Om chatten inte tar emot hela texten kan du spara felloggen som TXT och bifoga filen i stället.
+
+### Välja plats för en fellogg
+
+**Aktivitet → Spara fellogg som…** öppnar Thunderbirds spara-dialog, där du väljer mapp och filnamn. Under **Inställningar → Loggar & automatiska säkerhetskopior → Välj plats för en loggkopia** finns både **Spara fellogg som…** och **Spara logg som…** (den fullständiga tekniska textloggen).
+
+Platsvalet gäller **manuella ögonblickskopior**, inte den löpande loggningen. Den automatiska loggen ligger kvar under **Lasfilter/logs/** i Thunderbirds hämtningsmapp. Tilläggets nuvarande API och behörigheter kan inte välja en valfri permanent automatisk loggmapp utanför hämtningsmappen. SortBro sparar ingen absolut målsökväg och flyttar inte gamla loggar. Ingen reservfil skapas på annan plats om du avbryter dialogen eller får ett fel. Den äldre knappen **Spara samlad fellogg** behåller sin vanliga export till hämtningsmappen.
+
 ### Spara en loggkopia i Dokument
 
 1. Öppna **Aktivitet → Spara logg som…**.
@@ -542,6 +556,14 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.29
+
+- **Kopiera alla fel.** Kopiera hela det sparade felarkivet med versionshuvud direkt från Aktivitet. Om urklippet nekas visas en skrivskyddad, markerbar text utan falsk framgångsbekräftelse. Inga nya behörigheter.
+- **Välj plats för båda textloggarna.** Ny **Spara fellogg som…**, plus åtkomst till båda spara-dialogerna från Inställningar. De fyra knapparna delar ett klickskydd så att flera spara-dialoger inte öppnas samtidigt.
+- **Tydliga gränser.** Manuell kopia är inte automatisk loggplats. Befintliga exporter, automatiska loggfiler och veckobackuper är oförändrade. Ingen logg rensas av kopieringen och ingen reservfil skapas vid avbruten spara-dialog.
+
+Verifierat med **533 automatiska tester, 545 DOM-kontroller och 24 Chromium-layouter** (SV/EN, 600/840/1280 px, 12/14/20/24 px, ljust/mörkt). Testerna omfattar hela felarkivet, kopiering av 5 000 poster utan avkortning, nekat/saknat urklipp, tangentbord, dubbelklick och simulerade svar för spara/start/Avbryt/fel. Riktig Thunderbird-/Windows-urklippsåtkomst och spara-dialog är inte testade här. Det rapporterade **move_error** efter läsfönstret är **inte diagnostiserat eller åtgärdat** av denna ändring; flyttmotorn och dess säkerhetskontroller är oförändrade.
 
 ## Nyheter i 1.0.28
 

@@ -3,19 +3,19 @@ const C=require('../addon/core.js');
 const source=fs.readFileSync(path.join(__dirname,'../addon/ui.js'),'utf8');
 // Execute the actual small helper and click handler, without loading unrelated UI.
 const helper=source.slice(source.indexOf('async function saveLogTextAs('),source.indexOf("let rulePanel='list'"));
-const handler=source.slice(source.indexOf('let savingLogAs=false;'),source.indexOf("handle('exportErrorLog','click'"));
+const handler=source.slice(source.indexOf('const logSaveButtons='),source.indexOf('/* Clipboard access may'));
 function setup({download=async()=>17,demo=false,rpcError=false}={}){
- const calls=[],blobs=[],revoked=[],timers=[],toasts=[],rpcCalls=[],button={disabled:false};let click;
+ const calls=[],blobs=[],revoked=[],timers=[],toasts=[],rpcCalls=[],buttons=Object.fromEntries(['saveLogAs','saveErrorAs','saveLogAsSettings','saveErrorAsSettings'].map(id=>[id,{disabled:false}])),clicks={};const button=buttons.saveLogAs;
  const sandbox={C,Blob,Date,Number,String,Error,DEMO:demo,globalThis:null,
   browser:{downloads:{download:async args=>{calls.push(args);return download(args);}}},
   URL:{createObjectURL:blob=>{blobs.push(blob);return 'blob:log-'+blobs.length;},revokeObjectURL:url=>revoked.push(url)},
   setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},
-  $:()=>button,paths:()=>({logs:'Lasfilter/logs/'}),T:key=>key,toast:text=>toasts.push(text),
+  $:id=>buttons[id],paths:()=>({logs:'Lasfilter/logs/'}),T:key=>key,toast:text=>toasts.push(text),
   rpc:async type=>{rpcCalls.push(type);if(rpcError)throw new C.RuleError('internal_error');return 'Teknisk logg\r\nÅäö\r\n';},
-  handle:(id,event,fn)=>{assert.equal(id,'saveLogAs');assert.equal(event,'click');click=fn;}
+  handle:(id,event,fn)=>{assert.equal(event,'click');clicks[id]=fn;}
  };
  sandbox.globalThis=sandbox;vm.runInNewContext(helper+handler+'\nglobalThis.save=saveLogTextAs;',sandbox);
- return {sandbox,save:sandbox.save,click:()=>click(),calls,blobs,revoked,timers,toasts,rpcCalls,button};
+ return {sandbox,save:sandbox.save,click:(id='saveLogAs')=>clicks[id](),buttons,calls,blobs,revoked,timers,toasts,rpcCalls,button};
 }
 test('manuell textlogg använder alltid spara-dialog och ingen tyst överskrivning',async()=>{
  const f=setup(),text='Version: 1.2.3\r\nÅäö\r\n';
@@ -56,4 +56,16 @@ test('misslyckad logghämtning öppnar ingen dialog och lämnar knappen användb
 });
 test('förhandsvisningen låtsas inte kunna välja Dokument eller spara en fil',async()=>{
  const f=setup({demo:true});await f.click();assert.deepEqual(f.toasts,['saveLogAsDemo']);assert.equal(f.calls.length,0);assert.equal(f.rpcCalls.length,0);assert.equal(f.button.disabled,false);
+});
+
+test('båda loggtyperna kan sparas på vald plats från Aktivitet och Inställningar',async()=>{
+ for(const [id,rpc,prefix] of [['saveLogAs','exportTextLog','sortbro-tekniklogg'],['saveLogAsSettings','exportTextLog','sortbro-tekniklogg'],['saveErrorAs','exportErrorLog','sortbro-fellogg'],['saveErrorAsSettings','exportErrorLog','sortbro-fellogg']]){
+  const f=setup();await f.click(id);assert.deepEqual(f.rpcCalls,[rpc]);assert.equal(f.calls[0].saveAs,true);assert(f.calls[0].filename.startsWith('Lasfilter/logs/'+prefix+'-'));
+  assert(Object.values(f.buttons).every(b=>!b.disabled));
+ }
+});
+test('val av loggplats är gemensamt låst för alla fyra knappar medan dialogen väntar',async()=>{
+ let finish;const f=setup({download:()=>new Promise(r=>finish=r)}),first=f.click('saveErrorAsSettings');await new Promise(r=>setImmediate(r));
+ assert(Object.values(f.buttons).every(b=>b.disabled));await f.click('saveLogAs');assert.equal(f.calls.length,1);finish(10);await first;
+ assert(Object.values(f.buttons).every(b=>!b.disabled));
 });

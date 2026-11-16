@@ -602,6 +602,29 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  el('exportLog').click();
  await until(()=>/Loggen exporterades/.test(txt('toast')),'loggexporten kvitteras');
  check(/Lasfilter\/logs\/sortbro-tekniklogg-\d{4}-\d{2}-\d{2}\.json/.test(txt('toast')),'loggfilen hamnar i logs-mappen: "'+txt('toast')+'"');
+
+ w.eval('showView("activity")');
+ check(txt('copyErrors')==='Kopiera alla fel'&&el('copyErrors').getAttribute('aria-describedby')==='copyErrorsHelp','Kopiera alla fel finns med tydlig omfattning');
+ check(/5 000.*30 dagar/.test(txt('copyErrorsHelp')),'kopieringen lovar endast sparad felhistorik');
+ el('copyErrors').click();await until(()=>!el('copyErrorsFallback').hidden&&!el('copyErrors').disabled,'saknad urklipps-API visar hela kopierbara texten');
+ const fallbackText=el('copyErrorsText').value;
+ check(el('copyErrorsText').readOnly&&/SORTBRO – SAMLAD FELLOGG/.test(fallbackText)&&/exempeldata/.test(fallbackText),'fallback är skrivskyddad text med tydligt demohuvud');
+ check(doc.activeElement===el('copyErrorsText')&&el('copyErrorsText').selectionEnd===fallbackText.length,'hela felloggen markeras för manuell kopiering');
+ await w.refresh();check(el('copyErrorsText').value===fallbackText,'statusuppdatering ändrar inte text medan användaren kopierar');
+ el('copyErrorsSelect').click();check(el('copyErrorsText').selectionStart===0&&el('copyErrorsText').selectionEnd===fallbackText.length,'Markera hela felloggen väljer allt');
+ el('copyErrorsHide').click();check(el('copyErrorsFallback').hidden&&el('copyErrorsText').value===''&&doc.activeElement===el('copyErrors'),'Stäng texten tömmer kopian och återställer fokus');
+ let clipboardText='';Object.defineProperty(w.navigator,'clipboard',{configurable:true,value:{writeText:async text=>{clipboardText=text;}}});
+ el('copyErrors').click();await until(()=>/Felloggen är kopierad/.test(txt('toast')),'lyckad urklippsskrivning får bekräftelse');
+ check(/SORTBRO – SAMLAD FELLOGG/.test(clipboardText)&&el('copyErrorsFallback').hidden,'lyckad kopiering skriver hela rapporten utan extra textfält');
+ Object.defineProperty(w.navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('Permission denied');}}});
+ el('copyErrors').click();await until(()=>!el('copyErrorsFallback').hidden&&!el('copyErrors').disabled,'nekad urklippsåtkomst ger reservvägen');
+ check(/Automatisk kopiering kunde inte göras/.test(txt('toast')),'nekad åtkomst kallas inte lyckad kopiering');el('copyErrorsHide').click();
+ check(el('saveErrorAsSettings').closest('#storageSettings')&&el('saveLogAsSettings').closest('#storageSettings'),'båda manuella loggkopiorna går att spara från Inställningar');
+ check(/permanent automatisk loggmapp kan inte väljas/.test(txt('logLocationHelp')),'platsvalet lovar inte en ändrad automatisk loggmapp');
+ for(const id of ['saveErrorAs','saveErrorAsSettings','saveLogAsSettings']){
+  const before=blob;el(id).click();await until(()=>/Ingen fil sparades i förhandsvisningen/.test(txt('toast')),'demo visar ingen falsk spara-dialog: '+id);
+  check(blob===before&&!el(id).disabled,'demo skapar ingen reservfil: '+id);
+ }
  check(/Spara logg som/.test(txt('saveLogAs')),'manuell Spara logg som-knapp finns under Aktivitet');
  check(el('saveLogAs').getAttribute('aria-describedby')==='saveLogAsHelp','spara-knappen är kopplad till förklaringen');
  check(/Dokument.*Lasfilter.*logs/.test(txt('saveLogAsHelp')),'hjälpen visar Dokument och tilläggets logs-mapp');
@@ -620,6 +643,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  el('langEn').click();
  await until(()=>/Save combined error log/.test(txt('exportErrorLog')),'felloggsknappen översätts till engelska');
  check(/last 30 days/.test(doc.querySelector('[data-i18n="fileLogNote"]').textContent),'även historikgränsen är översatt');
+ check(txt('copyErrors')==='Copy all errors'&&txt('saveErrorAsSettings')==='Save error log as…'&&/permanent folder/.test(txt('logLocationHelp')),'kopiering och loggplats översätts till engelska');
  check(txt('saveLogAs')==='Save log as…'&&/Documents.*Lasfilter.*logs/.test(txt('saveLogAsHelp')),'manuell spara-knapp och Dokument-hjälp finns också på engelska');
  el('langSv').click();
  await until(()=>/Spara samlad fellogg/.test(txt('exportErrorLog')),'tillbaka till svenska');

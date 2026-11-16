@@ -6,6 +6,18 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  copyErrorsBtn:"Kopiera alla fel",
+  copyErrorsHelp:"Kopierar hela SortBros sparade fellogg: högst 5 000 fel från de senaste 30 dagarna, med tidsstämplar, felkoder och versionsuppgifter. Inga mejltexter. Granska loggen innan du delar den – detaljer kan innehålla regelnamn och domäner.",
+  copyErrorsDone:"Felloggen är kopierad. Klistra in den i chatten med Ctrl+V (Mac: ⌘V).",
+  copyErrorsManual:"Automatisk kopiering kunde inte göras. Under Aktivitet finns hela felloggen att markera och kopiera med Ctrl+C (Mac: ⌘C).",
+  copyErrorsTitle:"Fellogg att kopiera",
+  copyErrorsFallbackHelp:"Markera hela texten och tryck Ctrl+C (Mac: ⌘C). Klistra sedan in den i chatten. Texten är en ögonblickskopia och uppdateras inte medan du kopierar.",
+  copyErrorsSelect:"Markera hela felloggen",
+  copyErrorsHide:"Stäng texten",
+  copyErrorsDemo:"Förhandsvisning – detta är exempeldata, inte dina verkliga fel.",
+  saveErrorAsBtn:"Spara fellogg som…",
+  logLocationTitle:"Välj plats för en loggkopia",
+  logLocationHelp:"Välj mapp och filnamn i spara-dialogen, till exempel Dokument → Lasfilter → logs. Detta gäller bara den manuella kopian. Automatisk loggning fortsätter i Thunderbirds hämtningsmapp under Lasfilter/logs. En valfri permanent automatisk loggmapp kan inte väljas i detta tillägg.",
   saveLogAsBtn:"Spara logg som…",
   saveLogAsHelp:"För en kopia i Dokument: klicka på Spara logg som… och välj Dokument → Lasfilter → logs i dialogen. Skapa mapparna där vid behov. Automatisk loggning fortsätter i Hämtade filer. Loggen kan innehålla regelnamn och domäner; granska den innan du delar den.",
   saveLogAsStarted:"Loggexporten har startats till den plats du valde. Kopian uppdateras inte automatiskt.",
@@ -849,6 +861,18 @@ const I18N={
   }
  },
  en:{
+  copyErrorsBtn:"Copy all errors",
+  copyErrorsHelp:"Copies the complete saved SortBro error log: up to 5,000 errors from the last 30 days, with timestamps, error codes and version details. No message bodies. Review before sharing – details may contain rule names and domains.",
+  copyErrorsDone:"Error log copied. Paste it into the chat with Ctrl+V (Mac: ⌘V).",
+  copyErrorsManual:"Automatic copying was unavailable. The full error log is available under Activity: select it and press Ctrl+C (Mac: ⌘C).",
+  copyErrorsTitle:"Error log to copy",
+  copyErrorsFallbackHelp:"Select all the text and press Ctrl+C (Mac: ⌘C), then paste it into the chat. This is a snapshot and does not change while you copy it.",
+  copyErrorsSelect:"Select the entire error log",
+  copyErrorsHide:"Close text",
+  copyErrorsDemo:"Preview – this is sample data, not your real errors.",
+  saveErrorAsBtn:"Save error log as…",
+  logLocationTitle:"Choose a location for a log copy",
+  logLocationHelp:"Choose a folder and filename in the save dialog, for example Documents → Lasfilter → logs. This only applies to the manual copy. Automatic logging stays in Thunderbird’s download folder under Lasfilter/logs. This add-on cannot select an arbitrary permanent folder for automatic logs.",
   saveLogAsBtn:"Save log as…",
   saveLogAsHelp:"For a copy in Documents: click Save log as… and choose Documents → Lasfilter → logs in the dialog. Create the folders there if needed. Automatic logging stays in Downloads. The log may contain rule names and domains; review it before sharing.",
   saveLogAsStarted:"Log export started to the location you selected. This copy is not updated automatically.",
@@ -3847,16 +3871,52 @@ async function exportRuleFile(rule){
  toast(T('toastSingleExported').replace('{path}',singleFile));
 }
 if($('exportSingleRule'))handle('exportSingleRule','click',()=>exportRuleFile(buildRule()));
+const logSaveButtons=['saveLogAs','saveErrorAs','saveLogAsSettings','saveErrorAsSettings'];
 let savingLogAs=false;
-handle('saveLogAs','click',async()=>{
+async function saveLogCopy(kind){
  if(savingLogAs)return;
  if(DEMO){toast(T('saveLogAsDemo'));return;}
- savingLogAs=true;$('saveLogAs').disabled=true;
+ savingLogAs=true;for(const id of logSaveButtons)$(id).disabled=true;
  try{
-  const text=await rpc('exportTextLog');
-  const accepted=await saveLogTextAs(text,paths().logs+'sortbro-tekniklogg-'+new Date().toISOString().slice(0,10)+'.txt');
+  const text=await rpc(kind==='errors'?'exportErrorLog':'exportTextLog');
+  const name=kind==='errors'?'sortbro-fellogg':'sortbro-tekniklogg';
+  const accepted=await saveLogTextAs(text,paths().logs+name+'-'+new Date().toISOString().slice(0,10)+'.txt');
   toast(T(accepted?'saveLogAsStarted':'saveLogAsCancelled'));
- }finally{savingLogAs=false;$('saveLogAs').disabled=false;}
+ }finally{savingLogAs=false;for(const id of logSaveButtons)$(id).disabled=false;}
+}
+for(const id of ['saveLogAs','saveLogAsSettings'])handle(id,'click',()=>saveLogCopy('technical'));
+for(const id of ['saveErrorAs','saveErrorAsSettings'])handle(id,'click',()=>saveLogCopy('errors'));
+/* Clipboard access may be denied without clipboardWrite. Do not request a new
+   permission or claim success: expose the same complete text for manual copying. */
+async function writeErrorClipboard(text){
+ try{
+  if(typeof navigator.clipboard?.writeText!=='function')return false;
+  await navigator.clipboard.writeText(text);return true;
+ }catch{return false;}
+}
+function selectErrorText(){
+ const field=$('copyErrorsText');field.focus();field.select();field.scrollTop=0;
+}
+let copyingErrors=false;
+handle('copyErrors','click',async()=>{
+ if(copyingErrors)return;
+ copyingErrors=true;$('copyErrors').disabled=true;
+ try{
+  const text=(DEMO?T('copyErrorsDemo')+'\r\n\r\n':'')+await rpc('exportErrorLog');
+  if(await writeErrorClipboard(text)){
+   $('copyErrorsFallback').hidden=true;$('copyErrorsText').value='';toast(T('copyErrorsDone'));
+  }else{
+   $('copyErrorsText').value=text;$('copyErrorsFallback').hidden=false;
+   if(activeView==='activity'&&!document.querySelector('.shell').inert){
+    $('copyErrorsFallback').scrollIntoView({block:'nearest'});selectErrorText();
+   }
+   toast(T('copyErrorsManual'));
+  }
+ }finally{copyingErrors=false;$('copyErrors').disabled=false;}
+});
+handle('copyErrorsSelect','click',selectErrorText);
+handle('copyErrorsHide','click',()=>{
+ $('copyErrorsFallback').hidden=true;$('copyErrorsText').value='';$('copyErrors').focus();
 });
 handle('exportErrorLog','click',async()=>{
  const file=paths().logs+'sortbro-fellogg.txt';

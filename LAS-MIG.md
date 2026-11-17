@@ -26,12 +26,23 @@ Inga filer installeras någon annanstans, och inga externa program krävs.
 
 1. Öppna en mejlflik och markera ett befintligt mejl där, exempelvis en faktura.
 2. Öppna **Regler → Ny från markerat mejl** för att fylla konto och första villkoret. Editorn visas i stället för regellistan.
-3. Välj målmapp, lägg till fler villkor vid behov (OCH/ELLER) och **Spara regel**.
+3. Kryssa i ett eller flera källkonton, välj en gemensam målmapp, lägg till fler villkor vid behov (OCH/ELLER) och **Spara regel**.
 4. **Testa markerat** visar om villkoren matchar och varför en flytt eventuellt inte sker nu. Testet flyttar aldrig något.
 5. När du är nöjd: skicka eller ta emot ett nytt mejl, läs det, gå vidare till nästa. I testläge simuleras bevakningen och räknas som prov.
 6. Välj **Aktivera flytt** först när proven ser rätt ut. Då utförs riktiga flyttar för framtida läst-markeringar.
 
 Redan lästa gamla mejl massbehandlas inte. Vill du testa på ett sådant, välj **Bevaka markerat läst →** i nederkanten; det köar just det mejlet.
+
+## Samma regel för flera konton
+
+I regelredigeraren finns **Konton som regeln ska läsa**. Kryssa i de konton som ska omfattas och välj **en gemensam målmapp**. Exempel: Fortnox-mejl från både privatkontot och arbetskontot kan flyttas till samma Fakturor-mapp, även i ett tredje konto eller i Lokala mappar. Kontovalet ändrar inte målet automatiskt och **Spara regel** krävs innan ändringen gäller.
+
+- Samma villkor, läst-/olästval, före-/eftervisning och eventuella fördelningar gäller för alla valda konton. Fördelningsmål och årsmappar är också gemensamma, inte ett mål per konto.
+- Regelns svep och diagnos omfattar vanliga mappar i alla valda konton. Målmapparna undantas från svepet, liksom tidigare specialmappar. Inkommande mejl och läst-markeringar använder samma kontoval.
+- Endast uttryckligen markerade konton ingår. Nya konton läggs inte till automatiskt. Minst ett konto krävs; ett saknat sparat konto visas som saknat och ersätts inte med ett annat konto.
+- Gamla regler behåller sitt enda konto. Flerkontovalet sparas i ett extra fält, **sourceAccounts**, medan det första kontot behålls i **sourceAccount** för befintliga arbetsflöden. Stöd för flera konton kräver **SortBro 1.0.30 eller senare**.
+- JSON-export/import och veckobackuper bevarar hela kontovalet. Vid import måste de uttryckligen angivna kontona finnas; tillägget gissar inte ersättningskonton i en annan profil. Thunderbirds egna filterfiler gäller per konto och kan inte bevara detta val: flerkontoregler hoppas därför över med en tydlig förklaring i **msgFilterRules.dat-exporten**. Använd SortBros JSON-export för dessa regler.
+- Kögräns, säkerhetsbroms, testläge och läsfönstrets säkerhetskontroller gäller även när fler konton används. Kontrollera först regeln i testläge, särskilt vid flytt mellan konton.
 
 ## Snabbare vägar till en färdig regel
 
@@ -264,7 +275,7 @@ med **Skapa regel**, **Inte nu** och **Sluta föreslå**.
 - Högst ett flyttförsök per meddelande. Journalen skrivs före försöket och rensas inte förrän Thunderbird har bekräftat flytthändelsen. Ett avbrutet eller osäkert försök pausar motorn och upprepas inte.
 - Vid osäkerhet eller ändrade regler rensas väntande jobb; redan registrerade spärrar rensas endast manuellt efter din egen kontroll.
 - Regeländringar och växling mellan test/flytt ökar regelversionen och gör gamla köade jobb ogiltiga.
-- Flyttar godkänns bara mellan vanliga mappar i samma konto. Specialmappar, sökmappar, skrivskydd och regelkedjor med loopar avvisas. Vid ett fel görs ingen kopiering som reserv.
+- Flyttar godkänns bara mellan vanliga mappar, även mellan konton, när källan tillåter borttagning och målet tillåter mottagning. Specialmappar, sökmappar, skrivskydd och regelkedjor med loopar avvisas. Vid ett fel görs ingen kopiering som reserv.
 - Oläst-markering, ändrad källmapp eller en öppnad visning stoppar en väntande flytt.
 - Kön är begränsad till 100 väntande jobb; när gränsen nås töms kön och resten väntar till nästa svep. Väntande jobb kan återställas efter omstart om Message-ID, datum, storlek och källmapp är entydiga; ett gammalt sessions-id återanvänds aldrig.
 
@@ -556,6 +567,15 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.30
+
+- **Flera källkonton, ett gemensamt mål.** Kryssrutor ersätter det ensamma kontovalet i regelredigeraren. Valen behålls vid språkbyte, statusuppdatering, sparning, återöppning och JSON-export. Målkontot väljs fortfarande separat.
+- **Hela kedjan använder kontovalet.** Matchning, inkommande mejl, läst-markeringar, svep, diagnos, konflikter och regelsökning känner till samtliga valda konton. Köjournalen använder mejlets faktiska källmapp, även vid en läst-händelse i ett annat konto eller en undermapp, inte regelns ursprungliga ankarmapp.
+- **Ingen tyst utvidgning.** Befintliga regler får inte fler konton. Saknade konton visas och valideras; nya konton måste kryssas i. Ingen automatisk ersättning av konton vid import av flerkontoregler.
+- **Säker export.** SortBros JSON-format och veckobackuper bevarar kontolistan. Den enklare Thunderbird-filterfilen hoppar över flerkontoregler med förklaring i stället för att tappa kontovalet utan besked.
+
+Verifierat med **565 automatiska tester, 557 DOM-kontroller och 48 Chromium-layouter** (SV/EN, ljust/mörkt, 600/840/1280 px, 12/14/20/24 px). Nya tester täcker gemensamt mål, faktiskt käll-ID, läsfönster och stängningsväntan i andra kontot, återställd kö, olästa/ej valda konton, sammanlagd säkerhetsbroms, kögräns 100, provkörning, årsmappar, fördelningar och export/import. **Riktiga Thunderbird-/IMAP-flyttar mellan konton har inte testats här.** Inga nya behörigheter eller körberoenden. Tidigare rapporterat **move_error** är inte bevisat löst av detta släpp.
 
 ## Nyheter i 1.0.29
 

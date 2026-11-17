@@ -31,9 +31,19 @@ function email(author){
  if(!/^[^\s<>(),;:"@]+@[^\s<>(),;:"@]+$/u.test(s))return '';
  const at=s.lastIndexOf('@');try{return norm(s.slice(0,at))+'@'+domain(s.slice(at+1));}catch{return '';}
 }
+/* Legacy single-account rules keep their shape; multiple accounts are explicit. */
+function accountIds(rule){return rule?.scope==='account'?(Array.isArray(rule.sourceAccounts)?rule.sourceAccounts:(rule.sourceAccount?[rule.sourceAccount]:[])):[];}
 function validateRule(raw){
  if(!raw||typeof raw!=='object')fail('bad_rule');
  const scope=raw.scope===undefined?'folder':raw.scope;if(!['folder','account'].includes(scope))fail('bad_rule');
+ let sourceAccounts;
+ if(raw.sourceAccounts!==undefined){
+  if(scope!=='account'||!Array.isArray(raw.sourceAccounts)||raw.sourceAccounts.length>100)fail('bad_rule');
+  if(!raw.sourceAccounts.length)fail('choose_source');
+  sourceAccounts=raw.sourceAccounts.map(id=>text(id,2048,'choose_source'));
+  if(new Set(sourceAccounts).size!==sourceAccounts.length)fail('bad_rule');
+  if(raw.sourceAccount!==undefined&&raw.sourceAccount!==sourceAccounts[0])fail('bad_rule');
+ }
  const readFilter=raw.readFilter===undefined?'default':raw.readFilter;if(!['default','read','unread','both'].includes(readFilter))fail('bad_rule');
  const openTiming=raw.openTiming===undefined?'after':raw.openTiming;if(!['before','after'].includes(openTiming))fail('bad_rule');
  const unreadAction=raw.unreadAction===undefined?'default':raw.unreadAction;if(!['default','keep','window','read'].includes(unreadAction))fail('bad_rule');
@@ -42,8 +52,9 @@ function validateRule(raw){
  const trialUntil=raw.trialUntil===undefined||raw.trialUntil===null?0:raw.trialUntil;
  if(typeof trialUntil!=='number'||!Number.isFinite(trialUntil)||trialUntil<0)fail('bad_rule');
  const r={id:text(raw.id,80,'bad_id'),name:text(raw.name,100,'bad_name'),enabled:raw.enabled===true,
-  source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(raw.sourceAccount,2048,'choose_source'):'',scope,
+  source:text(raw.source,2048,'choose_source'),sourceAccount:scope==='account'?text(sourceAccounts?.[0]??raw.sourceAccount,2048,'choose_source'):'',scope,
   target:text(raw.target,2048,'choose_target'),match:raw.match,readFilter,unreadAction,openTiming,trialUntil:Math.floor(trialUntil),yearFolders:raw.yearFolders===true};
+ if(sourceAccounts?.length>1)r.sourceAccounts=sourceAccounts;
  if(!/^[a-zA-Z0-9_-]+$/.test(r.id))fail('bad_id');
  if(r.scope==='folder'&&r.source===r.target)fail('same_folder');
  if(!['all','any'].includes(r.match))fail('bad_match');
@@ -285,7 +296,7 @@ function condHit(c,values,now=Date.now()){
 function match(rule,message,includeDisabled=false,ignoreSource=false,now=Date.now()){
  if(!rule.enabled&&!includeDisabled)return false;
  if(!ignoreSource){
-  const inSource=rule.scope==='account'?message.folder?.accountId===rule.sourceAccount:message.folder?.id===rule.source;
+  const inSource=rule.scope==='account'?accountIds(rule).includes(message.folder?.accountId):message.folder?.id===rule.source;
   if(!inSource)return false;
  }
  const values=valuesFor(message);const hits=rule.conditions.map(c=>condHit(c,values,now));
@@ -401,10 +412,10 @@ function rulesCanCollide(a,b,now){
 function sourcesOverlap(a,b,accountOf){
  const af=a.scope==='folder'?a.source:'',bf=b.scope==='folder'?b.source:'';
  if(af&&bf)return af===bf;
- if(!af&&!bf)return !!a.sourceAccount&&a.sourceAccount===b.sourceAccount;
- const folder=af||bf,account=af?b.sourceAccount:a.sourceAccount;
+ if(!af&&!bf)return accountIds(a).some(id=>accountIds(b).includes(id));
+ const folder=af||bf,ids=accountIds(af?b:a);
  const owner=typeof accountOf==='function'?accountOf(folder):'';
- return !!account&&!!owner&&owner===account;
+ return !!owner&&ids.includes(owner);
 }
 function sharedFields(a,b){
  const bf=new Set(b.conditions.map(c=>c.field));
@@ -461,7 +472,7 @@ function blockReason(rule,message,{arrived=false}={}){
  if(rule.enabled!==true)return pseudoCondition('regeln är avstängd');
  if(arrived)return '';
  if(rule.scope==='account'){
-  if(message.folder?.accountId!==rule.sourceAccount)return pseudoCondition('regeln gäller ett annat konto');
+  if(!accountIds(rule).includes(message.folder?.accountId))return pseudoCondition('regeln gäller ett annat konto');
  }else if(message.folder?.id!==rule.source){
   return pseudoCondition('regeln läser en annan mapp än mejlet ligger i');
  }
@@ -561,7 +572,7 @@ function ruleMatchesSearch(rule,query,folders=[]){
  const folderText=id=>{const f=folders.find(f=>f.id===id);return f?[f.name,f.label,f.accountName].join(' '):'';};
  const conditionText=c=>[c?.field,c?.op,c?.value].join(' ');
  const text=norm([rule.name,folderText(rule.source),folderText(rule.target),
-  ...folders.filter(f=>rule.scope==='account'&&f.accountId===rule.sourceAccount).map(f=>f.accountName||''),
+  ...folders.filter(f=>accountIds(rule).includes(f.accountId)).map(f=>f.accountName||''),
   ...(rule.conditions||[]).map(conditionText),
   ...(rule.branches||[]).map(b=>conditionText(b.condition)+' '+folderText(b.target))].join(' '));
  return words.every(word=>text.includes(word));
@@ -592,7 +603,7 @@ function readerPauseState(until=0,now=Date.now()){
  if(!Number.isSafeInteger(until)||until< -1)fail('bad_request');
  return {until,paused:until===-1||until>now};
 }
-const api={readerPauseDeadline,readerPauseState,senderCondition,addSenderCondition,ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
+const api={accountIds,readerPauseDeadline,readerPauseState,senderCondition,addSenderCondition,ruleMatchesSearch,cleanErrorLogs,errorLogText,LIMITS,SEASONS,FIELD_OPS,RuleError,fail,norm,domain,email,validateRule,validateRules,match,firstMatch,targetFor,usableFolder,validatePair,defaults,config,fingerprint,event,cleanLogs,seasonOf,shouldOpenWindow,trialActive,trialDaysLeft,suggestFrom,suggestWords,choiceSummary,countHits,looksLikeEmail,looksLikeDomain,importedCondition,parseImportList,mergeConditions,inboxHints,choiceCondition,choiceRule,ruleFromChoice,countMatches,yearOf,yearFolderName,yearNameOf,conflicts,conditionsPossible,textSetPossible,datePossible,sourcesOverlap,rulesCanCollide,
 whyHere,explainRule,conditionText,blockReason,pseudoCondition};
 root.LasCore=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

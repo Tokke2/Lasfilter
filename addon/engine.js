@@ -131,13 +131,13 @@ class Engine {
  async validateRuleFolders(rule){
   if(rule.scope!=='account')return this.pair(rule);
   const [accounts,target,tc]=await Promise.all([this.api.accounts.list(true),this.api.folders.get(rule.target,false),this.api.folders.getFolderCapabilities(rule.target)]);
-  if(!accounts.some(a=>a.id===rule.sourceAccount)||!C.usableFolder(target))throw new C.RuleError('unsafe_folder');
+  if(!C.accountIds(rule).length||C.accountIds(rule).some(id=>!accounts.some(a=>a.id===id))||!C.usableFolder(target))throw new C.RuleError('unsafe_folder');
   if(tc.canAddMessages!==true)throw new C.RuleError('read_only');
   return {target};
  }
  makeRecord(m,rule,target,source=null,notify=false){
   const key=C.fingerprint(m);if(!key||!Number.isFinite(+new Date(m.date))||!Number.isSafeInteger(m.size))return null;
-  return {key,headerMessageId:m.headerMessageId,date:+new Date(m.date),size:m.size,source:source||rule.source,target,ruleId:rule.id,notify:notify===true,
+  return {key,headerMessageId:m.headerMessageId,date:+new Date(m.date),size:m.size,source:source||(rule.scope==='account'?m.folder?.id:rule.source),target,ruleId:rule.id,notify:notify===true,
    unread:m.read!==true,rulesVersion:this.config.rulesVersion,stage:'pending',created:this.now()};
  }
  jobIdentity(message,record){
@@ -359,15 +359,16 @@ class Engine {
     svep; diagnosen tar med dem för att kunna förklara var mejlen ligger. */
  async ruleFolders(rule,{excludeTargets=true}={}){
   const accounts=await this.api.accounts.list(true);
-  let account;
-  if(rule.scope==='account')account=accounts.find(a=>a.id===rule.sourceAccount);
-  else{const src=await this.api.folders.get(rule.source,false);account=accounts.find(a=>a.id===src?.accountId);}
-  if(!account)throw new C.RuleError('unsafe_folder');
+  let selected;
+  if(rule.scope==='account')selected=C.accountIds(rule).map(id=>accounts.find(a=>a.id===id));
+  else{const src=await this.api.folders.get(rule.source,false);selected=[accounts.find(a=>a.id===src?.accountId)];}
+  // Missing selected accounts are an error, never permission to scan a substitute.
+  if(!selected.length||selected.some(a=>!a))throw new C.RuleError('unsafe_folder');
   const excluded=excludeTargets?new Set([rule.target,...(rule.branches||[]).map(b=>b.target)]):new Set();
   const folders=[],seen=new Set();
   const walk=f=>{if(!f||seen.has(f.id))return;seen.add(f.id);if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
-  walk(account.rootFolder);for(const f of account.folders||[])walk(f);
-  return {account,excluded,folders};
+  for(const account of selected){walk(account.rootFolder);for(const f of account.folders||[])walk(f);}
+  return {account:selected[0],accounts:selected,excluded,folders};
  }
  /* Läsbar diagnos: varför flyttas inte mejlen? Rör ingenting – köar inte, skapar
     inga mappar och ändrar ingen status. Kan köras i testläge och vid paus. */

@@ -6,6 +6,11 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  sourceAccountsLabel:"Konton som regeln ska läsa",
+  sourceAccountsHelp:"Markera ett eller flera konton. Alla valda konton använder samma villkor och gemensamma målmapp. Flytten kan ske mellan konton. Målmappen och övriga regler ändras inte när du kryssar i ett konto.",
+  sourceAccountMissing:"Saknat konto: {id} – välj bort det eller återanslut kontot.",
+  scopeAccounts:"{n} konton",
+  multiAccountsExport:"Regler med flera källkonton kan inte exporteras till en enda Thunderbird-filterfil. Använd SortBros JSON-export för att bevara kontovalet.",
   copyErrorsBtn:"Kopiera alla fel",
   copyErrorsHelp:"Kopierar hela SortBros sparade fellogg: högst 5 000 fel från de senaste 30 dagarna, med tidsstämplar, felkoder och versionsuppgifter. Inga mejltexter. Granska loggen innan du delar den – detaljer kan innehålla regelnamn och domäner.",
   copyErrorsDone:"Felloggen är kopierad. Klistra in den i chatten med Ctrl+V (Mac: ⌘V).",
@@ -111,7 +116,7 @@ const I18N={
   navMenu:'MENY',
   navSuggestions:"Föreslagna regler",
   rulesPageTitle:"Regler",
-  ruleEditorPageHelp:"Välj konto, villkor och målmapp för regeln.",
+  ruleEditorPageHelp:"Välj ett eller flera konton, villkor och en gemensam målmapp.",
   rulesPageHelp:"Dina sparade regler. Välj en regel för att redigera eller skapa en ny.",
   suggestionsPageTitle:"Föreslagna regler",
   suggestionsPageHelp:"Utgå från din Inkorg eller dina egna flyttar. Du väljer själv vad som ska bli en regel.",
@@ -319,9 +324,8 @@ const I18N={
   step1Title:'Markera ett exempelmejl',
   step1Help:'Gå till Thunderbird, klicka på ett mejl som ska sorteras och kom tillbaka hit.',
   fromSelectedBtn:'✉ Hämta konto från markerat mejl',
-  accountLabel:'Konto',
   chooseAccount:'Välj ett konto…',
-  accountScopeTitle:'Alla mappar i kontot ingår',
+  accountScopeTitle:'Alla vanliga mappar i valda konton ingår',
   accountScopeBody:'Inkorg, arkiv och vanliga undermappar bevakas automatiskt. Skickat, Utkast, Skräppost och Papperskorg undantas.',
   step2Title:'Vilka liknande mejl?',
   conditionOr:"ELLER",
@@ -541,7 +545,7 @@ const I18N={
   clearBlockedBtn:'Rensa spärrar efter egen kontroll',
   clearBlockedNote:'Detta ångrar ingen flytt och startar inget nytt försök. Kontrollera mapparna i Thunderbird först.',
   helpTitle:'En lugnare inkorg, på dina villkor',
-  helpStep1:'Välj kontot som ska bevakas, ett eller flera villkor, läst/oläst-läge och en målmapp. Du kan skapa hur många regler du vill.',
+  helpStep1:'Välj ett eller flera konton som ska bevakas, ett eller flera villkor, läst/oläst-läge och en målmapp. Du kan skapa hur många regler du vill.',
   helpStep2:'Använd Hämta konto från markerat mejl för att välja rätt konto och avsändare automatiskt. Markera exakt ett mejl i Thunderbird först.',
   helpStep3:'Kontrollera-knappen testar den redigerade regeln (även osparade ändringar) utan att flytta mejlet.',
   helpStep4:'För varje regel kan du välja om den ska flytta Endast lästa, Både olästa och lästa, Endast olästa, eller följa standardinställningen – samt hur flyttade olästa mejl ska hanteras.',
@@ -805,7 +809,7 @@ const I18N={
    bad_rule:'Ogiltig regel.',
    bad_id:'Ogiltigt regel-id.',
    bad_name:'Ange ett regelnamn, högst 100 tecken.',
-   choose_source:'Välj en källmapp.',
+   choose_source:'Välj minst ett källkonto eller en källmapp.',
    choose_target:'Välj en målmapp.',
    same_folder:'Källa och mål får inte vara samma mapp.',
    bad_match:'Välj hur villkoren ska kombineras.',
@@ -861,6 +865,11 @@ const I18N={
   }
  },
  en:{
+  sourceAccountsLabel:"Accounts this rule reads",
+  sourceAccountsHelp:"Select one or more accounts. All selected accounts use the same conditions and a shared destination folder. Messages may move between accounts. Selecting an account does not change the destination or other rules.",
+  sourceAccountMissing:"Missing account: {id} – deselect it or reconnect the account.",
+  scopeAccounts:"{n} accounts",
+  multiAccountsExport:"Rules with multiple source accounts cannot be exported to a single Thunderbird filter file. Use SortBro’s JSON export to preserve the account selection.",
   copyErrorsBtn:"Copy all errors",
   copyErrorsHelp:"Copies the complete saved SortBro error log: up to 5,000 errors from the last 30 days, with timestamps, error codes and version details. No message bodies. Review before sharing – details may contain rule names and domains.",
   copyErrorsDone:"Error log copied. Paste it into the chat with Ctrl+V (Mac: ⌘V).",
@@ -966,7 +975,7 @@ const I18N={
   navMenu:'MENU',
   navSuggestions:"Suggested rules",
   rulesPageTitle:"Rules",
-  ruleEditorPageHelp:"Choose the account, conditions and destination for the rule.",
+  ruleEditorPageHelp:"Choose one or more accounts, conditions and a shared destination folder.",
   rulesPageHelp:"Your saved rules. Choose one to edit or create a new rule.",
   suggestionsPageTitle:"Suggested rules",
   suggestionsPageHelp:"Start from your Inbox or your own moves. You decide which suggestions become rules.",
@@ -1174,9 +1183,8 @@ const I18N={
   step1Title:'Select a sample email',
   step1Help:'In Thunderbird, click an email you want to sort, then return here.',
   fromSelectedBtn:'✉ Fetch account & sender from selected email',
-  accountLabel:'Account',
   chooseAccount:'Select an account…',
-  accountScopeTitle:'All folders in the account are included',
+  accountScopeTitle:'All regular folders in selected accounts are included',
   accountScopeBody:'Inbox, archives and normal subfolders are monitored automatically. Sent, Drafts, Junk and Trash are excluded.',
   step2Title:'Which matching emails?',
   conditionOr:"OR",
@@ -1396,7 +1404,7 @@ const I18N={
   clearBlockedBtn:'Clear locks after manual check',
   clearBlockedNote:'This does not undo any move or retry failed moves. Check your folders in Thunderbird first.',
   helpTitle:'A calmer inbox, on your terms',
-  helpStep1:'Choose the account to monitor, one or more conditions, unread/read mode and a target folder. You can create as many rules as you need.',
+  helpStep1:'Choose one or more accounts to monitor, one or more conditions, unread/read mode and a target folder. You can create as many rules as you need.',
   helpStep2:'Use Fetch account & sender from selected email to fill in the account and sender automatically. Select one email in Thunderbird first.',
   helpStep3:'The Test rule button checks the rule currently in the editor (including unsaved edits) without moving the email.',
   helpStep4:'For each rule you can choose Read emails only, Both unread and read, Unread emails only, or Use global default – plus how moved unread emails are handled.',
@@ -2084,7 +2092,7 @@ async function createTbRules(button){
 }
 
 function tbExportNoteText(code){
- const table={domain:'tbExportNoteDomain',size:'tbExportNoteSize',branches:'tbExportNoteBranches',yearFolders:'tbExportNoteYearFolders',readPolicy:'tbExportNoteReadPolicy',date:'tbExportNoteDate'};
+ const table={domain:'tbExportNoteDomain',size:'tbExportNoteSize',branches:'tbExportNoteBranches',yearFolders:'tbExportNoteYearFolders',readPolicy:'tbExportNoteReadPolicy',date:'tbExportNoteDate',multipleAccounts:'multiAccountsExport'};
  if(table[code])return T(table[code]);
  if(code.startsWith('condition:'))return T('tbExportNoteCondition').replace('{what}',code.slice(10));
  return '';
@@ -2100,8 +2108,9 @@ async function exportTbFilters(){
  const result=await rpc('filterExport',{accountId,uriPrefix});
  const report=$('tbReport');
  if(!result.written){
-  if(report){report.hidden=false;report.textContent=T('tbExportNoUri');}
-  toast(T('tbExportNoUri'));
+  const message=(result.notes||[]).includes('multipleAccounts')?T('multiAccountsExport'):T('tbExportNoUri');
+  if(report){report.hidden=false;report.textContent=message;}
+  toast(message);
   return;
  }
  const filterFile=paths().filters+'msgFilterRules.dat';
@@ -2230,12 +2239,12 @@ function renderSenderPreview(){
   if(plan.original){
    const rule=plan.original;
    paragraph(rule.name,'sender-rule-name');
-   paragraph(T('senderSource')+(rule.scope==='account'?(accounts().find(a=>a.id===rule.sourceAccount)?.name||rule.sourceAccount):label(rule.source)));
+   paragraph(T('senderSource')+(rule.scope==='account'?accountNames(C.accountIds(rule)):label(rule.source)));
    paragraph(T('senderTarget')+label(rule.target));
    paragraph(T('senderBefore')+rule.conditions.map(ruleConditionLabel).join(' '+T(rule.match==='all'?'conditionAnd':'conditionOr')+' '));
    paragraph(T('senderAfter')+plan.rule.conditions.map(ruleConditionLabel).join(' '+T(plan.rule.match==='all'?'conditionAnd':'conditionOr')+' '));
    paragraph(T('senderPolicy'),'muted');
-   if(rule.scope==='account'?rule.sourceAccount!==s.data.accountId:rule.source!==s.data.folderId)paragraph(T('senderOutside'),'notice');
+   if(rule.scope==='account'?!C.accountIds(rule).includes(s.data.accountId):rule.source!==s.data.folderId)paragraph(T('senderOutside'),'notice');
    if(!rule.enabled){paragraph(T('senderDisabled'),'notice');$('senderRun').disabled=true;}
    if(plan.duplicate){paragraph(T('senderDuplicate'),'notice');$('senderSave').disabled=$('senderRun').disabled=true;}
   }else{paragraph(ruleConditionLabel(plan.condition));paragraph(T('senderNewNote'),'muted');}
@@ -2435,7 +2444,7 @@ function renderStatus(next){
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
  if(!rule.enabled)return T('tagDisabled');
- const scopeText=rule.scope==='account'?T('scopeAccount'):T('scopeFolder');
+ const scopeText=rule.scope==='account'?(C.accountIds(rule).length>1?T('scopeAccounts').replace('{n}',C.accountIds(rule).length):T('scopeAccount')):T('scopeFolder');
  const rf=rule.readFilter||'default';
  const modeText=rf==='read'?T('tagRead'):rf==='both'?T('tagBoth'):rf==='unread'?T('tagUnread'):T('tagDefault');
  return scopeText+' · '+modeText+(rule.yearFolders?' · '+T('tagYearFolders'):'');
@@ -2589,7 +2598,7 @@ function paintRules(){
   meta.append(el('span','rule-order',T('ruleOrder').replace('{n}',position+1)),el('span','rule-status'+(rule.enabled?' is-on':''),T(rule.enabled?'ruleOn':'ruleOff')));
   const details=el('details','rule-details');details.append(el('summary','',T('ruleDetails')));
   const body=el('div','rule-details-body');
-  const source=rule.scope==='account'?(accounts().find(a=>a.id===rule.sourceAccount)?.label||T('missingFolderShort')):label(rule.source);
+  const source=rule.scope==='account'?accountNames(C.accountIds(rule)):label(rule.source);
   body.append(el('p','',T('ruleSource')+': '+source),el('p','',T('ruleTarget')+': '+(f?.label||T('missingFolderShort'))));
   for(const branch of rule.branches||[])body.append(el('p','',ruleConditionLabel(branch.condition)+' → '+label(branch.target)));
   body.append(el('strong','',T('ruleConditions')+' · '+T(rule.match==='any'?'ruleAny':'ruleAll')));
@@ -2699,7 +2708,26 @@ function accounts(){
  const seen=new Set();return folders.filter(f=>{if(!f.accountId||seen.has(f.accountId))return false;seen.add(f.accountId);return true;})
   .map(f=>({id:f.accountId,label:[f.accountName||f.accountId,f.accountEmail].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ')}));
 }
-function accountOptions(value=''){selectOptions($('source'),accounts(),T('chooseAccount'),value);}
+function selectedSourceAccounts(){
+ const checked=[...document.querySelectorAll('#sourceAccounts input:checked')].map(n=>n.value),primary=$('source').value;
+ return checked.includes(primary)?[primary,...checked.filter(id=>id!==primary)]:checked;
+}
+function accountNames(ids){return ids.map(id=>accounts().find(a=>a.id===id)?.label||T('sourceAccountMissing').replace('{id}',id)).join(' · ');}
+function accountOptions(value='',selected){
+ const kept=selectedSourceAccounts();
+ const ids=selected||((value===$('source').value&&kept.includes(value))?kept:(value?[value]:[]));
+ const list=accounts();for(const id of ids)if(!list.some(a=>a.id===id))list.push({id,label:T('sourceAccountMissing').replace('{id}',id)});
+ selectOptions($('source'),list,T('chooseAccount'),ids[0]||'');
+ $('sourceAccounts').replaceChildren(...list.map(a=>{
+  const row=el('label','source-account-choice'),check=el('input');check.type='checkbox';check.value=a.id;check.checked=ids.includes(a.id);
+  row.append(check,el('span','',a.label));
+  check.addEventListener('change',()=>{
+   const next=[...document.querySelectorAll('#sourceAccounts input:checked')].map(n=>n.value);
+   if(!next.includes($('source').value))$('source').value=next[0]||'';
+   dirty=true;updateRuleExplanation();
+  });return row;
+ }));
+}
 /* Varje väljare äger sitt konto/sökfält. ID:n för Thunderbird-mappar ändras aldrig.
    En avsiktligt tömd väljare får inte återställas från senast använda målmapp. */
 const folderPickers=new WeakMap();let folderPickerSeq=0,folderTreeSession=null;
@@ -2859,7 +2887,7 @@ function updateRuleExplanation(){
  const box=$('ruleSummaryBody');if(!box)return;
  const rows=[...$('conditions').children],join=T($('match').value==='any'?'conditionOr':'conditionAnd');
  rows.forEach((row,i)=>{const node=row.querySelector('.condition-join');if(node){node.hidden=i===0;node.textContent=join;}});
- const source=accounts().find(a=>a.id===$('source').value)?.label||T('summarySourceMissing');
+ const source=accountNames(selectedSourceAccounts())||T('summarySourceMissing');
  const target=id=>id?label(id):T('summaryTargetMissing');
  const main=el('p','rule-summary-main');
  main.append(document.createTextNode(explanationText('summaryMove',{source,target:target($('target').value)})));
@@ -2950,7 +2978,7 @@ function addCondition(c={field:'domain',op:'equals',value:''}){
  const join=el('span','condition-join');join.setAttribute('aria-hidden','true');
  row.append(field,op,value,remove,join);$('conditions').append(row);updateRuleExplanation();
 }
-function draft(){const accountId=$('source').value,old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',openTiming:$('ruleOpenTiming').value,yearFolders:$('ruleYearFolders')?.checked===true,
+function draft(){const sourceAccounts=selectedSourceAccounts(),accountId=sourceAccounts[0]||'',old=state.config.rules.find(r=>r.id===selectedId),anchor=(old?.sourceAccount===accountId&&folders.some(f=>f.id===old.source)?old.source:folders.find(f=>f.accountId===accountId)?.id)||'';return C.validateRule({id:selectedId||crypto.randomUUID(),name:$('ruleName').value,enabled:$('enabled').checked,source:anchor,sourceAccount:accountId,sourceAccounts,scope:'account',target:$('target').value,match:$('match').value,readFilter:$('ruleReadFilter')?.value||'default',unreadAction:$('ruleUnreadAction')?.value||'default',openTiming:$('ruleOpenTiming').value,yearFolders:$('ruleYearFolders')?.checked===true,
   trialUntil:$('ruleTrial')?.checked===true?(old?.trialUntil&&old.trialUntil>Date.now()?old.trialUntil:Date.now()+C.LIMITS.trialDays*86400000):0,
  conditions:[...$('conditions').children].map(row=>({field:row.children[0].value,op:row.children[1].value,value:row.children[2].value})),
  branches:[...$('branches').children].map(row=>({condition:{field:row.children[0].value,op:row.children[1].value,value:row.children[2].value},target:row.querySelector('.folder-choice').value}))});}
@@ -2967,7 +2995,7 @@ function loadRule(id='',presetAccount='',{openEditor=true}={}){
  setTrialFields(rule);
  updateReadPolicy();
  const ruleAccount=rule?(rule.sourceAccount||folders.find(f=>f.id===rule.source)?.accountId||''):(presetAccount||accounts()[0]?.id||'');
- accountOptions(ruleAccount);targetOptions(rule?.target||'',true);updateMatchHelp();
+ accountOptions(ruleAccount,rule?.scope==='account'?C.accountIds(rule):(ruleAccount?[ruleAccount]:[]));targetOptions(rule?.target||'',true);updateMatchHelp();
  $('conditions').replaceChildren();for(const c of rule?.conditions||[{field:'domain',op:'equals',value:''}])addCondition(c);
  $('branches').replaceChildren();for(const b of rule?.branches||[])addBranchRow(b);
  $('testResult').hidden=true;$('delete').disabled=!rule;
@@ -3194,7 +3222,7 @@ $('ruleForm').addEventListener('change',e=>{
 });
 handle('newRule','click',()=>{if(!dirty||confirm(T('confirmDiscard')))loadRule('',$('source').value);});
 handle('ruleSearch','input',renderRules);
-handle('source','change',()=>{dirty=true;});
+handle('source','change',()=>{accountOptions($('source').value,[$('source').value].filter(Boolean));dirty=true;updateRuleExplanation();});
 handle('ruleMoveUnread','change',()=>{
  if($('ruleReadFilter'))$('ruleReadFilter').value=$('ruleMoveUnread').checked?'both':'read';
  dirty=true;updateReadPolicy();
@@ -3262,7 +3290,7 @@ async function saveCurrentRule({openNewAfter=false,forceNew=false}={}){
   selectedId=oldSelected;
   throw err;
  }
- const keptAccount=$('source').value;
+ const keptAccount=$('source').value,keptAccounts=selectedSourceAccounts();
  $('save').disabled=true;if($('saveAndNew'))$('saveAndNew').disabled=true;if($('saveAsNew'))$('saveAsNew').disabled=true;
  try{
   const rules=[...state.config.rules],i=rules.findIndex(r=>r.id===rule.id);
@@ -3270,7 +3298,7 @@ async function saveCurrentRule({openNewAfter=false,forceNew=false}={}){
   const next=await rpc('saveRules',{rules,revision:editRevision});
   dirty=false;renderStatus(next);
   if(openNewAfter){
-   loadRule('',keptAccount);
+   loadRule('',keptAccount);accountOptions(keptAccount,keptAccounts);updateRuleExplanation();
    $('ruleName').focus();
    toast(T('toastSavedAndNew'));
   }else{
@@ -3303,7 +3331,7 @@ async function fetchSelectedIntoEditor({forceNew=false}={}){
  if(forceNew||(existing&&existingVal&&incomingVal&&existingVal!==incomingVal)){
   loadRule('',m.sourceAccount);
  }
- $('source').value=m.sourceAccount;targetOptions($('target').value);
+ accountOptions(m.sourceAccount,[...new Set([...selectedSourceAccounts(),m.sourceAccount])]);targetOptions($('target').value);
  const row=$('conditions').children[0],field=row.children[0].value;
  row.children[2].value=field==='domain'?m.domain:field==='sender'?m.email:m.subject.slice(0,256);
  if(!$('ruleName').value)$('ruleName').value=(T('defaultRulePrefix')+(m.domain||m.email||T('defaultSenderFallback'))).slice(0,100);

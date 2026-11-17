@@ -429,17 +429,17 @@
                   >
                     ✉ Hämta konto från markerat mejl
                   </button>
-                  <label class="field compact-field">
-                    <span data-i18n="accountLabel">Konto</span>
-                    <select id="source" required="">
-                      <option value="">Välj ett konto…</option>
-                    </select>
-                  </label>
+                  <fieldset class="source-accounts-field" aria-describedby="sourceAccountsHelp">
+                    <legend data-i18n="sourceAccountsLabel">Konton som regeln ska läsa</legend>
+                    <p id="sourceAccountsHelp" class="muted" data-i18n="sourceAccountsHelp">Markera ett eller flera konton. Alla valda konton använder samma villkor och gemensamma målmapp. Flytten kan ske mellan konton. Målmappen och övriga regler ändras inte när du kryssar i ett konto.</p>
+                    <div id="sourceAccounts" class="source-accounts"></div>
+                  </fieldset>
+                  <select id="source" hidden aria-hidden="true" tabindex="-1"></select>
                   <div class="account-scope">
                     <span class="account-check">✓</span>
                     <span>
                       <strong data-i18n="accountScopeTitle"
-                        >Alla mappar i kontot ingår</strong
+                        >Alla vanliga mappar i valda konton ingår</strong
                       >
                       <small data-i18n="accountScopeBody"
                         >Inkorg, arkiv och vanliga undermappar bevakas
@@ -1640,7 +1640,7 @@ order@fortnox.se, nyheter@klarna.se"
             <h2 data-i18n="helpTitle">En lugnare inkorg, på dina villkor</h2>
             <ol>
               <li data-i18n="helpStep1">
-                Välj kontot som ska bevakas, ett eller flera villkor,
+                Välj ett eller flera konton som ska bevakas, ett eller flera villkor,
                 läst/oläst-läge och en målmapp. Du kan skapa hur många regler du
                 vill.
               </li>

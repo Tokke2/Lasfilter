@@ -2723,3 +2723,11 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .copy-errors-fallback textarea { display: block; width: 100%; min-height: 180px; max-height: 50vh; resize: vertical; font-family: ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .log-copy-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .log-location { border-block: 1px solid var(--line); padding: 12px 0 20px; margin-bottom: 20px; }
+
+.source-accounts-field { min-width: 0; border: 0; padding: 0; margin: 18px 0 12px; }
+.source-accounts-field legend { font-weight: 750; padding: 0; }
+.source-accounts { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; padding: 3px; }
+.source-account-choice { display: flex; align-items: start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); cursor: pointer; }
+.source-account-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.source-account-choice input { flex: none; margin-top: .3em; width: 18px; height: 18px; }
+.source-account-choice span { overflow-wrap: anywhere; min-width: 0; }

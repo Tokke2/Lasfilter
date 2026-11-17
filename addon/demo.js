@@ -154,7 +154,7 @@ globalThis.LasDemo=(()=>{
    case 'testRule':{
     const rule=LasCore.validateRule(m.rule),message={...selected,folder:{id:selected.source,accountId:selected.sourceAccount}},matched=LasCore.match(rule,message,true,true);
     const rf=rule.readFilter||'default',direct=rf==='both'||rf==='unread'||(rf==='default'&&state.config.moveMode==='direct');
-    data={matches:matched,reason:!matched?'no_match':!rule.enabled?'disabled':rf==='unread'?'already_read':direct?'eligible':'displayed',conditions:LasCore.explainRule(rule,message).conditions.map(c=>c.ok),paused:state.config.paused,dryRun:state.config.dryRun,trial:LasCore.trialActive(rule),fault:!!state.fault,read:true,target:LasCore.targetFor(rule,message),author:selected.author,subject:selected.subject,outsideSource:matched&&(rule.scope==='account'?selected.sourceAccount!==rule.sourceAccount:selected.source!==rule.source)};break;
+    data={matches:matched,reason:!matched?'no_match':!rule.enabled?'disabled':rf==='unread'?'already_read':direct?'eligible':'displayed',conditions:LasCore.explainRule(rule,message).conditions.map(c=>c.ok),paused:state.config.paused,dryRun:state.config.dryRun,trial:LasCore.trialActive(rule),fault:!!state.fault,read:true,target:LasCore.targetFor(rule,message),author:selected.author,subject:selected.subject,outsideSource:matched&&(rule.scope==='account'?!LasCore.accountIds(rule).includes(selected.sourceAccount):selected.source!==rule.source)};break;
    }
    case 'setMode':state.config.paused=m.paused;state.config.dryRun=m.dryRun;state.config.revision++;state.queued=0;data=state;break;
    case 'queueSelected':data={queued:true};state.queued++;break;

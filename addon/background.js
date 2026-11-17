@@ -988,7 +988,12 @@ App.extractImportedRules=(backup,currentFolders=[],existingRules=[])=>{
   let target=resolveFolderId(raw.target||'');
   let sourceAccount=typeof raw.sourceAccount==='string'?raw.sourceAccount.trim():'';
   if(scope==='account'){
-   if(currentFolders.length&&!currentFolders.some(f=>f.accountId===sourceAccount)){
+   if(raw.sourceAccounts!==undefined){
+    const checked=C.validateRule({...raw,id,source:source||raw.source,target});
+    sourceAccount=checked.sourceAccount;
+    if(currentFolders.length&&C.accountIds(checked).some(id=>!currentFolders.some(f=>f.accountId===id)))throw new C.RuleError('unsafe_folder');
+   }
+   if(raw.sourceAccounts===undefined&&currentFolders.length&&!currentFolders.some(f=>f.accountId===sourceAccount)){
     const tFolder=folderById.get(target)||currentFolders[0];
     if(tFolder)sourceAccount=tFolder.accountId;
    }
@@ -1047,7 +1052,7 @@ App.handle=async msg=>{
     reason=!r.enabled?'disabled':(onlyUnread&&m.read===true)?'already_read':(!allowUnread&&m.read!==true)?'unread':(!allowUnread&&(await e.displayed()).has(m.id))?'displayed':'eligible';
     await e.validateRuleFolders(r);
    }
-   App.log('simulated',1);return {matches,reason,conditions:C.explainRule(r,m).conditions.map(c=>c.ok),paused:e.config.paused===true,dryRun:e.config.dryRun===true,trial:C.trialActive(r),fault:!!e.fault,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&(r.scope==='account'?m.folder?.accountId!==r.sourceAccount:m.folder?.id!==r.source))};
+   App.log('simulated',1);return {matches,reason,conditions:C.explainRule(r,m).conditions.map(c=>c.ok),paused:e.config.paused===true,dryRun:e.config.dryRun===true,trial:C.trialActive(r),fault:!!e.fault,read:m.read,subject:m.subject,author:m.author,target:C.targetFor(r,m),ruleName:r.name,outsideSource:!!(matches&&(r.scope==='account'?!C.accountIds(r).includes(m.folder?.accountId):m.folder?.id!==r.source))};
   }
   case 'catchUp':{
    if(msg.revision!==undefined)App.checkRevision(msg.revision);

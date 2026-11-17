@@ -254,6 +254,7 @@ function conditionToFilter(c){
 }
 function fromSortBroRule(rule,{uriPrefix='',folderPath='',type='17'}={}){
  const notes=[],skipped=[],terms=[];
+ if(C.accountIds(rule).length>1)return {ok:false,notes:['multipleAccounts'],skipped,reason:'multipleAccounts'};
  for(const c of rule.conditions||[]){
   const term=conditionToFilter(c);
   if(!term){skipped.push(c.field+':'+c.op);notes.push('condition:'+c.field);continue;}
@@ -293,7 +294,7 @@ function buildFilterFile(rules,{uriOf={}}={}){
   const info=uriOf[rule.id]||{};
   const built=fromSortBroRule(rule,info);
   for(const n of built.notes||[])if(!report.notes.includes(n))report.notes.push(n);
-  if(!built.ok){report.skipped++;report.missingUri.push(rule.name);continue;}
+  if(!built.ok){report.skipped++;if(built.reason==='noUri')report.missingUri.push(rule.name);continue;}
   out.push(...built.lines);
   report.written++;
  }

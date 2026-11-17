@@ -1854,3 +1854,34 @@ test('kopiering/export av fellogg hämtar felarkivet även utan synliga fel elle
  assert.match(text,/window_error/);assert.match(text,/move_error/);assert.match(text,/Antal felposter: 2/);assert.match(text,/1\.2\.3/);assert.match(text,/160\.0/);
  assert.doesNotMatch(text,/\tmoved\t/);assert.equal(downloads,0);assert.equal(writes,0);assert.equal(app.errorLogs.length,2);
 });
+
+const multiAccountRule=()=>C.validateRule({...exportRule,scope:'account',source:'a-in',sourceAccount:'a',sourceAccounts:['a','b']});
+test('flerkontoregel sparas atomärt och byte av konton rensar gamla köjobb',async()=>{
+ const {app,api}=await loadBackground();let cleared=0,stored;const e=fakeEngineWithRules(app,{clearPending:async()=>cleared++});
+ api.storage.local.set=async value=>{if(value.config)stored=value.config;};
+ await app.handle({type:'saveRules',rules:[multiAccountRule()],revision:0});
+ assert.deepEqual([...stored.rules[0].sourceAccounts],['a','b']);assert.equal(e.config.rulesVersion,1);assert.equal(cleared,1);
+ const single={...e.config.rules[0],sourceAccounts:['a']};await app.handle({type:'saveRules',rules:[single],revision:e.config.revision});
+ assert.deepEqual(C.accountIds(e.config.rules[0]),['a']);assert.equal(cleared,2);assert.equal(e.config.rulesVersion,2);
+});
+test('JSON-export och veckobackup bevarar alla källkonton och gemensamt mål',async()=>{
+ const {api,files}=backupApi(),{app}=await loadBackground(api);swedishAccounts(api);fakeEngineWithRules(app,{config:backupConfig([multiAccountRule()])});
+ const exported=await app.handle({type:'export'});assert.deepEqual([...exported.rules[0].sourceAccounts],['a','b']);
+ await app.autoBackup({force:true});const saved=JSON.parse(files['Lasfilter/Regelbackuper/sortbro-regler-backup.json']);
+ assert.deepEqual(saved.rules[0].sourceAccounts,['a','b']);assert.equal(saved.rules[0].target,'fin');
+ const imported=app.extractImportedRules(saved,[{id:'a-in',accountId:'a'},{id:'b-in',accountId:'b'},{id:'fin',accountId:'b'}]);
+ assert.deepEqual([...C.validateRule(imported[0]).sourceAccounts],['a','b']);
+});
+test('import av flerkontoregel får aldrig ersätta saknat konto med målkontot',async()=>{
+ const {app}=await loadBackground();const r=multiAccountRule();
+ for(const folders of [[{id:'a-in',accountId:'a'},{id:'fin',accountId:'c'}],[{id:'b-in',accountId:'b'},{id:'fin',accountId:'c'}]]){
+  assert.throws(()=>app.extractImportedRules({rules:[r]},folders),e=>e.code==='unsafe_folder');
+ }
+ assert.throws(()=>app.extractImportedRules({rules:[{...r,sourceAccounts:[]}]},[{id:'fin',accountId:'c'}]));
+});
+test('kontroll av markerat mejl känner igen även det andra källkontot',async()=>{
+ const {app}=await loadBackground();fakeEngineWithRules(app);app.selected=async()=>({id:9,read:true,folder:{id:'b-in',accountId:'b'},author:'faktura@fortnox.se',subject:'Faktura'});
+ const r=multiAccountRule();r.readFilter='both';const result=await app.handle({type:'testRule',rule:r});assert.equal(result.matches,true);assert.equal(result.outsideSource,false);
+ app.selected=async()=>({id:9,read:true,folder:{id:'c-in',accountId:'c'},author:'faktura@fortnox.se',subject:'Faktura'});
+ assert.equal((await app.handle({type:'testRule',rule:r})).outsideSource,true);
+});

@@ -2731,3 +2731,9 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .source-account-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .source-account-choice input { flex: none; margin-top: .3em; width: 18px; height: 18px; }
 .source-account-choice span { overflow-wrap: anywhere; min-width: 0; }
+
+/* Read-only incident guide; long server folder IDs must not widen the UI. */
+.health-guide { margin: 1rem 0; padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow-wrap: anywhere; }
+.health-guide summary { cursor: pointer; font-weight: 700; }
+.health-issue { border-top: 1px solid var(--line); padding-top: .7rem; margin-top: .7rem; }
+.health-issue p, .health-guide li { margin-block: .6rem; }

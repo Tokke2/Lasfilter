@@ -105,3 +105,20 @@ test('year destination is shared and created once across selected source account
 test('existing branch conditions still choose shared branch targets for either account',async()=>{
  const f=fixture();f.e.config.rules[0].branches=[{condition:{field:'subject',op:'contains',value:'Invoice'},target:'c-sub'}];await f.e.sweepRule(f.e.config.rules[0],{force:true});assert.deepEqual([...f.e.pending.values()].map(j=>j.record.target),['c-sub','c-sub']);
 });
+
+test('isolated source-folder failure does not stop the independent source account',async()=>{
+ const f=fixture();f.api.folders.getFolderCapabilities=async id=>({canAddMessages:true,canDeleteMessages:id!=='a-in'});
+ await f.e.sweepAll();await f.e.tick();assert.equal(f.e.fault,'');
+ assert.deepEqual(f.calls,[{ids:[2],target:'shared'}]);assert.equal(f.e.faultHolds.get('folder:a-in').phase,'source_capabilities');
+ const before=JSON.stringify(f.e.healthState());await f.e.sweepAll({force:true});await f.e.tick();assert.equal(f.calls.length,1);assert.equal(JSON.stringify(f.e.healthState()),before);
+});
+test('shared target failure holds every dependent route, independent account route still runs',async()=>{
+ const f=fixture();const r=C.validateRule({...raw(),id:'independent',sourceAccount:'c',sourceAccounts:undefined,source:'c-in',target:'c-sub'});f.e.config.rules.push(r);
+ f.api.folders.getFolderCapabilities=async id=>({canAddMessages:id!=='shared',canDeleteMessages:true});
+ await f.e.sweepAll();await f.e.tick();assert.equal(f.e.fault,'');assert.deepEqual(f.calls,[{ids:[3],target:'c-sub'}]);assert(f.e.faultHolds.has('folder:shared'));
+});
+test('missing selected account is held while the other selected account continues in same sweep',async()=>{
+ const f=fixture();f.accounts.splice(0,1);await f.e.sweepAll();await f.e.tick();
+ assert.equal(f.e.fault,'');assert.equal(f.e.faultHolds.get('account:a').reason,'missing_account');assert.deepEqual(f.calls,[{ids:[2],target:'shared'}]);
+ assert.equal(await f.e.enqueue(f.messages.get(1)),false);
+});

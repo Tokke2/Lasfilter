@@ -24,6 +24,7 @@
     "scripts": [
       "core.js",
       "filters.js",
+      "health.js",
       "engine.js",
       "background.js"
     ],

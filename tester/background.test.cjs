@@ -1885,3 +1885,56 @@ test('kontroll av markerat mejl känner igen även det andra källkontot',async(
  app.selected=async()=>({id:9,read:true,folder:{id:'c-in',accountId:'c'},author:'faktura@fortnox.se',subject:'Faktura'});
  assert.equal((await app.handle({type:'testRule',rule:r})).outsideSource,true);
 });
+
+/* Real engine integration: persisted locks are never implicit resume consent. */
+async function healthBackground({health,work=[]}={}){
+ const Engine=require('../addon/engine.js'),api=stubApi();
+ const stored={config:{...C.defaults(),paused:true,hourly:false,rules:[]},beforeReaderMigration:1,work,...(health?{health}:{})};
+ api.storage.local.get=async()=>structuredClone(stored);api.storage.local.set=async x=>Object.assign(stored,structuredClone(x));
+ api.messages.query=async()=>({messages:[]});api.messages.abortList=async()=>{};
+ const loaded=await loadBackground(api,{LasEngine:Engine});return {...loaded,stored};
+}
+test('startup preserves attempted journal and exposes unknown call state in snapshot',async()=>{
+ const m={headerMessageId:'id@invalid',date:new Date('2026-10-01'),size:100};
+ const work=[{key:C.fingerprint(m),headerMessageId:m.headerMessageId,date:+m.date,size:100,source:'source',target:'target',ruleId:'r1',created:Date.now(),rulesVersion:0,stage:'attempted'}];
+ const {app,stored}=await healthBackground({work});await app.writeChain;
+ const snap=app.snapshot();assert.equal(snap.blocked,1);assert.equal(snap.fault,'uncertain_move');assert.equal(snap.health.global.phase,'restore_attempted');assert.equal(snap.health.global.called,null);
+ assert.equal(stored.work.length,1);assert.equal(stored.work[0].stage,'attempted');
+ assert(!app.logs.some(x=>/rensad vid start/.test(x.data?.detail||'')));
+ const rev=app.engine.config.revision;
+ await app.handle({type:'setMode',paused:false,dryRun:false,revision:rev});
+ assert.equal(app.engine.blocked(),1);assert.equal(app.engine.fault,'uncertain_move');assert.equal(app.engine.enabled(),false);assert.equal(stored.work.length,1);
+ await assert.rejects(app.handle({type:'clearBlocked'}),e=>e.code==='bad_request');assert.equal(app.engine.blocked(),1);
+ await app.handle({type:'clearBlocked',confirmed:true});assert.equal(app.engine.blocked(),0);assert.equal(app.engine.fault,'');assert.equal(stored.health.global,null);
+});
+test('account and folder holds survive startup and mode changes',async()=>{
+ const Engine=require('../addon/engine.js'),e=new Engine({},C.defaults());
+ const issue=e.issue('move_error',{scope:'account',accountId:'a',phase:'accounts_validate',reason:'missing_account',called:false});
+ const {app,stored}=await healthBackground({health:{global:null,holds:[issue]}});
+ assert.equal(app.snapshot().health.holds.length,1);assert.equal(app.engine.routeHeld('x','y','a'),true);
+ await app.handle({type:'setMode',paused:false,dryRun:true,revision:app.engine.config.revision});assert.equal(app.snapshot().health.holds.length,1);
+ await app.handle({type:'clearBlocked',confirmed:true});assert.equal(stored.health.holds.length,0);
+});
+test('invalid saved health stops startup rather than enabling monitoring',async()=>{
+ const {app}=await healthBackground({health:{global:null,holds:[{message:'SECRET'}]}});
+ assert.equal(app.engine.fault,'invalid_storage');assert.equal(app.engine.enabled(),false);assert.doesNotMatch(JSON.stringify(app.snapshot().health),/SECRET/);
+});
+test('reader body failure exposes phase, called=false and safe reason only',async()=>{
+ const {app,tick,api}=await loadBackground();const w=windowApi(api,app);w.message.folder.id='inbox';const e=unreadEngine(app);e.records.set('job',{});let details;
+ e.stop=(code,d)=>{e.fault=code;details=d;};api.messages.getFull=async()=>{throw Error('SECRET subject and body');};
+ await tick.settle(app.beforeMove(w.message,{key:'job',ruleId:'r1',source:'inbox',target:'fin'}),100);
+ assert.equal(details.phase,'reader_body');assert.equal(details.called,false);assert.equal(details.reason,'api_error');assert.doesNotMatch(JSON.stringify(details),/SECRET/);assert.equal(w.opened.length,0);
+});
+test('invalid health cannot erase an uncertain journal on a later settings save',async()=>{
+ const m={headerMessageId:'id@invalid',date:new Date('2026-10-01'),size:100};
+ const work=[{key:C.fingerprint(m),headerMessageId:m.headerMessageId,date:+m.date,size:100,source:'source',target:'target',ruleId:'r1',created:Date.now(),stage:'attempted'}];
+ const {app,stored}=await healthBackground({health:{holds:'broken'},work});
+ assert.equal(app.engine.fault,'invalid_storage');assert.equal(app.engine.blocked(),1);
+ await app.handle({type:'setMode',paused:false,dryRun:true,revision:app.engine.config.revision});assert.equal(stored.work.length,1);assert.equal(stored.work[0].stage,'attempted');assert.equal(app.engine.enabled(),false);
+});
+test('corrupt journal is retained verbatim until an explicit confirmed clear',async()=>{
+ const work=[{stage:'attempted',key:'broken'}];const {app,stored}=await healthBackground({work});
+ assert.equal(app.engine.fault,'invalid_storage');
+ await app.handle({type:'setMode',paused:false,dryRun:true,revision:app.engine.config.revision});assert.deepEqual(stored.work,work);
+ await app.handle({type:'clearBlocked',confirmed:true});assert.deepEqual(stored.work,[]);
+});

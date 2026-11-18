@@ -82,7 +82,7 @@ test('native moved message not chained',async()=>{const f=fixture();await f.read
 test('marked unread while waiting cancels',async()=>{const f=fixture();await f.e.enqueue(msg());await f.e.readChanged({...msg(),read:false},{read:false});assert.equal(f.e.pending.size,0);});
 test('live rechecks unread even without event',async()=>{const f=fixture();await f.e.enqueue(msg());await f.e.tick();f.messages.get(1).read=false;f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);});
 test('changed source cancels',async()=>{const f=fixture();await f.e.enqueue(msg());await f.e.tick();f.messages.get(1).folder.id='changed';f.advance();await f.e.tick();assert.equal(f.api.calls.length,0);});
-test('read-only source never moves',async()=>{const f=fixture();f.api.folders.getFolderCapabilities=async()=>({canDeleteMessages:false,canAddMessages:true});await f.ready();assert.equal(f.api.calls.length,0);assert(f.e.fault);});
+test('read-only source never moves',async()=>{const f=fixture();f.api.folders.getFolderCapabilities=async()=>({canDeleteMessages:false,canAddMessages:true});await f.ready();assert.equal(f.api.calls.length,0);assert.equal(f.e.fault,'');assert.equal(f.e.faultHolds.get('folder:inbox').phase,'source_capabilities');});
 test('display lookup failure stops',async()=>{const f=fixture();f.api.messageDisplay.getDisplayedMessages=async()=>{throw Error('private');};await f.ready();assert.equal(f.api.calls.length,0);assert.equal(f.e.fault,'display_error');});
 test('pause during validation prevents move',async()=>{const f=fixture();f.api.folders.getFolderCapabilities=async()=>{f.e.config.paused=true;return {canDeleteMessages:true,canAddMessages:true};};await f.ready();assert.equal(f.api.calls.length,0);});
 test('storage failure prevents enqueue and move',async()=>{const f=fixture({persistReject:true});await assert.rejects(f.e.enqueue(msg()));await f.e.tick();assert.equal(f.api.calls.length,0);assert.equal(f.e.fault,'storage_error');});
@@ -142,7 +142,7 @@ test('config accepts verbose flag',()=>assert.equal(C.config({...C.defaults(),ve
 test('config rejects non-boolean verbose',()=>assert.throws(()=>C.config({...C.defaults(),verbose:'ja'})));
 test('sweep writes per-rule debug line',async()=>{const f=fixture();f.messages.clear();f.messages.set(5,msg(5));await f.e.catchUp('rule1');assert.ok(f.debugs.some(t=>t.startsWith('svep regel rule1')));});
 test('move validates the actual sweep source and branch target',async()=>{const f=fixture();const checked=[];f.api.folders.getFolderCapabilities=async id=>{checked.push(id);return {canAddMessages:true,canDeleteMessages:true};};f.e.config.rules=[branched()];f.messages.clear();f.messages.set(8,{...msg(8),subject:'Order 8',folder:{id:'sub1',accountId:'a'}});await f.e.catchUp('br');await f.e.tick();f.advance();await f.e.tick();assert.ok(checked.includes('sub1'));assert.ok(checked.includes('brt'));assert.equal(f.api.calls[0].target,'brt');});
-test('sweepAll reports errors without stopping live monitoring',async()=>{const f=fixture();f.api.accounts.list=async()=>{throw Error('offline');};await assert.rejects(f.e.sweepAll(),e=>e.code==='sweep_error');assert.equal(f.e.fault,'');});
+test('unknown account-list failure stops globally with exact stage',async()=>{const f=fixture();f.api.accounts.list=async()=>{throw Error('offline');};await assert.rejects(f.e.sweepAll(),e=>e.code==='sweep_error');assert.equal(f.e.fault,'sweep_error');assert.equal(f.e.failure.phase,'accounts_read');});
 test('account scope matches every folder in the selected account',()=>{const r=C.validateRule({...base(),scope:'account',sourceAccount:'a'});assert(C.match(r,{...msg(),folder:{id:'other',accountId:'a'}}));assert(!C.match(r,{...msg(),folder:{id:'other',accountId:'b'}}));});
 test('account scope does not requeue mail already in its target',()=>{const r=C.validateRule({...base(),scope:'account',sourceAccount:'a'}),m={...msg(),folder:{id:'archive',accountId:'a'}};assert.equal(C.firstMatch([r],m),null);});
 test('sweep skips one unavailable folder and continues the account',async()=>{const f=fixture();const query=f.api.messages.query;f.api.messages.query=async q=>{if(q.folderId==='sub1')throw Error('offline folder');return query(q);};const r=await f.e.sweepAll();assert.equal(r.skippedFolders,1);assert.ok(r.searchedFolders>0);assert.equal(f.e.fault,'');});
@@ -171,12 +171,12 @@ test('IMAP move without onMoved event is confirmed via folder verification',asyn
  await f.ready();
  assert.equal(f.e.stats.moved,1);assert.equal(f.e.fault,'');assert.equal(f.e.blocked(),0);
 });
-test('restore automatically clears attempted record when message is already in target',async()=>{
+test('restart preserves uncertain attempted record even when target seems present',async()=>{
  const f=fixture({noAck:true});await f.ready();assert.equal(f.e.blocked(),1);
  const g=fixture();
  const old=g.messages.get(1);g.messages.delete(1);g.messages.set(1001,{...old,id:1001,size:old.size+32,folder:{id:'archive',accountId:'a'}});
  await g.e.restore(f.e.recordList());
- assert.equal(g.e.blocked(),0);assert.equal(g.e.fault,'');
+ assert.equal(g.e.blocked(),1);assert.equal(g.e.fault,'uncertain_move');assert.equal(g.e.failure.called,null);
 });
 test('sweepAll picks up unread matching mail in real inbox when newInboxDirect is enabled',async()=>{
  const f=fixture();
@@ -185,10 +185,10 @@ test('sweepAll picks up unread matching mail in real inbox when newInboxDirect i
  const r=await f.e.sweepAll();
  assert.equal(r.queued,1);await f.e.tick();assert.equal(f.e.stats.moved,1);
 });
-test('vanished message in queue is dropped without stopping engine',async()=>{
+test('failed message lookup is unknown, not proof that message vanished',async()=>{
  const f=fixture();await f.e.enqueue(msg(1));await f.e.tick();
  f.messages.delete(1);f.advance();await f.e.tick();
- assert.equal(f.e.fault,'');assert.equal(f.e.pending.size,0);
+ assert.equal(f.e.fault,'move_error');assert.equal(f.e.failure.phase,'message_read');assert.equal(f.e.failure.called,false);assert.equal(f.e.pending.size,0);
 });
 test('rule readFilter supports read, unread, both and default',()=>{
  for(const rf of ['default','read','unread','both'])assert.equal(C.validateRule({...base(),readFilter:rf}).readFilter,rf);
@@ -247,13 +247,13 @@ test('rule unreadAction supports default, keep, window and read',()=>{
  for(const ua of ['default','keep','window','read'])assert.equal(C.validateRule({...base(),unreadAction:ua}).unreadAction,ua);
  assert.throws(()=>C.validateRule({...base(),unreadAction:'invalid'}));
 });
-test('tick processes pending messages even when an unloaded background tab hangs in getDisplayedMessages',async()=>{
+test('hung background tab is unknown and stops instead of permitting a move',async()=>{
  const f=fixture();
  f.e.hooks.displayTimeout=20;
  f.api.messageDisplay.getDisplayedMessages=async id=>{if(id===8)return new Promise(()=>{});return [];};
  await f.ready();
- assert.equal(f.e.stats.moved,1);
- assert.equal(f.e.fault,'');
+ assert.equal(f.e.stats.moved,0);
+ assert.equal(f.e.fault,'display_error');assert.equal(f.e.failure.phase,'display_check');
 });
 test('tick processes pending messages even when sweeping counter is non-zero',async()=>{
  const f=fixture({moveMode:'direct'});
@@ -291,7 +291,7 @@ test('unmovable subfolder message from sweep is dropped without stopping other q
  await f.e.tick();
  assert.equal(f.e.fault,'');
  assert.equal(f.e.stats.moved,1);
- assert.equal(f.e.stats.skipped,1);
+ assert.equal(f.e.faultHolds.get('folder:sub1').phase,'source_capabilities');
 });
 test('sweepRule moves messages concurrently while building the queue and drains when reaching 100 in queue',async()=>{
  const f=fixture();
@@ -1386,8 +1386,8 @@ test('diagnosfel samlas även utan detaljlogg och utan rå exception-text',async
 test('svepets överhoppade felmappar registreras utan detaljlogg',async()=>{
  const f=fixture();f.e.hooks.debug=()=>{};
  f.api.messages.query=async()=>{throw Error('SECRET@example.invalid');};
- await assert.rejects(()=>f.e.sweepRule(C.validateRule(base())),{code:'sweep_error'});
- assert.ok(f.logs.some(x=>x.event==='error'&&x.data.detail.startsWith('svep_query_failed')));
+ const result=await f.e.sweepRule(C.validateRule(base()));assert.ok(result.skippedFolders>0);assert.equal(f.e.fault,'');
+ assert.ok(f.logs.some(x=>x.event==='error'&&x.data.detail.includes('phase=folder_query')));
  assert.doesNotMatch(JSON.stringify(f.logs),/SECRET/);
 });
 
@@ -1475,4 +1475,98 @@ test('läsfönsterpaus har endast godkända längder och exakt sluttid',()=>{
  assert.equal(C.readerPauseState(-1,now+86400000).paused,true);
  for(const mode of [null,undefined,'15','forever',15,{},''])assert.throws(()=>C.readerPauseDeadline(mode,now));
  for(const until of [-2,NaN,Infinity,'-1',null,{},1.5])assert.throws(()=>C.readerPauseState(until,now));
+});
+
+/* Structured failures: safe metadata, persistent holds, no retry on uncertainty. */
+test('move rejection records call stage and never raw exception text',async()=>{
+ const f=fixture({moveReject:true});await f.ready();
+ assert.equal(f.e.failure.phase,'move_call');assert.equal(f.e.failure.called,true);
+ assert.equal(f.e.failure.scope,'global');assert.equal(f.e.failure.reason,'api_error');
+ assert.doesNotMatch(JSON.stringify(f.e.healthState())+JSON.stringify(f.logs),/SECRET|raw|stack/);
+});
+for(const [operation,phase] of [['source','source_read'],['target','target_read'],['cap','target_capabilities']])test('isolates attributable '+phase+' before move',async()=>{
+ const f=fixture(),get=f.api.folders.get;
+ if(operation==='cap')f.api.folders.getFolderCapabilities=async id=>{if(id==='archive')throw Object.assign(Error('SECRET'),{name:'TimeoutError'});return {canDeleteMessages:true,canAddMessages:true};};
+ else f.api.folders.get=async id=>{if(id===(operation==='source'?'inbox':'archive'))throw Error('SECRET');return get(id);};
+ await f.ready();assert.equal(f.api.calls.length,0);assert.equal(f.e.fault,'');
+ const h=[...f.e.faultHolds.values()][0];assert.equal(h.phase,phase);assert.equal(h.called,false);
+ assert.equal(h.reason,operation==='cap'?'timeout':'api_error');
+});
+test('folder holds persist and block later enqueues without a new move attempt',async()=>{
+ const f=fixture();let saved;
+ f.e.hooks.persistHealth=async state=>{saved=structuredClone(state);};
+ f.api.folders.getFolderCapabilities=async()=>({canDeleteMessages:false,canAddMessages:true});await f.ready();
+ const g=fixture();g.e.restoreHealth(saved);assert.equal(await g.e.enqueue(msg()),false);
+ assert.equal(g.e.fault,'');assert.equal(g.e.faultHolds.size,1);assert.equal(g.api.calls.length,0);
+});
+test('global stop persists across a new engine',async()=>{
+ const f=fixture({moveReject:true});let saved;f.e.hooks.persistHealth=async x=>saved=structuredClone(x);await f.ready();
+ const g=fixture();g.e.restoreHealth(saved);assert.equal(g.e.enabled(),false);assert.equal(g.e.failure.called,true);
+});
+test('hold persistence failure stops globally rather than continuing unprotected',async()=>{
+ const f=fixture();f.e.hooks.persistHealth=async()=>{throw Error('SECRET');};
+ f.api.folders.getFolderCapabilities=async()=>({canDeleteMessages:false,canAddMessages:true});await f.ready();
+ assert.equal(f.e.fault,'storage_error');assert.equal(f.e.failure.phase,'journal_confirmation');assert.equal(f.api.calls.length,0);
+});
+test('attempt journal write failure reports precise pre-call stage',async()=>{
+ const f=fixture();const persist=f.e.hooks.persist;
+ f.e.hooks.persist=async()=>{if(f.e.recordList().some(r=>r.stage==='attempted'))throw Error('SECRET');return persist();};
+ await f.ready();assert.equal(f.e.fault,'storage_error');assert.equal(f.e.failure.phase,'journal_attempt');assert.equal(f.e.failure.called,false);assert.equal(f.api.calls.length,0);
+});
+test('message recheck failure records its step and stops globally',async()=>{
+ const f=fixture(),get=f.api.messages.get;let reads=0;
+ f.api.messages.get=async id=>{if(++reads===2)throw Error('SECRET');return get(id);};
+ await f.ready();assert.equal(f.e.failure.phase,'message_recheck');assert.equal(f.e.failure.called,false);assert.equal(f.api.calls.length,0);
+});
+test('reader failure is never isolated as an account failure',async()=>{
+ const f=beforeFixture();f.e.hooks.beforeMove=async()=>{throw Error('SECRET');};await f.ready();
+ assert.equal(f.e.failure.phase,'reader_receipt');assert.equal(f.e.failure.called,false);assert.equal(f.e.faultHolds.size,0);
+});
+for(const mode of ['query-error','empty-both','duplicate-target','paginated-source'])test('uncertain move remains globally locked: '+mode,async()=>{
+ const f=fixture({noAck:true});
+ f.api.messages.query=async q=>{
+  if(mode==='query-error')throw Error('SECRET');
+  if(mode==='empty-both')return {messages:[]};
+  const target={...msg(),id:90,folder:{id:'archive',accountId:'a'}};
+  if(q.folderId==='archive')return {messages:mode==='duplicate-target'?[target,{...target,id:91}]:[target]};
+  return {messages:[],...(mode==='paginated-source'?{id:'more'}:{})};
+ };
+ await f.ready();await f.e.tick();assert.equal(f.e.fault,'uncertain_move');assert.equal(f.e.failure.phase,'move_receipt');assert.equal(f.e.failure.called,true);assert.equal(f.e.blocked(),1);assert.equal(f.api.calls.length,1);
+});
+test('restart does not query or unlock attempted moves even when both folders seem empty',async()=>{
+ const f=fixture({noAck:true});await f.ready();const g=fixture();let queries=0;
+ g.api.messages.query=async()=>{queries++;return {messages:[]};};await g.e.restore(f.e.recordList());
+ assert.equal(queries,0);assert.equal(g.e.blocked(),1);assert.equal(g.e.failure.called,null);assert.equal(g.e.fault,'uncertain_move');
+});
+test('folder-query failure stays held on the next sweep instead of being retried',async()=>{
+ const f=fixture(),query=f.api.messages.query;let attempts=0;
+ f.api.messages.query=async q=>{if(q.folderId==='sub1'){attempts++;throw Error('SECRET');}return query(q);};
+ await f.e.sweepAll();await f.e.sweepAll({force:true});assert.equal(attempts,1);assert.equal(f.e.faultHolds.get('folder:sub1').phase,'folder_query');
+});
+test('an isolated target also blocks other rules using that folder as source',async()=>{
+ const f=fixture();await f.e.isolate({phase:'target_read',folderId:'other'});
+ assert.equal(f.e.routeHeld('inbox','other'),true);assert.equal(f.e.routeHeld('other','archive'),true);assert.equal(f.e.routeHeld('inbox','archive'),false);
+});
+test('health validation rejects corrupt states and strips foreign keys',()=>{
+ const H=require('../addon/health.js'),f=fixture(),issue=f.e.issue('move_error',{phase:'message_read',called:false});
+ assert.deepEqual(H.cleanState(undefined),{global:null,holds:[]});
+ assert(!JSON.stringify(H.cleanState({global:{...issue,message:'SECRET'},holds:[]})).includes('SECRET'));
+ for(const bad of [{global:issue,holds:null},{global:{...issue,phase:'SECRET'},holds:[]},{global:null,holds:[{...issue,scope:'folder',folderId:'inbox',called:true}]}])assert.throws(()=>H.cleanState(bad));
+ assert.equal(H.reason(Error('SECRET')),'api_error');
+});
+test('malformed attempted journal stops without rewriting stored work',async()=>{
+ const f=fixture();await f.e.restore([{stage:'attempted',key:'broken'}]);
+ assert.equal(f.e.fault,'invalid_storage');assert.equal(f.saved.length,0);assert.equal(f.e.failure.called,null);
+});
+
+test('display query timeout cannot masquerade as no open message',async()=>{
+ const f=fixture();f.e.hooks.displayTimeout=1;f.api.messageDisplay.getDisplayedMessages=()=>new Promise(()=>{});
+ await f.ready();assert.equal(f.e.fault,'display_error');assert.equal(f.e.failure.phase,'display_check');assert.equal(f.e.failure.reason,'timeout');assert.equal(f.api.calls.length,0);
+});
+test('unknown tab list cannot masquerade as closed tabs',async()=>{
+ const f=fixture();f.api.tabs.query=async()=>null;await f.ready();assert.equal(f.e.fault,'display_error');assert.equal(f.api.calls.length,0);
+});
+test('restart retains a previously recorded exact move failure rather than overwriting its phase',async()=>{
+ const f=fixture({moveReject:true});await f.ready();const g=fixture();g.e.restoreHealth(f.e.healthState());await g.e.restore(f.e.recordList());
+ assert.equal(g.e.failure.phase,'move_call');assert.equal(g.e.failure.called,true);assert.equal(g.e.failure.id,f.e.failure.id);assert.equal(g.e.blocked(),1);
 });

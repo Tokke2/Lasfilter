@@ -272,12 +272,27 @@ med **Skapa regel**, **Inte nu** och **Sluta föreslå**.
 
 ## Säkerhetsmekaniker
 
-- Högst ett flyttförsök per meddelande. Journalen skrivs före försöket och rensas inte förrän Thunderbird har bekräftat flytthändelsen. Ett avbrutet eller osäkert försök pausar motorn och upprepas inte.
+- Högst ett flyttförsök per meddelande. Journalen skrivs före försöket och rensas automatiskt bara efter ett giltigt flyttkvitto: Thunderbirds flytthändelse eller en entydig kontroll av både mål och källa. Ett avbrutet eller osäkert försök pausar motorn och upprepas inte.
 - Vid osäkerhet eller ändrade regler rensas väntande jobb; redan registrerade spärrar rensas endast manuellt efter din egen kontroll.
 - Regeländringar och växling mellan test/flytt ökar regelversionen och gör gamla köade jobb ogiltiga.
 - Flyttar godkänns bara mellan vanliga mappar, även mellan konton, när källan tillåter borttagning och målet tillåter mottagning. Specialmappar, sökmappar, skrivskydd och regelkedjor med loopar avvisas. Vid ett fel görs ingen kopiering som reserv.
 - Oläst-markering, ändrad källmapp eller en öppnad visning stoppar en väntande flytt.
 - Kön är begränsad till 100 väntande jobb; när gränsen nås töms kön och resten väntar till nästa svep. Väntande jobb kan återställas efter omstart om Message-ID, datum, storlek och källmapp är entydiga; ett gammalt sessions-id återanvänds aldrig.
+
+### Felsökning utan automatiska åtgärder
+
+Under flyttstatus visas **Felsökning – endast läsning** när ett fel finns. Fäll ut guiden för att se:
+
+- incident-ID och tid, exakt kontrollsteg och en säker feltyp;
+- om flytt-API:t anropades: **ja**, **nej** eller **okänt**;
+- om hela motorn har stannat eller bara ett bestämt konto/en bestämd mapp är spärrad;
+- kontroller att göra i Thunderbird och regelredigeraren. Guiden läser bara sparad status: den flyttar inga mejl, skapar inga mappar, gör inga nya flyttförsök och rensar inga spärrar.
+
+Ett tydligt avgränsat mappfel före flytt spärrar mappen som både källa och mål. Saknade valda konton spärras var för sig. Oberoende konton och mappar kan fortsätta; ett fel i ett gemensamt mål spärrar däremot alla flyttar som behöver det målet. Okänd kontostatus, visningsfel, lagringsfel och osäkra flyttar stoppar hela motorn. Spärrarna sparas över omstart och spärrade flyttar görs inte om automatiskt.
+
+**Omstart, Pausa/Återuppta och byte mellan test/flytt rensar inte spärrarna.** Efter egen kontroll kan du välja **Rensa spärr och fortsätt** utanför guiden. Knappen kräver en separat bekräftelse och rensar alla felspärrar och osäkra flyttjournaler; den kan återuppta sorteringen, men reparerar inte orsaken. Kontrollera osäkra flyttar i både källa och mål först. Vid återstart kan ett gammalt journalfört försök ha okänd anropsstatus: journalen skrivs före API-anropet. Ett redan sparat exakt fel behålls när det finns.
+
+Den nya diagnosen sparar inte exception-meddelanden, stackar, ämnesrader eller mejlkroppar. Den använder uppräknade felkoder och interna konto-/mapp-/regel-ID:n. Guiden visar mappnamn från den vanliga mapplistan när de finns. Äldre fel kan inte i efterhand få en exakt diagnos.
 
 ## Integritet och behörigheter
 
@@ -561,12 +576,23 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 
 ## Gränser som du bör känna till
 
-- Flytten bekräftas av Thunderbirds lokala flytthändelse, inte av en separat kvittens från din IMAP-server. Kontrollera mål- och källmapp i Thunderbird efter aktivering.
+- Flytten bekräftas av Thunderbirds lokala flytthändelse eller entydiga mappkontroller via Thunderbird, inte av en separat kvittens från din IMAP-server. Kontrollera mål- och källmapp i Thunderbird efter aktivering.
 - Om ett annat filter eller en annan åtgärd redan har flyttat eller raderat meddelandet registreras det som överhoppat eller spärrat, beroende på läge.
 - Röda dagar, frånvaro och arbetsflöden hanteras inte. Ställ in paus manuellt vid behov.
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.31
+
+Endast de valda förslagen **1, 3 och 4** från den senaste förslagslistan:
+
+- **Exakt felsteg.** Flyttfel, mapp-/kontokontroller, läsfönster, visningskontroller och journalskrivning får strukturerad diagnos med uppgift om flyttanropet startat. Råa undantagstexter sparas inte i den nya diagnosen.
+- **Säker isolering.** Avgränsade fel före flytt spärrar berörd mapp eller saknat konto. Oberoende flöden fortsätter, men gemensamma mål respekterar spärren. Spärrade flöden får inga automatiska nya flyttförsök.
+- **Skrivskyddad guide på svenska och engelska.** Visar stoppets omfattning, steg, anropsstatus och manuella kontrollpunkter. Upplåsning sker endast med separat bekräftelse utanför guiden.
+- **Osäkerhet förblir ett stopp.** Omstart rensar inte längre osäkra försök. Ett misslyckat/oklart mappuppslag eller en visning som inte svarar får inte tolkas som att mejlet/fliken är borta. En sparad exakt diagnos bevaras över omstart; korrupt journal behålls tills användaren uttryckligen bekräftar rensning.
+
+Verifierat med **596 automatiska tester, 571 DOM-kontroller och 48 Chromium-layouter** (SV/EN, ljust/mörkt, 600/840/1280 px, 12/14/20/24 px). Testerna använder simulerade Thunderbird-API:er. **Inte provat med riktiga Thunderbird-/IMAP-flyttar här.** Det tidigare rapporterade felets grundorsak är inte bevisat löst; nästa fel får bättre diagnos. Inga nya behörigheter eller körberoenden, inga automatiska omförsök och ingen ändring av veckobackuper, donationer eller uppdateringskälla.
 
 ## Nyheter i 1.0.30
 

@@ -2,11 +2,13 @@
 (function(root){
 'use strict';
 const C=root.LasCore||(typeof require!=='undefined'?require('./core.js'):null);
+const H=root.LasHealth||(typeof require!=='undefined'?require('./health.js'):null);
 const ZERO_SWEEP={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,matched:0,inTarget:0,handled:0};
 class Engine {
  constructor(api,config,hooks={}){
   this.api=api;this.config=config;this.hooks=hooks;this.now=hooks.now||Date.now;
   this.pending=new Map();this.records=new Map();this.inflight=new Map();this.done=new Set();
+  this.failure=null;this.faultHolds=new Map();this.folderAccounts=new Map();this.incidentSerial=0;
   this.busy=false;this.sweeping=0;this.hold=false;this.fault='';this.epoch=0;
   /* Smart mapp-cache: tomma mappar och oförändrade mappar utan träffar hoppas
      över på under 1 ms i stället för att skannas om varje svep. */
@@ -63,7 +65,7 @@ class Engine {
  log(name,count=0,detail=''){this.hooks.log?.(name,count,detail);}
  debug(t){this.hooks.debug?.(t);}
  change(){this.hooks.change?.();}
- async persist(){try{await this.hooks.persist?.();}catch{this.stop('storage_error');throw new C.RuleError('storage_error');}}
+ async persist(detail={phase:'journal_before',called:false}){try{await this.hooks.persist?.();}catch{this.stop('storage_error',{...detail,reason:'storage_error'});throw new C.RuleError('storage_error');}}
  /* Bromsens gräns för en regel: {limit, median} eller null när den är avstängd. */
  brakeFor(rule){
   try{const b=this.hooks.brakeLimit?.(rule);return b&&Number.isFinite(b.limit)&&b.limit>0?b:null;}catch{return null;}
@@ -87,24 +89,66 @@ class Engine {
   if(dropped)this.persist().catch(()=>{});
   return dropped;
  }
- stop(code){this.fault=code;this.epoch++;this.log('error',0,'motor_stoppad code='+code);this.debug('motorn stoppad: '+code);this.change();}
+ healthState(){return {global:this.failure,holds:[...this.faultHolds.values()]};}
+ restoreHealth(raw){const state=H.cleanState(raw);this.failure=state.global;this.faultHolds=new Map(state.holds.map(x=>[x.scope+':'+(x.scope==='account'?x.accountId:x.folderId),x]));if(this.failure)this.fault=this.failure.code;}
+ async saveHealth(){
+  try{await this.hooks.persistHealth?.(this.healthState());}
+  catch{const called=this.failure?this.failure.called:false;this.fault='storage_error';this.epoch++;this.failure=this.issue('storage_error',{phase:'journal_confirmation',called,reason:'storage_error'});this.logIssue(this.failure);this.change();throw new C.RuleError('storage_error');}
+ }
+ issue(code,detail={}){
+  return H.cleanIssue({id:'incident-'+this.now()+'-'+(++this.incidentSerial),at:this.now(),scope:'global',phase:'unknown',reason:H.reasons.includes(code)?code:'api_error',called:null,accountId:'',folderId:'',source:'',target:'',ruleId:'',...detail,code:H.codes.includes(code)?code:'internal_error'});
+ }
+ logIssue(x){this.log('error',0,'incident='+x.id+' code='+x.code+' scope='+x.scope+' phase='+x.phase+' reason='+x.reason+' move_started='+(x.called===null?'unknown':x.called?'yes':'no'));}
+ stop(code,detail={}){
+  if(['storage_error','uncertain_move','invalid_storage'].includes(this.fault)&&!['storage_error','uncertain_move','invalid_storage'].includes(code))return;
+  this.fault=code;this.epoch++;this.failure=this.issue(code,detail);this.logIssue(this.failure);this.debug('motorn stoppad: '+code);this.change();this.saveHealth().catch(()=>{});
+ }
+ async step(phase,fn,context={}){
+  try{return await fn();}catch(error){
+   if(H.phases.includes(error?.phase))throw error;
+   const e=new C.RuleError(H.reasons.includes(error?.code)?error.code:'internal_error');
+   e.phase=phase;e.reason=H.reason(error);Object.assign(e,context);throw e;
+  }
+ }
+ rememberFolder(folder){if(folder?.id&&folder.accountId)this.folderAccounts.set(folder.id,folder.accountId);return folder;}
+ routeHeld(source,target,accountId=''){
+  const sourceAccount=accountId||this.folderAccounts.get(source),targetAccount=this.folderAccounts.get(target);
+  return this.faultHolds.has('folder:'+source)||this.faultHolds.has('folder:'+target)||!!sourceAccount&&this.faultHolds.has('account:'+sourceAccount)||!!targetAccount&&this.faultHolds.has('account:'+targetAccount);
+ }
+ async isolate(error,context={}){
+  // Only folder/account checks before messages.move are eligible. Display,
+  // storage and unknown operation state are always global.
+  if(this.fault||!['source_read','target_read','source_capabilities','target_capabilities','source_validate','target_validate','accounts_validate','folder_query'].includes(error?.phase))return false;
+  const folderId=error.folderId||'',accountId=error.accountId||this.folderAccounts.get(folderId)||'';
+  if(!folderId&&!accountId)return false;
+  const scope=accountId&&error.phase==='accounts_validate'?'account':'folder',key=scope+':'+(scope==='account'?accountId:folderId);
+  if(this.faultHolds.has(key))return true;
+  if(this.faultHolds.size>=100)return false;
+  const issue=this.issue('move_error',{...context,scope,phase:error.phase,reason:H.reason(error),called:false,accountId,folderId});
+  this.faultHolds.set(key,issue);this.logIssue(issue);await this.saveHealth();this.change();return true;
+ }
+
  enabled(){return !this.config.paused&&!this.fault&&!this.hold;}
- recordList(){return [...this.records.values()].map(r=>({...r}));}
+ recordList(){return this.untrustedWork!==undefined?structuredClone(this.untrustedWork):[...this.records.values()].map(r=>({...r}));}
  blocked(){const active=new Set([...this.pending.values()].map(j=>j.record.key));return [...this.records.values()].filter(r=>r.stage==='attempted'&&!active.has(r.key)).length;}
  withTimeout(promise,ms, onTimeout){
   let timer;
   return Promise.race([
    Promise.resolve(promise).finally(()=>clearTimeout(timer)),
-   new Promise((resolve,reject)=>{timer=setTimeout(()=>{if(typeof onTimeout==='function')resolve(onTimeout());else reject(new Error('timeout'));},ms);})
+   new Promise((resolve,reject)=>{timer=setTimeout(()=>{if(typeof onTimeout==='function')resolve(onTimeout());else reject(Object.assign(new Error('timeout'),{name:'TimeoutError'}));},ms);})
   ]);
  }
  async displayed(strict=false){
-  const ids=new Set(),tabs=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,strict?undefined:()=>[]);
-  const mailTabs=(tabs||[]).filter(tab=>['mail','messageDisplay'].includes(tab?.type));
+  return this.step('display_check',()=>this.readDisplayed(strict));
+ }
+ async readDisplayed(strict=false){
+  const ids=new Set(),tabs=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800);
+  if(!Array.isArray(tabs))throw new C.RuleError('display_error');
+  const mailTabs=tabs.filter(tab=>['mail','messageDisplay'].includes(tab?.type));
   await Promise.all(mailTabs.map(async tab=>{
    try{
-    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??400,strict?undefined:()=>[]);
-    const messages=Array.isArray(raw)?raw:Array.isArray(raw?.messages)?raw.messages:raw==null?[]:null;
+    const raw=await this.withTimeout(this.api.messageDisplay.getDisplayedMessages(tab.id),this.hooks.displayTimeout??400);
+    const messages=Array.isArray(raw)?raw:Array.isArray(raw?.messages)?raw.messages:null;
     if(!messages)throw new C.RuleError('display_error');
     for(const m of messages){
      if(Number.isSafeInteger(m?.id))ids.add(m.id);
@@ -116,16 +160,23 @@ class Engine {
    }catch(error){
     // En flik kan ha stängts mellan listning och kontroll. Bara en bekräftat
     // försvunnen flik får ignoreras; övriga fel stoppar bevakningen.
-    const current=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800,strict?undefined:()=>[]);
-    if((current||[]).some(t=>t.id===tab.id))throw error;
+    const current=await this.withTimeout(this.api.tabs.query({}),this.hooks.displayTimeout??800);
+    if(!Array.isArray(current)||current.some(t=>t.id===tab.id))throw error;
    }
   }));
   return ids;
  }
  async pair(rule){return this.pairFolders(rule.source,rule.target);}
  async pairFolders(sourceId,targetId){
-  const [source,target]=await this.withTimeout(Promise.all([this.api.folders.get(sourceId,false),this.api.folders.get(targetId,false)]),5000);
-  const [sc,tc]=await this.withTimeout(Promise.all([this.api.folders.getFolderCapabilities(sourceId),this.api.folders.getFolderCapabilities(targetId)]),5000);
+  const get=(id,phase)=>this.step(phase,async()=>this.rememberFolder(await this.withTimeout(this.api.folders.get(id,false),5000)),{folderId:id});
+  const [source,target]=await Promise.all([get(sourceId,'source_read'),get(targetId,'target_read')]);
+  const verify=(folder,id,phase)=>this.step(phase,async()=>{if(!C.usableFolder(folder))throw new C.RuleError('unsafe_folder');},{folderId:id,accountId:folder?.accountId||''});
+  await verify(source,sourceId,'source_validate');await verify(target,targetId,'target_validate');
+  const cap=(folder,phase,key)=>this.step(phase,async()=>{
+   const value=await this.withTimeout(this.api.folders.getFolderCapabilities(folder.id),5000);
+   if(value?.[key]!==true)throw new C.RuleError('read_only');return value;
+  },{folderId:folder.id,accountId:folder.accountId});
+  const [sc,tc]=await Promise.all([cap(source,'source_capabilities','canDeleteMessages'),cap(target,'target_capabilities','canAddMessages')]);
   C.validatePair(source,target,sc,tc);return {source,target};
  }
  async validateRuleFolders(rule){
@@ -137,7 +188,7 @@ class Engine {
  }
  makeRecord(m,rule,target,source=null,notify=false){
   const key=C.fingerprint(m);if(!key||!Number.isFinite(+new Date(m.date))||!Number.isSafeInteger(m.size))return null;
-  return {key,headerMessageId:m.headerMessageId,date:+new Date(m.date),size:m.size,source:source||(rule.scope==='account'?m.folder?.id:rule.source),target,ruleId:rule.id,notify:notify===true,
+  return {key,headerMessageId:m.headerMessageId,date:+new Date(m.date),size:m.size,sourceAccount:m.folder?.accountId||'',source:source||(rule.scope==='account'?m.folder?.id:rule.source),target,ruleId:rule.id,notify:notify===true,
    unread:m.read!==true,rulesVersion:this.config.rulesVersion,stage:'pending',created:this.now()};
  }
  jobIdentity(message,record){
@@ -252,8 +303,11 @@ class Engine {
   this.stats.checks++;
   const rule=candidateRule;if(!rule){this.debug('kö avvisad id='+message.id+' ingen regel matchar avsendar doman='+((C.email(message.author)||'').split('@')[1]||'okand'));return false;}
   const notify=forced?.notify===true||['both','unread'].includes(rule.readFilter);
-  const target=forced?forced.target:await this.resolveTarget(rule,message);
+  if(this.routeHeld(message.folder.id,C.targetFor(rule,message),message.folder.accountId))return false;
+  const target=forced?forced.target:await this.step('target_resolve',()=>this.resolveTarget(rule,message));
   if(!target||target===message.folder.id){this.debug('kö avvisad id='+message.id+' mejlet ligger redan i målmappen');return false;}
+  this.rememberFolder(message.folder);
+  if(this.routeHeld(message.folder.id,target,message.folder.accountId))return false;
   const record=this.makeRecord(message,rule,target,forced?message.folder.id:null,notify);
   if(record)record.fromSweep=forced?.fromSweep===true;
   if(!record){this.log('skipped',1);this.debug('kö avvisad id='+message.id+' saknar fingeravtryck (Message-ID/datum/storlek)');return false;}
@@ -276,18 +330,9 @@ class Engine {
   await this.persist();this.change();
  }
  async clearBlocked(){
-  if(this.inflight.size||this.busy)throw new C.RuleError('operation_running');
+  if(this.inflight.size||this.busy||this.sweeping)throw new C.RuleError('operation_running');
   for(const [key,r] of this.records)if(r.stage==='attempted'){this.done.add(key);this.records.delete(key);}
-  this.trimDone();this.fault='';await this.persist();this.change();if(this.pending.size)this.hooks.kick?.();
- }
- async findByHeader(folderId,headerMessageId){
-  if(!folderId||!headerMessageId)return null;
-  let page=null;
-  try{
-   page=await this.withTimeout(this.api.messages.query({folderId,headerMessageId}),5000);
-   return (page?.messages||[])[0]||null;
-  }catch{return null;}
-  finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
+  this.untrustedWork=undefined;this.trimDone();this.fault='';this.failure=null;this.faultHolds.clear();this.invalidateFolders();await this.persist();await this.saveHealth();this.change();if(this.pending.size)this.hooks.kick?.();
  }
  async confirmMove(id,op,after=null){
   if(op.confirmed)return true;
@@ -300,40 +345,31 @@ class Engine {
       stället för att öppna ett id som redan lämnat källmappen (tom ruta). */
    Promise.resolve(this.hooks.notify?.(Number.isSafeInteger(after?.id)?after.id:null,op.record.ruleId,op.record.target||'',op.record.headerMessageId||'',op.record.source||'',op.record.date,op.record.fromSweep===true)).catch(()=>this.log('error',0,'oppna_mejl_misslyckades'));
   }
-  op.resolve(true);await this.persist();this.change();return true;
+  op.resolve(true);await this.persist({phase:'journal_confirmation',called:true});this.change();return true;
  }
  async verifyMoved(job,op){
   if(op.confirmed)return true;
-  const inTarget=await this.findByHeader(job.record.target,job.record.headerMessageId);
-  if(inTarget){
-   this.debug('flytt bekraftad via malmapp id='+job.id);
-   return this.confirmMove(job.id,op,inTarget);
-  }
-  const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
-  let stillById=false;
-  try{const cur=await this.withTimeout(this.api.messages.get(job.id),4000);if(cur&&cur.folder?.id===job.record.source)stillById=true;}catch{}
-  if(!inSource&&!stillById){
-   this.debug('flytt bekraftad via kallmapp id='+job.id);
-   return this.confirmMove(job.id,op,null);
-  }
+  const probe=async folderId=>{
+   let page;
+   try{page=await this.withTimeout(this.api.messages.query({folderId,headerMessageId:job.record.headerMessageId}),5000);if(page?.id||!Array.isArray(page?.messages))return null;return page.messages;}
+   catch{return null;}finally{if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});}
+  };
+  const target=await probe(job.record.target),source=await probe(job.record.source);
+  if(target?.length===1&&source?.length===0&&target[0].folder?.id===job.record.target&&target[0].headerMessageId===job.record.headerMessageId&&+new Date(target[0].date)===job.record.date)return this.confirmMove(job.id,op,target[0]);
   return false;
  }
  async restore(rows){
-  if(!Array.isArray(rows))return;
+  if(rows===undefined)return;
+  if(!Array.isArray(rows)){this.untrustedWork=structuredClone(rows);this.stop('invalid_storage',{phase:'restore_attempted',called:null,reason:'invalid_storage'});return;}
+  if(rows.length>C.LIMITS.queue||rows.some(r=>r?.stage==='attempted'&&(typeof r.headerMessageId!=='string'||!r.headerMessageId||r.headerMessageId.length>4096||!Number.isFinite(r.date)||!Number.isSafeInteger(r.size)||typeof r.source!=='string'||typeof r.target!=='string'||typeof r.ruleId!=='string'||!Number.isFinite(r.created)||r.key!==JSON.stringify([r.headerMessageId,r.date,r.size])))){this.untrustedWork=structuredClone(rows);this.stop('invalid_storage',{phase:'restore_attempted',called:null,reason:'invalid_storage'});return;}
   for(const raw of rows.slice(0,C.LIMITS.queue)){
    if(!raw||typeof raw.key!=='string'||typeof raw.headerMessageId!=='string'||raw.headerMessageId.length>4096||!raw.headerMessageId||
      !Number.isFinite(raw.date)||!Number.isSafeInteger(raw.size)||typeof raw.source!=='string'||typeof raw.target!=='string'||
      !['pending','attempted'].includes(raw.stage)||typeof raw.ruleId!=='string'||!Number.isFinite(raw.created))continue;
    const r={key:raw.key,headerMessageId:raw.headerMessageId,date:raw.date,size:raw.size,source:raw.source,target:raw.target,
-    ruleId:raw.ruleId,rulesVersion:raw.rulesVersion,stage:raw.stage,created:raw.created,unread:raw.unread===true||raw.notify===true,openedBefore:raw.openedBefore===true,fromSweep:raw.fromSweep===true};
+    sourceAccount:typeof raw.sourceAccount==='string'?raw.sourceAccount:'',ruleId:raw.ruleId,rulesVersion:raw.rulesVersion,stage:raw.stage,created:raw.created,unread:raw.unread===true||raw.notify===true,openedBefore:raw.openedBefore===true,fromSweep:raw.fromSweep===true};
    if(r.key!==JSON.stringify([r.headerMessageId,r.date,r.size]))continue;
-   if(r.stage==='attempted'){
-    const inTarget=await this.findByHeader(r.target,r.headerMessageId);
-    const inSource=await this.findByHeader(r.source,r.headerMessageId);
-    if(inTarget&&!inSource){this.done.add(r.key);if(C.fingerprint(inTarget))this.done.add(C.fingerprint(inTarget));this.debug('aterstalld sparr lost: mejlet finns i malmappen');continue;}
-    if(!inTarget&&!inSource){this.done.add(r.key);this.debug('aterstalld sparr lost: mejlet finns inte kvar i kallmappen');continue;}
-    this.records.set(r.key,r);continue;
-   }
+   if(r.stage==='attempted'){this.records.set(r.key,r);continue;}
    if(r.rulesVersion!==this.config.rulesVersion||this.now()-r.created>7*86400000)continue;
    const notify=raw.notify===true;
    let page;
@@ -352,18 +388,30 @@ class Engine {
     r.notify=notify;this.records.set(r.key,r);this.pending.set(m.id,{id:m.id,record:r,persisted:true,hiddenSince:null});
    }catch{this.log('error');}
   }
-  if(this.blocked())this.fault='uncertain_move';
+  if(this.blocked()&&!['uncertain_move','storage_error','invalid_storage'].includes(this.fault))this.stop('uncertain_move',{phase:'restore_attempted',called:null,reason:'not_confirmed'});
   await this.persist();this.log('restored',this.pending.size);this.change();if(this.pending.size)this.hooks.kick?.();
  }
  /* Regelns kontomappar. Målmapparna (grundmål och fördelningar) utesluts för
     svep; diagnosen tar med dem för att kunna förklara var mejlen ligger. */
- async ruleFolders(rule,{excludeTargets=true}={}){
-  const accounts=await this.api.accounts.list(true);
+ async ruleFolders(rule,{excludeTargets=true,isolateMissing=false}={}){
+  const accounts=await this.step('accounts_read',()=>this.withTimeout(this.api.accounts.list(true),5000));
+  const remember=f=>{if(!f)return;this.rememberFolder(f);for(const child of f.subFolders||[])remember(child);};
+  for(const a of accounts){remember(a.rootFolder);for(const f of a.folders||[])remember(f);}
   let selected;
-  if(rule.scope==='account')selected=C.accountIds(rule).map(id=>accounts.find(a=>a.id===id));
-  else{const src=await this.api.folders.get(rule.source,false);selected=[accounts.find(a=>a.id===src?.accountId)];}
+  if(rule.scope==='account'){
+   selected=[];
+   for(const id of C.accountIds(rule)){
+    if(excludeTargets&&this.faultHolds.has('account:'+id))continue;
+    const account=accounts.find(a=>a.id===id);
+    if(account){selected.push(account);continue;}
+    const error=Object.assign(new C.RuleError('unsafe_folder'),{phase:'accounts_validate',reason:'missing_account',accountId:id});
+    if(isolateMissing&&await this.isolate(error,{ruleId:rule.id,source:rule.source,target:rule.target}))continue;
+    throw error;
+   }
+  }
+  else{const src=await this.step('source_read',async()=>this.rememberFolder(await this.withTimeout(this.api.folders.get(rule.source,false),5000)),{folderId:rule.source});selected=[accounts.find(a=>a.id===src?.accountId)];}
   // Missing selected accounts are an error, never permission to scan a substitute.
-  if(!selected.length||selected.some(a=>!a))throw new C.RuleError('unsafe_folder');
+  if(selected.some(a=>!a))throw new C.RuleError('unsafe_folder');
   const excluded=excludeTargets?new Set([rule.target,...(rule.branches||[]).map(b=>b.target)]):new Set();
   const folders=[],seen=new Set();
   const walk=f=>{if(!f||seen.has(f.id))return;seen.add(f.id);if(C.usableFolder(f)&&!excluded.has(f.id))folders.push(f);for(const c of f.subFolders||[])walk(c);};
@@ -414,7 +462,7 @@ class Engine {
       out.wouldMove++;example(m,'move');
      }
      if(!page.id||out.scanned>=C.LIMITS.diagnose)break;
-     page=await this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000);
+     page=await this.step('folder_query',()=>this.withTimeout(this.api.messages.continueList(page.id),this.hooks.queryTimeout??10000),{folderId:folder.id,accountId:folder.accountId});
     }
    }catch(error){
     out.skippedFolders++;this.log('error',0,'diagnos_query_failed');
@@ -427,7 +475,11 @@ class Engine {
   this.debug('diagnos regel '+rule.id+': mappar='+out.folders+' skannade='+out.scanned+' matchade='+out.matched+' med_eller='+out.anyMatched+' utan_traff='+out.unmatched+' flyttbara='+out.wouldMove+' olasta='+out.waitingUnread+' i_mal='+out.alreadyInTarget+' klara='+out.alreadyQueued);
   return out;
  }
- async sweepRule(rule,{includeInboxUnread=false,force=false}={}){
+ async sweepRule(rule,options={}){
+  try{return await this.sweepRuleChecked(rule,options);}
+  catch(error){if(await this.isolate(error,{ruleId:rule?.id||'',source:rule?.source||'',target:rule?.target||''}))return {...ZERO_SWEEP,isolated:true};throw error;}
+ }
+ async sweepRuleChecked(rule,{includeInboxUnread=false,force=false}={}){
   if(!this.enabled())throw new C.RuleError('paused');
   if(!rule||!rule.enabled)throw new C.RuleError('disabled');
   this.sweeping++;
@@ -435,12 +487,14 @@ class Engine {
    const trial=this.trialActive(rule);
    const rf=this.ruleMode(rule);
    const direct=rf==='both'||rf==='unread'||(rf==='default'&&this.config.moveMode==='direct');
-   const {account,excluded,folders}=await this.ruleFolders(rule);
+   if(this.routeHeld(rule.scope==='account'?'':rule.source,rule.target))return {...ZERO_SWEEP,isolated:true};
+   const {excluded,folders}=await this.ruleFolders(rule,{isolateMissing:true});
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
    const brake=trial?null:this.brakeFor(rule);
    let wouldQueue=0,tripped=false,trialNew=0;
    foldersLoop:for(const folder of folders){
     if(!this.enabled())break;
+    if(this.routeHeld(folder.id,rule.target,folder.accountId))continue;
     const isInbox=this.inboxFolder(folder);
     const folderDirect=rf==='read'?false:rf==='both'||rf==='unread'?true:(direct||(includeInboxUnread&&this.config.newInboxDirect&&isInbox));
     // Mapp-cachen: hoppa över tomma mappar och mappar som är oförändrade sedan
@@ -464,7 +518,7 @@ class Engine {
     else if(!folderDirect)q.unread=false;
     let page=null,finished=false;
     try{
-     page=await this.withTimeout(this.api.messages.query(q),this.hooks.queryTimeout??10000);searchedFolders++;
+     page=await this.step('folder_query',()=>this.withTimeout(this.api.messages.query(q),this.hooks.queryTimeout??10000),{folderId:folder.id,accountId:folder.accountId});searchedFolders++;
      for(;;){
       for(const m of page.messages||[]){
        if(!this.enabled())break;
@@ -477,7 +531,7 @@ class Engine {
        /* Redan i målmappen eller i sin årsmapp: räkna som klar utan att ens slå upp målet. */
        if(this.sameTarget(rule,m)){inTarget++;continue;}
        /* Provkörning får inte skapa årsmappar: ett test ska inte lämna spår. */
-       const target=trial?(await this.resolveTarget(rule,m,{create:false}))||C.targetFor(rule,m):await this.resolveTarget(rule,m);
+       const target=await this.step('target_resolve',async()=>trial?(await this.resolveTarget(rule,m,{create:false}))||C.targetFor(rule,m):await this.resolveTarget(rule,m));
        if(!target)continue;
        if(target===m.folder.id){inTarget++;continue;}
        /* Provkörning: räkna mejlet och gå vidare. Inget köas, inget flyttas,
@@ -519,15 +573,16 @@ class Engine {
      }
      finished=true;
     }catch(error){
-     // En enskild IMAP-/nyhetsmapp kan vara frånkopplad eller sakna lokal
-     // databas. Hoppa över just den mappen i stället för att stoppa kontot.
-     skippedFolders++;this.log('error',0,'svep_query_failed folder_index='+(searchedFolders+skippedFolders));
+     // Only a failed folder query is safe to isolate here. Storage, target
+     // resolution and unknown errors must propagate to the global stop.
+     if(error.phase!=='folder_query'||!await this.isolate(error,{ruleId:rule.id,source:folder.id,target:rule.target}))throw error;
+     skippedFolders++;
     }finally{
      if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});
      if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true,rulesVersion:this.config.rulesVersion});
     }
    }
-   if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders===0)throw new C.RuleError('sweep_error');
+   if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders+skippedFolders===0)throw new C.RuleError('sweep_error');
    if(tripped)return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue,held:true};
    if(trial){
     const trialTotal=this.trialCount(rule.id);
@@ -554,7 +609,7 @@ class Engine {
     /* Ett avslutat svep blir regelns normalnivå – det är den bromsen jämför mot. */
     try{this.hooks.ruleDone?.(rule,r);}catch{}
     scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
-   catch(error){const code=error?.code||error?.name||'Error';this.debug('svep_regel_misslyckades error_code='+code);this.log('error',0,'svep av regel misslyckades ('+code+') – kontrollera att regelns käll- och målmappar finns kvar och går att skriva i');throw new C.RuleError('sweep_error');}
+   catch(error){if(!this.fault)this.stop('sweep_error',{phase:error.phase||'unknown',reason:H.reason(error),called:false,ruleId:rule.id});throw new C.RuleError('sweep_error');}
   }
   return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,heldRules,trialRules,held};
  }
@@ -602,7 +657,7 @@ class Engine {
     if(!direct&&this.now()-job.hiddenSince<2000)continue;
     await this.process(job,epoch,batchState);
    }
-  }catch{this.stop('display_error');}
+  }catch(error){if(!this.fault)this.stop('display_error',{phase:error.phase||'display_check',reason:H.reason(error),called:false});}
   finally{
    this.busy=false;this.change();
    if(this.enabled()&&this.pending.size){
@@ -620,9 +675,11 @@ class Engine {
  async process(job,epoch,batchState=null){
   /* Jobbet kan ha släppts av säkerhetsbromsen efter att ticken tog sin lista. */
   if(this.pending.get(job.id)!==job||job.record.stage!=='pending')return;
-  let called=false,op=null;
+  let called=false,op=null,phase='message_read';
   try{
-   let m;try{m=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet finns inte langre');await this.dropId(job.id);return;}
+   if(this.routeHeld(job.record.source,job.record.target,job.record.sourceAccount)){await this.dropId(job.id);return;}
+   const m=await this.withTimeout(this.api.messages.get(job.id),5000);
+   phase='target_resolve';
    const rule=this.config.rules.find(r=>r.id===job.record.ruleId);
    const rf=this.ruleMode(rule);
    const allowUnread=job.record.notify||rf==='both'||rf==='unread'||this.config.moveMode==='direct';
@@ -632,17 +689,10 @@ class Engine {
    // för svep från undermappar, fördelningsmål och flyttar mellan konton.
    const pairKey=job.record.source+'\0'+job.record.target;
    if(!batchState?.pairs.has(pairKey)){
-    try{
-     await this.pairFolders(job.record.source,job.record.target);
-     batchState?.pairs.set(pairKey,true);
-    }catch(err){
-     if(this.hooks.ackTimeout===undefined||job.record.source!==rule.source){
-      this.debug('jobb '+job.id+' slappt: mappen tillater inte flytt');
-      await this.dropId(job.id);return;
-     }
-     throw err;
-    }
+    await this.pairFolders(job.record.source,job.record.target);batchState?.pairs.set(pairKey,true);
    }
+   if(this.routeHeld(job.record.source,job.record.target,m.folder?.accountId)){await this.dropId(job.id);return;}
+   phase='window_check';
    if(!this.enabled()||epoch!==this.epoch)return;
    job.waitingWindow=false;
    // A window opened by SortBro protects its message even if another rule would
@@ -651,9 +701,9 @@ class Engine {
    const before=job.record.unread&&rule.openTiming==='before'&&(rule.unreadAction==='window'||((rule.unreadAction||'default')==='default'&&this.config.openWindow!==false));
    if(before&&this.trialActive(rule)){await this.dropId(job.id);return;}
    if(before&&!this.config.dryRun){
-    if(!job.record.openedBefore){job.record.openedBefore=true;job.hiddenSince=null;await this.persist();}
+    if(!job.record.openedBefore){job.record.openedBefore=true;job.hiddenSince=null;phase='journal_before';await this.persist();}
     if(!this.enabled()||epoch!==this.epoch)return;
-    if(!this.hooks.beforeMove||!await this.hooks.beforeMove(m,job.record)){job.waitingWindow=true;return;}
+    if(!this.hooks.beforeMove||!await this.step('reader_receipt',()=>this.hooks.beforeMove(m,job.record))){job.waitingWindow=true;return;}
     if((await this.displayed(true)).has(job.id)){job.hiddenSince=null;job.waitingWindow=true;return;}
     if(job.hiddenSince===null){job.hiddenSince=this.now();job.waitingWindow=true;return;}
     if(this.now()-job.hiddenSince<2000){job.waitingWindow=true;return;}
@@ -665,9 +715,9 @@ class Engine {
     this.pending.delete(job.id);this.records.delete(job.record.key);this.done.add(job.record.key);this.trimDone();
     await this.persist();this.stats.simulated++;this.log('simulated',1);return;
    }
-   let latest;try{latest=await this.withTimeout(this.api.messages.get(job.id),5000);}catch{this.debug('jobb '+job.id+' slappt: meddelandet forsvann fore flytt');await this.dropId(job.id);return;}
+   phase='message_recheck';const latest=await this.withTimeout(this.api.messages.get(job.id),5000);
    const visible=direct?new Set():before?await this.displayed(true):await this.currentDisplayed(batchState);
-   const expectedLatest=await this.resolveTarget(rule,latest,{create:false});
+   phase='target_resolve';const expectedLatest=await this.resolveTarget(rule,latest,{create:false});
    if(!this.enabled()||epoch!==this.epoch||(rf==='unread'&&latest.read===true&&!job.record.openedBefore)||(latest.read!==true&&!allowUnread)||latest.folder?.id!==job.record.source||
       !this.jobIdentity(latest,job.record)||(!direct&&visible.has(job.id))||!C.match(rule,latest,false,true)||expectedLatest!==job.record.target){
     if(job.record.rulesVersion===this.config.rulesVersion){this.debug('jobb '+job.id+' vantar: last/visas/utanfor kalla just nu');job.record.stage='pending';job.hiddenSince=null;}
@@ -675,12 +725,13 @@ class Engine {
     await this.persist();return;
    }
    // Journalen skrivs FÖRE flytt. Ett osäkert försök återupptas aldrig automatiskt.
-   job.record.stage='attempted';await this.persist();
+   phase='journal_attempt';job.record.stage='attempted';await this.persist({phase:'journal_attempt',called:false});phase='final_gate';
    if(!this.enabled()||epoch!==this.epoch||job.record.rulesVersion!==this.config.rulesVersion||await this.hooks.windowOpen?.(latest)||(before&&(await this.displayed(true)).has(job.id))){job.record.stage='pending';job.hiddenSince=null;await this.persist();return;}
    let resolve;const ack=new Promise(r=>resolve=r);
    op={record:job.record,resolve,confirmed:false};this.inflight.set(job.id,op);
    this.done.add(job.record.key);this.trimDone();called=true;
-   await this.withTimeout(this.api.messages.move([job.id],job.record.target,{isUserAction:true}),20000);
+   phase='move_call';await this.withTimeout(this.api.messages.move([job.id],job.record.target,{isUserAction:true}),20000);
+   phase='move_receipt';
    if(!op.confirmed){
     const steps=this.hooks.ackTimeout!==undefined?[this.hooks.ackTimeout]:[1500,3000,5000,6000];
     for(const waitMs of steps){
@@ -690,30 +741,18 @@ class Engine {
     }
    }
    if(!op.confirmed){
-    if(this.hooks.ackTimeout===undefined){
-     const inTarget=await this.findByHeader(job.record.target,job.record.headerMessageId);
-     const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
-     if(inTarget){await this.confirmMove(job.id,op,inTarget);return;}
-     if(inSource){
-      this.debug('jobb '+job.id+' kvar i kallmapp: hoppar over enskilt meddelande');
-      this.pending.delete(job.id);this.inflight.delete(job.id);this.records.delete(job.record.key);this.stats.skipped++;await this.persist().catch(()=>{});return;
-     }
-    }
-    this.pending.delete(job.id);this.inflight.delete(job.id);this.stop('uncertain_move');
+    this.pending.delete(job.id);this.inflight.delete(job.id);
+    this.stop('uncertain_move',{phase,reason:'not_confirmed',called:true,ruleId:job.record.ruleId,source:job.record.source,target:job.record.target});
    }
-  }catch{
-   if(called&&op&&!op.confirmed){
-    const inTarget=await this.findByHeader(job.record.target,job.record.headerMessageId);
-    const inSource=await this.findByHeader(job.record.source,job.record.headerMessageId);
-    if(inTarget&&!inSource){await this.confirmMove(job.id,op,inTarget);return;}
-    if(!inTarget&&inSource&&this.hooks.ackTimeout===undefined){
-     this.log('error',0,'flyttfel men kvar i kallmapp: hoppar over enskilt meddelande');
-     this.pending.delete(job.id);this.inflight.delete(job.id);this.records.delete(job.record.key);this.stats.skipped++;await this.persist().catch(()=>{});return;
-    }
-   }
+  }catch(error){
    this.pending.delete(job.id);this.inflight.delete(job.id);
+   const context={ruleId:job.record.ruleId,source:job.record.source,target:job.record.target};
    if(!called){this.records.delete(job.record.key);await this.persist().catch(()=>{});}
-   if(!op?.confirmed)this.stop(called?'uncertain_move':'move_error');
+   if(!op?.confirmed){
+    if(this.fault==='storage_error')return;
+    if(!called&&await this.isolate(error,context))return;
+    this.stop(called?'uncertain_move':this.fault==='storage_error'?'storage_error':'move_error',{...context,phase:error.phase||phase,reason:H.reason(error),called});
+   }
   }finally{this.change();}
  }
  trimDone(){while(this.done.size>4096)this.done.delete(this.done.values().next().value);}

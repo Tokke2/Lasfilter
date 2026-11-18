@@ -6,6 +6,53 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  healthTitle:"Felsökning – endast läsning",
+  healthIntro:"Guiden visar sparade fel och föreslår kontroller. Den flyttar inga mejl, gör inga nya flyttförsök och rensar inga spärrar. Paus, återuppta eller omstart rensar inte heller spärrarna.",
+  healthGlobal:"Hela motorn är stoppad",
+  healthAccount:"Isolerat konto",
+  healthFolder:"Isolerad mapp",
+  healthIndependent:"Övriga oberoende mappar och konton kan fortsätta. Regler som använder den spärrade källan eller målet väntar.",
+  healthCalled:"Flytt-API anropat",
+  healthYes:"Ja – kontrollera både källa och mål. Starta inte om samma flytt på chans.",
+  healthNo:"Nej – detta fel inträffade före flyttanropet.",
+  healthUnknown:"Okänt – behandla flytten som osäker.",
+  healthPhase:"Steg",
+  healthReason:"Feltyp",
+  healthRoute:"Källa → mål",
+  healthCheckFolders:"Kontrollera i Thunderbird att kontot är anslutet och att käll- och målmapparna finns, går att öppna och tillåter flytt. Kontrollera sedan regelns kontoval och mål i SortBro.",
+  healthCheckReader:"Kontrollera att mejlet kan öppnas och läsas i Thunderbird. Stäng eventuella tomma SortBro-läsfönster. Guiden öppnar eller stänger inga mejlfönster åt dig.",
+  healthCheckStorage:"Kontrollera ledigt diskutrymme och att Thunderbird-profilen går att skriva till. Spara felloggen innan du ändrar något.",
+  healthCheckMove:"Jämför källa och mål manuellt i Thunderbird. Ett saknat kvitto betyder inte att flytten misslyckades. Gör inte om flytten innan du vet var mejlet finns.",
+  healthCheckOther:"Kontrollera Thunderbird och regeln. Kopiera felloggen under Aktivitet om orsaken fortfarande är oklar.",
+  healthFinish:"När du har kontrollerat orsaken kan du själv välja ”Rensa spärr och fortsätt” utanför guiden. Det kräver en separat bekräftelse och kan återuppta sortering. Osäkra flyttar ska kontrolleras först.",
+  healthConfirm:"Har du kontrollerat orsaken och eventuella osäkra flyttar i både källa och mål? Detta rensar alla felspärrar och osäkra flyttjournaler och återupptar bevakningen. Guiden har inte rättat felet. Fortsätta?",
+  healthLegacy:"Ingen detaljerad diagnos finns sparad för detta äldre fel.",
+  phase_unknown:"Okänt steg",
+  phase_message_read:"Läs meddelande",
+  phase_target_resolve:"Bestäm mål",
+  phase_source_read:"Läs källmapp",
+  phase_target_read:"Läs målmapp",
+  phase_source_capabilities:"Kontrollera källans rättigheter",
+  phase_target_capabilities:"Kontrollera målets rättigheter",
+  phase_source_validate:"Validera källmapp",
+  phase_target_validate:"Validera målmapp",
+  phase_accounts_read:"Läs kontolista",
+  phase_accounts_validate:"Kontrollera valda konton",
+  phase_folder_query:"Sök i mapp",
+  phase_display_check:"Kontrollera visade meddelanden",
+  phase_window_check:"Kontrollera öppna fönster",
+  phase_reader_identity:"Verifiera läsarens meddelande",
+  phase_reader_body:"Läs mejltext till läsfönster",
+  phase_reader_create:"Skapa läsfönster",
+  phase_reader_receipt:"Invänta visningskvitto",
+  phase_journal_before:"Spara journal före flytt",
+  phase_message_recheck:"Läs meddelande på nytt",
+  phase_journal_attempt:"Spara flyttavsikt",
+  phase_final_gate:"Sista säkerhetskontroll",
+  phase_move_call:"Anropa flytt-API",
+  phase_move_receipt:"Verifiera flyttkvitto",
+  phase_journal_confirmation:"Spara flyttkvitto",
+  phase_restore_attempted:"Återställ osäker journal",
   sourceAccountsLabel:"Konton som regeln ska läsa",
   sourceAccountsHelp:"Markera ett eller flera konton. Alla valda konton använder samma villkor och gemensamma målmapp. Flytten kan ske mellan konton. Målmappen och övriga regler ändras inte när du kryssar i ett konto.",
   sourceAccountMissing:"Saknat konto: {id} – välj bort det eller återanslut kontot.",
@@ -832,7 +879,7 @@ const I18N={
    already_read:'Meddelandet är redan läst och regeln gäller endast olästa mejl.',
    no_match:'Ingen aktiv regel matchar det markerade meddelandet.',
    operation_running:'En flytt pågår. Vänta tills Thunderbird har svarat.',
-   uncertain_move:'Ett flyttförsök fick osäkert svar. Klicka på "Rensa spärr och fortsätt" (eller under Inställningar) för att återuppta bevakningen.',
+   uncertain_move:'Ett flyttförsök saknar säkert kvitto. Kontrollera både källa och mål i Thunderbird innan du överväger att rensa spärren.',
    log_save_failed:'Loggkopian kunde inte exporteras. Ingen reservkopia har sparats till en annan mapp. Försök igen och välj en skrivbar mapp.',
    log_save_unavailable:'Spara-dialogen är inte tillgänglig. Öppna SortBro i Thunderbird och försök igen.',
    storage_error:'Inställningarna kunde inte sparas. Motorn är stoppad i denna session.',
@@ -865,6 +912,53 @@ const I18N={
   }
  },
  en:{
+  healthTitle:"Troubleshooting – read only",
+  healthIntro:"This guide displays saved failures and suggests checks. It never moves mail, retries a move or clears locks. Pausing, resuming or restarting does not clear locks either.",
+  healthGlobal:"The entire engine is stopped",
+  healthAccount:"Isolated account",
+  healthFolder:"Isolated folder",
+  healthIndependent:"Other independent folders and accounts can continue. Rules using the locked source or destination wait.",
+  healthCalled:"Move API called",
+  healthYes:"Yes – check both source and destination. Do not retry the move on a guess.",
+  healthNo:"No – this failure occurred before the move call.",
+  healthUnknown:"Unknown – treat the move as uncertain.",
+  healthPhase:"Step",
+  healthReason:"Failure type",
+  healthRoute:"Source → destination",
+  healthCheckFolders:"In Thunderbird, check that the account is connected and both folders exist, can be opened and allow moves. Then check the rule’s selected accounts and destination in SortBro.",
+  healthCheckReader:"Check that the message opens and is readable in Thunderbird. Close any blank SortBro reader windows. This guide does not open or close message windows for you.",
+  healthCheckStorage:"Check free disk space and whether the Thunderbird profile is writable. Save the error log before changing anything.",
+  healthCheckMove:"Compare source and destination manually in Thunderbird. A missing receipt does not prove that the move failed. Do not repeat the move until you know where the message is.",
+  healthCheckOther:"Check Thunderbird and the rule. Copy the error log under Activity if the cause remains unclear.",
+  healthFinish:"After checking the cause, you can choose “Clear lock & resume” outside this guide. It requires separate confirmation and may resume sorting. Check uncertain moves first.",
+  healthConfirm:"Have you checked the cause and any uncertain moves in both source and destination? This clears all failure locks and uncertain move journals and resumes monitoring. The guide has not fixed the failure. Continue?",
+  healthLegacy:"No detailed diagnosis was saved for this older failure.",
+  phase_unknown:"Unknown step",
+  phase_message_read:"Read message",
+  phase_target_resolve:"Resolve destination",
+  phase_source_read:"Read source folder",
+  phase_target_read:"Read destination folder",
+  phase_source_capabilities:"Check source permissions",
+  phase_target_capabilities:"Check destination permissions",
+  phase_source_validate:"Validate source folder",
+  phase_target_validate:"Validate destination folder",
+  phase_accounts_read:"Read accounts",
+  phase_accounts_validate:"Check selected accounts",
+  phase_folder_query:"Query folder",
+  phase_display_check:"Check displayed messages",
+  phase_window_check:"Check open windows",
+  phase_reader_identity:"Verify reader message",
+  phase_reader_body:"Read message body for reader",
+  phase_reader_create:"Create reader window",
+  phase_reader_receipt:"Wait for display receipt",
+  phase_journal_before:"Save journal before move",
+  phase_message_recheck:"Recheck message",
+  phase_journal_attempt:"Save move intent",
+  phase_final_gate:"Final safety check",
+  phase_move_call:"Call move API",
+  phase_move_receipt:"Verify move receipt",
+  phase_journal_confirmation:"Save move receipt",
+  phase_restore_attempted:"Restore uncertain journal",
   sourceAccountsLabel:"Accounts this rule reads",
   sourceAccountsHelp:"Select one or more accounts. All selected accounts use the same conditions and a shared destination folder. Messages may move between accounts. Selecting an account does not change the destination or other rules.",
   sourceAccountMissing:"Missing account: {id} – deselect it or reconnect the account.",
@@ -1691,7 +1785,7 @@ const I18N={
    already_read:'The message is already read and this rule only moves unread mail.',
    no_match:'No active rule matches the selected message.',
    operation_running:'A move is currently in progress. Wait for Thunderbird to finish.',
-   uncertain_move:'A move attempt returned an uncertain status. Click "Clear lock & resume" (or under Settings) to resume monitoring.',
+   uncertain_move:'A move attempt has no reliable receipt. Check both source and destination in Thunderbird before considering clearing the lock.',
    log_save_failed:'The log copy could not be exported. No fallback copy was saved elsewhere. Try again and select a writable folder.',
    log_save_unavailable:'The save dialog is unavailable. Open SortBro in Thunderbird and try again.',
    storage_error:'Settings could not be saved. Engine is stopped for this session.',
@@ -1849,7 +1943,7 @@ function applyLanguage(lang){
  for(const select of document.querySelectorAll('#folderModal .folder-choice, #tbImportReview .folder-choice'))folderPicker(select,select.value);
  updateReadPolicy();updateMatchHelp();if(folderTreeSession)renderFolderTree();if(senderSession)renderSenderPreview();
  if($('editorTitle'))$('editorTitle').textContent=selectedId?T('editorEdit'):T('editorNew');
- if(state){applySeason(state.prefs);renderReaderPause();updateDonationView();}
+ if(state){applySeason(state.prefs);renderReaderPause();renderHealth();updateDonationView();}
  repaint();
 }
 
@@ -2406,8 +2500,35 @@ async function setReaderPause(mode){
 handle('readerPauseApply','click',()=>setReaderPause($('readerPauseDuration').value));
 handle('readerPauseResume','click',()=>setReaderPause('resume'));
 handle('readerPauseResumeNotice','click',()=>setReaderPause('resume'));
+function renderHealth(){
+ const panel=$('healthGuide'),body=$('healthIssues');if(!panel||!body)return;
+ const health=state.health||{global:null,holds:[]},issues=[health.global,...health.holds||[]].filter(Boolean);
+ panel.hidden=!issues.length&&!state.fault&&!state.blocked;body.replaceChildren();
+ const label=id=>folders.find(f=>f.id===id)?.label||id||'—';
+ for(const issue of issues){
+  const section=el('section','health-issue');
+  section.append(el('h3','',T(issue.scope==='global'?'healthGlobal':issue.scope==='account'?'healthAccount':'healthFolder')));
+  section.append(el('p','muted',new Date(issue.at).toLocaleString(locale())+' · '+issue.id));
+  if(issue.scope!=='global')section.append(el('p','',T('healthIndependent')));
+  if(issue.scope==='account')section.append(el('p','',folders.find(f=>f.accountId===issue.accountId)?.accountName||issue.accountId));
+  if(issue.folderId)section.append(el('p','',label(issue.folderId)));
+  section.append(el('p','',T('healthPhase')+': '+T('phase_'+issue.phase)+' ('+issue.phase+')'));
+  section.append(el('p','',T('healthReason')+': '+issue.reason+' · '+issue.code));
+  section.append(el('p','',T('healthCalled')+': '+T(issue.called===true?'healthYes':issue.called===false?'healthNo':'healthUnknown')));
+  if(issue.source||issue.target)section.append(el('p','',T('healthRoute')+': '+label(issue.source)+' → '+label(issue.target)));
+  const list=el('ol','');
+  const checks=[];
+  if(issue.called!==false)checks.push('healthCheckMove');
+  if(/journal/.test(issue.phase)||issue.code==='storage_error'||issue.code==='invalid_storage')checks.push('healthCheckStorage');
+  else if(/reader|display|window/.test(issue.phase))checks.push('healthCheckReader');
+  else if(/source|target|folder|account/.test(issue.phase))checks.push('healthCheckFolders');
+  else checks.push('healthCheckOther');
+  for(const key of checks)list.append(el('li','',T(key)));section.append(list);body.append(section);
+ }
+ if(!issues.length)body.append(el('p','',T('healthLegacy')),el('p','',T('healthCheckMove')));
+}
 function renderStatus(next){
- state=next;applyTheme(state.prefs);applySeason(state.prefs);renderReaderPause();
+ state=next;applyTheme(state.prefs);applySeason(state.prefs);renderReaderPause();renderHealth();
  const cfg=state.config,active=cfg.rules.filter(r=>r.enabled).length;
  $('navCount').textContent=cfg.rules.length;bumpCount('countRules',active);bumpCount('countQueue',state.queued);
  bumpCount('countMoved',state.stats.moved);bumpCount('countMatched',state.stats.matched);$('simulated').textContent=state.stats.simulated+' test';
@@ -2423,7 +2544,7 @@ function renderStatus(next){
  const setup=[cfg.rules.length>0,active>0,!cfg.dryRun&&!cfg.paused&&!state.fault];
  for(let i=0;i<3;i++){$('setup'+(i+1)).className='setup-step'+(setup[i]?' done':'')+(!setup[i]&&(i===0||setup[i-1])?' current':'');$('setup'+(i+1)).querySelector('b').textContent=setup[i]?'✓':String(i+1);}
  $('sweepNow').disabled=!!state.fault||cfg.paused||!rulesReady;$('sweepNow').textContent=state.queued?T('sweepQueueNow'):T('sweepRunNow');
- if($('clearFault'))$('clearFault').hidden=!state.fault&&!state.blocked;
+ if($('clearFault'))$('clearFault').hidden=!state.fault&&!state.blocked&&!state.health?.holds?.length;
  renderInstallWarning(state);
  renderBrakeWarns();
  $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?T('noticeStoppedPrefix')+Terr(state.fault)+T('noticeStoppedSuffix'):'';
@@ -3960,8 +4081,8 @@ handle('import','change',()=>handleRuleImport('import',false));
 if($('importSettings'))handle('importSettings','change',()=>handleRuleImport('importSettings',false));
 if($('importMerge'))handle('importMerge','change',()=>handleRuleImport('importMerge',true));
 if($('importMergeSettings'))handle('importMergeSettings','change',()=>handleRuleImport('importMergeSettings',true));
-handle('clearBlocked','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
-if($('clearFault'))handle('clearFault','click',async()=>{renderStatus(await rpc('clearBlocked'));toast(T('toastCleared'));});
+handle('clearBlocked','click',async()=>{if(!confirm(T('healthConfirm')))return;renderStatus(await rpc('clearBlocked',{confirmed:true}));toast(T('toastCleared'));});
+if($('clearFault'))handle('clearFault','click',async()=>{if(!confirm(T('healthConfirm')))return;renderStatus(await rpc('clearBlocked',{confirmed:true}));toast(T('toastCleared'));});
 handle('theme','change',async()=>{state.prefs=await rpc('prefs',{prefs:{theme:$('theme').value}});applyTheme(state.prefs);});
 handle('introToggle','click',async()=>{state.prefs=await rpc('prefs',{prefs:{introCollapsed:!state.prefs.introCollapsed}});applyAppearance(state.prefs);});
 for(const id of ['density','lineSpacing'])handle(id,'change',async()=>{state.prefs=await rpc('prefs',{prefs:{[id]:$(id).value}});applyAppearance(state.prefs);});

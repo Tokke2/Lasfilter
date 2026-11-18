@@ -1298,6 +1298,33 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(!el('folderTreeModal').hidden&&el('folderTreeChoose').disabled&&el('target').value==='tree-other','försvunnen mapp stoppas vid bekräftelsen utan automatisk ersättare');
  el('folderTreeCancel').click();w.eval('folders.push(removedTreeFolder);delete globalThis.removedTreeFolder;dirty=false;');
 
+ /* Read-only incident guide: render/toggle/language changes perform no RPC. */
+ const healthBefore=structuredClone(w.LasDemo.setState({}));
+ const healthIssue={id:'incident-1000-1',at:1000,scope:'folder',phase:'target_capabilities',reason:'read_only',code:'move_error',called:false,accountId:'a',folderId:'target-x',source:'source-x',target:'target-x',ruleId:'r1'};
+ w.LasDemo.setState({health:{global:null,holds:[healthIssue]},fault:'',blocked:0});await w.refresh();
+ check(!el('healthGuide').hidden&&!el('clearFault').hidden,'isolerad mapp visar guide och separat manuell rensning');
+ check(/flyttar inga mejl/.test(doc.querySelector('[data-i18n=healthIntro]').textContent),'guidens skrivskydd förklaras även före första språkbytet');
+ check(/separat bekräftelse/.test(doc.querySelector('[data-i18n=healthFinish]').textContent),'guiden förklarar att rensning kräver separat beslut');
+ check(/target_capabilities/.test(txt('healthIssues'))&&/Nej/.test(txt('healthIssues')),'guiden visar exakt steg och att flytt-API inte anropats');
+ check(/oberoende/.test(txt('healthIssues')),'guiden skiljer isolerat fel från globalt stopp');
+ const healthRequest=w.LasDemo.request;let healthCalls=[];w.LasDemo.request=async m=>{healthCalls.push(m.type);return healthRequest(m);};
+ const lockedState=JSON.stringify(w.LasDemo.setState({}));
+ el('healthGuide').open=true;w.renderHealth();w.applyLanguage('en');
+ check(/Troubleshooting/.test(el('healthGuide').textContent)&&/Move API called: No/.test(txt('healthIssues')),'öppen guide översätts till engelska');
+ check(el('healthGuide').open,'språkbyte behåller öppen guide');
+ check(el('healthGuide').querySelectorAll('button,a,input').length===0,'guiden har inga ändrande åtgärder');
+ check(healthCalls.length===0&&JSON.stringify(w.LasDemo.setState({}))===lockedState,'läsa och öppna guiden gör inga anrop eller ändringar');
+ w.confirm=()=>false;el('clearFault').click();await sleep(40);
+ check(!healthCalls.includes('clearBlocked')&&w.LasDemo.setState({}).health.holds.length===1,'nekad bekräftelse behåller alla spärrar');
+ w.LasDemo.setState({fault:'uncertain_move',blocked:1,health:{global:{...healthIssue,scope:'global',phase:'restore_attempted',called:null},holds:[]}});await w.refresh();
+ w.applyLanguage('en');check(/Unknown/.test(txt('healthIssues'))&&/entire engine/.test(txt('healthIssues')),'okänt flyttläge visas som globalt stopp, inte som misslyckad flytt');
+ w.LasDemo.setState({health:{global:{...healthIssue,scope:'global',phase:'move_call',called:true},holds:[]}});await w.refresh();
+ w.applyLanguage('en');check(/Move API called: Yes/.test(txt('healthIssues')),'anropad flytt visas tydligt med varning');
+ w.confirm=()=>true;el('clearFault').click();await until(()=>w.LasDemo.setState({}).health.global===null,'uttryckligen bekräftad rensning');
+ check(healthCalls.filter(x=>x==='clearBlocked').length===1,'endast den separata bekräftade knappen begär rensning');
+ w.LasDemo.request=healthRequest;w.LasDemo.setState(healthBefore);w.applyLanguage('sv');await w.refresh();
+ check(el('healthGuide').hidden,'guiden döljs när inga incidenter finns');
+
  /* Låt sista klickets löfteskedja bli klar innan fönstret rivs: annars kan en
     kvittentext skrivas efter stängningen och ge ett falskt skriptfel. */
  await sleep(400);

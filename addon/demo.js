@@ -13,7 +13,7 @@ globalThis.LasDemo=(()=>{
   prefs:{theme:'light',fontSize:14,density:'comfortable',lineSpacing:'normal',introCollapsed:false,lastRule:'demo-1',lang:'sv'},installType:'normal',
   paths:{root:'Lasfilter/',logs:'Lasfilter/logs/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'},
   brake:true,brakeHolds:[],lastBackupWeek:'2026-W42',cache:{on:true,at:0,day:''},trials:[],learn:{off:false,suggestions:[]},
-  moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
+  moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,health:{global:null,holds:[]},fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];let mockPrefill=null;
  /* Endast för förhandsvisningen: låt ett test byta en uppgift i demotillståndet. */
@@ -192,7 +192,7 @@ globalThis.LasDemo=(()=>{
    case 'learnOff':{state.learn={off:true,suggestions:[]};data=state;break;}
    case 'learnToggle':{const off=m.off===true;state.learn={off,suggestions:off?[]:(state.learn?.suggestions||[])};data=state;break;}
    case 'restoreBackup':if(!snapshots[m.index])throw new LasCore.RuleError('bad_request');saveRules(snapshots[m.index].rules);state.config.paused=true;state.config.dryRun=true;data=state;break;
-   case 'clearBlocked':data=state;break;
+   case 'clearBlocked':if(m.confirmed!==true)throw new LasCore.RuleError('bad_request');state.health={global:null,holds:[]};state.fault='';state.blocked=0;state.config.paused=false;data=state;break;
    case 'sweepNow':
     /* Samma svar som den riktiga bakgrunden: pausat läge kör ingenting, annars en liten fiktiv körning. */
     if(state.config.paused)data={scanned:0,queued:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0,deferred:0,skipped:'paused',fault:state.fault||''};

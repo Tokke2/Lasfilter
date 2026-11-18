@@ -25,6 +25,7 @@ App.applySeasonIcon=()=>{
  try{const season=App.season();if(App.seasonIcon===season)return;App.seasonIcon=season;B.browserAction.setIcon({path:App.seasonIconPath(season)}).catch(()=>{});}catch{}
 };
 App.write=fn=>{const p=App.writeChain.then(fn);App.writeChain=p.catch(()=>{});return p;};
+App.persistHealth=state=>App.write(()=>B.storage.local.set({health:state}));
 App.persistPending=null;
 App.persistWork=()=>{
  if(!App.persistPending){
@@ -649,7 +650,7 @@ App.quickRule=async(msg)=>{
    fallback can select the old copy or a duplicate and is deliberately not used. */
 App.mailWindows=new Map();App.beforeWindows=new Map();App.openingWindow=false;
 App.windowCall=(promise,ms=5000)=>{
- let timer;return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('display_timeout')),ms);})]).finally(()=>clearTimeout(timer));
+ let timer;return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('display_timeout'),{name:'TimeoutError'})),ms);})]).finally(()=>clearTimeout(timer));
 };
 App.windowClosed=id=>{
  const info=App.mailWindows.get(id);if(!info)return;
@@ -810,14 +811,18 @@ App.openSourceReader=async(message,record)=>{
   const current=await App.windowCall(B.messages.get(id));
   return current.folder?.id===folderId&&current.headerMessageId===headerMessageId&&+new Date(current.date)===date;
  };
- let token,entry,created,abandoned=false;
+ let token,entry,created,abandoned=false,phase='reader_identity';
+ App.readerFailure={phase,reason:'not_confirmed'};
  try{
   if(!await valid())return null;
+  phase='reader_body';App.readerFailure={phase,reason:'not_confirmed'};
   const content=App.readerParts(await App.windowCall(B.messages.getFull(id),15000));
+  phase='reader_identity';App.readerFailure={phase,reason:'not_confirmed'};
   if(!await valid())return null;
   if(App.readerPauseState().paused||pauseEpoch!==App.readerPauseEpoch)return {deferred:true};
   token=crypto.randomUUID();entry={tabId:null,ready:false,closed:false,data:{...content,subject:String(message.subject||'(utan ämne)'),author:String(message.author||''),date,lang:App.prefs.lang,fontSize:App.prefs.fontSize,theme:App.prefs.theme}};
   App.readers.set(token,entry);
+  phase='reader_create';App.readerFailure={phase,reason:'not_confirmed'};
   const opening=Promise.resolve(B.windows.create({url:B.runtime.getURL('reader.html')+'#'+token,type:'popup',width:900,height:760,allowScriptsToClose:true}));
   opening.then(async late=>{if(abandoned&&Number.isSafeInteger(late?.id))try{await B.windows.remove(late.id);}catch{}}).catch(()=>{});
   created=await App.windowCall(opening,10000);
@@ -825,6 +830,7 @@ App.openSourceReader=async(message,record)=>{
   if(!Number.isSafeInteger(tab?.id)||entry.tabId!==null&&entry.tabId!==tab.id)throw new Error('reader_tab');
   entry.tabId=tab.id;
   App.mailWindows.set(tab.id,{messageId:id,folderId,headerMessageId,beforeKey:record.key,readerToken:token});
+  phase='reader_receipt';App.readerFailure={phase,reason:'not_confirmed'};
   for(let i=0;i<80;i++){
    if(entry.ready&&await valid()){
     App.log('debug',0,'fore flytt: mejltext visad i SortBro-lasfonster; vantar pa stangning');return tab;
@@ -832,7 +838,7 @@ App.openSourceReader=async(message,record)=>{
    if(!await App.windowStillOpen(tab.id))break;
    await new Promise(r=>setTimeout(r,250));
   }
- }catch{abandoned=true;}
+ }catch(error){abandoned=true;App.readerFailure={phase,reason:typeof LasHealth!=='undefined'?LasHealth.reason(error):'api_error'};}
  if(Number.isSafeInteger(created?.id))try{await App.windowCall(B.windows.remove(created.id));if(entry?.tabId!==null)App.windowClosed(entry.tabId);}catch{}
  if(token)App.readers.delete(token);
  return null;
@@ -854,7 +860,7 @@ App.beforeMove=async(message,record)=>{
  try{
   const tab=await App.openSourceReader(message,record);
   if(tab?.deferred)return false;
-  if(!tab){App.engine?.stop('window_error');return false;}
+  if(!tab){App.engine?.stop('window_error',{...App.readerFailure,called:false,source:record.source||'',target:record.target||'',ruleId:record.ruleId||''});return false;}
   App.beforeWindows.set(record.key,{tabId:tab.id,confirmed:true,closed:!App.mailWindows.has(tab.id)});
   App.log('debug',0,'fore flytt: vantar tills mejlfonstret stangs');return false;
  }finally{App.openingWindow=false;}
@@ -913,7 +919,7 @@ App.selected=async()=>{
 App.snapshot=()=>{
  const e=App.engine;
  return {config:e.config,prefs:App.prefs,readerPause:App.readerPauseState(),stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
-   fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
+   health:e.healthState?.()||{global:null,holds:[]},fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
    enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,brake:e.config.brake!==false,
    brakeHolds:(e.heldList?.()||[]).map(h=>{const rule=e.config.rules.find(r=>r.id===h.ruleId);return {...h,name:rule?.name||h.ruleId,target:rule?.target||''};}),
@@ -1189,10 +1195,10 @@ App.handle=async msg=>{
   case 'setMode':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
    if(typeof msg.paused!=='boolean'||typeof msg.dryRun!=='boolean')throw new C.RuleError('bad_request');
-   if(e.blocked()&&!msg.paused)await e.clearBlocked();
+   // Pausing/resuming is never consent to discard an uncertain move.
    const changing=msg.dryRun!==e.config.dryRun;
    await App.save({...e.config,paused:msg.paused,dryRun:msg.dryRun,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(changing?1:0)},{discard:changing});
-   e.fault='';App.log('settings_saved');if(e.pending.size)App.kick();return App.snapshot();
+   App.log('settings_saved');if(e.pending.size)App.kick();return App.snapshot();
   });
   case 'export':{
    const folderHints=(await App.folderList().catch(()=>[])).map(f=>({id:f.id,accountId:f.accountId,accountName:f.accountName,name:f.name,label:f.label}));
@@ -1225,7 +1231,7 @@ App.handle=async msg=>{
    await App.save({...e.config,rules,paused:true,dryRun:true,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
    App.log('backup_restored',rules.length);return App.snapshot();
   });
-  case 'clearBlocked':return App.mutate(async()=>{await e.clearBlocked();await App.save({...e.config,paused:false,revision:e.config.revision+1});App.log('settings_saved');return App.snapshot();});
+  case 'clearBlocked':return App.mutate(async()=>{if(msg.confirmed!==true)throw new C.RuleError('bad_request');await e.clearBlocked();await App.save({...e.config,paused:false,revision:e.config.revision+1});App.log('settings_saved');return App.snapshot();});
   case 'prefs':return App.write(async()=>{
    const p=msg.prefs||{},next={...App.prefs};
    if(['system','light','dark'].includes(p.theme))next.theme=p.theme;
@@ -1292,7 +1298,7 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned','beforeReaderMigration','readerPauseUntil']);
+ const data=await B.storage.local.get(['config','work','health','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned','beforeReaderMigration','readerPauseUntil']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  if(typeof data.cacheDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(data.cacheDay))App.lastCacheDay=data.cacheDay;
@@ -1320,26 +1326,14 @@ App.ready=(async()=>{
  if(['sv','en'].includes(p.lang))App.prefs.lang=p.lang;
  if(['auto',...SEASONS].includes(p.season))App.prefs.season=p.season;
  App.applySeasonIcon();
- App.engine=new LasEngine(B,cfg,{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
+ App.engine=new LasEngine(B,cfg,{persist:App.persistWork,persistHealth:App.persistHealth,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
   notify:App.openUnread,beforeMove:App.beforeMove,windowOpen:App.windowOpen,brakeLimit:App.brakeLimit,ruleDone:App.brakeRecord});
+ try{App.engine.restoreHealth?.(data.health);}catch{fault='invalid_storage';}
  App.engine.trialRestore?.(data.trial);
  App.learned=App.cleanLearned(data.learned);
- let needResweep=false;
- if(fault){App.engine.fault=fault;App.log('error');}
- else{
-  const rawWork=Array.isArray(data.work)?data.work:[];
-  const staleAttempted=rawWork.filter(r=>r?.stage==='attempted');
-  const pendingWork=rawWork.filter(r=>r?.stage!=='attempted');
-  for(const r of staleAttempted.slice(0,15)){
-   if(r?.target&&r?.headerMessageId){
-    const inTarget=await App.engine.findByHeader(r.target,r.headerMessageId);
-    if(inTarget&&typeof r.key==='string'){App.engine.done.add(r.key);if(C.fingerprint(inTarget))App.engine.done.add(C.fingerprint(inTarget));}
-   }
-  }
-  if(staleAttempted.length)App.log('debug',staleAttempted.length,'tidigare flyttsparr rensad vid start');
-  if(pendingWork.length>20)needResweep=true;
-  await App.engine.restore(pendingWork.slice(0,20));
- }
+ if(fault){App.engine.stop(fault,{phase:'restore_attempted',called:null,reason:'invalid_storage'});App.engine.fault=fault;App.log('error');}
+ // Preserve uncertain work even if configuration or failure metadata is corrupt.
+ await App.engine.restore(data.work);
  await App.readTbVersion();
  await App.readSelfInfo();
  /* Senaste svepet från förra gången, så att starten vet om det är dags att ta igen något. */
@@ -1381,12 +1375,12 @@ App.ready=(async()=>{
  /* Ett svep vid varje start när bevakningen är på: direkt (800 ms) om svepet är på tiden
     efter en längre paus, annars lugnt efter tre sekunder så att kontona hinner svara. */
  if(App.engine.enabled()&&App.engine.config.rules.some(r=>r.enabled)){
-  const overdue=needResweep||App.sweepOverdue();
+  const overdue=App.sweepOverdue();
   setTimeout(()=>{if(App.engine?.enabled()&&!App.startSweepDone)App.startSweep().catch(()=>{});},overdue?800:3000);
   if(overdue)App.log('debug',0,'svepet ar forsenat sedan forra gangen - tar igen det direkt vid start');
  }
 })().catch(()=>{
- if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});
+ if(!App.engine)App.engine=new LasEngine(B,C.defaults(),{persist:App.persistWork,persistHealth:App.persistHealth,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);}});
  App.engine.stop('storage_error');
 });
 /* En sida som skickar ett ärende hit talar om vilken version dess kod har. Stämmer

@@ -101,13 +101,9 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(!el('qrModeCam'),'Swish har endast standardläget');
  check(el('donationPaypalLink').href==='https://paypal.me/Rickard3dPrint'&&el('donationKofiLink').href==='https://ko-fi.com/tokke2','fasta PayPal- och Ko-fi-knappar i donationsdialogen');
  check(w.eval('modalFocusItems($("donationModal")).includes($("donationPaypalLink"))&&modalFocusItems($("donationModal")).includes($("donationKofiLink"))'),'externa knappar ingår i dialogens tangentbordsfokus');
- for(const service of ['Paypal','Kofi']){
-  const toggle=el('donation'+service+'Toggle'),box=el('donation'+service+'Code');
-  check(box.hidden&&toggle.getAttribute('aria-expanded')==='false','QR börjar dold: '+service);
-  toggle.click();check(!box.hidden&&box.querySelector('svg')&&toggle.getAttribute('aria-expanded')==='true','QR visas lokalt: '+service);
-  const qr=box.firstElementChild;toggle.click();check(box.hidden&&toggle.getAttribute('aria-expanded')==='false','QR kan döljas: '+service);
-  toggle.click();check(box.firstElementChild===qr,'QR återanvänds utan nätverk: '+service);
- }
+ check(!el('donationPaypalToggle')&&!el('donationKofiToggle')&&!el('donationPaypalCode')&&!el('donationKofiCode'),'PayPal och Ko-fi saknar helt QR-kontroller');
+ check(el('donationModal').querySelectorAll('svg').length===1&&!!el('qrSvgWrap').querySelector('svg'),'endast Swish visar QR i dialogen');
+ check(/respektive knapp/.test(doc.querySelector('[data-i18n="donationExternal"]').textContent),'hjälptexten beskriver enbart knappar för PayPal och Ko-fi');
  check(/Swish/.test(doc.querySelector('.donation-amounts legend').textContent)&&/följer inte med/.test(doc.querySelector('[data-i18n="donationExternal"]').textContent),'beloppsväljaren gäller bara Swish');
  const donationFirst=el('beloppsrad').querySelector('button');
  el('donationClose').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
@@ -125,7 +121,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(!el('qrbox').hidden&&w.eval('currentSwishQrPayload()')==='C0721817177;75;SortBro;6','eget giltigt belopp visar ny QR');
  await w.refresh();check(el('donateCustomKr').value==='75'&&w.eval('currentSwishQrPayload()').includes(';75;'),'statusuppdatering behåller donationsbelopp');
  w.eval('applyLanguage("en");updateDonationView()');
- check(txt('donationPaypalLink')==='Open PayPal ↗'&&txt('donationKofiToggle')==='Hide QR code','externa knappar och QR-val översätts');
+ check(txt('donationPaypalLink')==='Open PayPal ↗'&&txt('donationKofiLink')==='Open Ko-fi ↗','externa knappar översätts utan QR-val');
  check(/calmer inbox/.test(doc.querySelector('.donation-tagline').textContent)&&txt('donationThanksTitle')==='Thank you for helping SortBro grow','ny rubrik och tacktext översätts i öppen dialog');
  check(txt('donationTitle')==='Support SortBro'&&txt('donateAmountInfo').includes('75 SEK')&&txt('donationClose')==='Close','donationsdialogen är översatt till engelska');
  w.eval('applyLanguage("sv");updateDonationView()');

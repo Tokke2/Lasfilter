@@ -2747,9 +2747,6 @@ h1, h2, h3, p, label, .notice { overflow-wrap: anywhere; }
 .donation-paypal .donation-link { background: linear-gradient(135deg, #086fb2, #064882); color: #fff; border-color: #086fb2; }
 .donation-kofi { border-top-color: #e76563; }
 .donation-kofi .donation-link { background: linear-gradient(135deg, #b83a4e, #953548); color: #fff; border-color: #b83a4e; }
-.donation-link-qr { margin-top: 16px; }
-.donation-link-qr svg { display: block; width: min(220px, 100%); height: auto; margin: auto; background: #fff; }
-.donation-camera { font-size: var(--text-small); margin-bottom: 0; }
 .donation-thanks { display: flex; align-items: center; gap: 16px; margin-top: 22px; padding: 20px; border-radius: 16px; background: linear-gradient(120deg, #20383d, #18392d); color: #fff; }
 .donation-thanks > span { color: #bde6c6; font-size: 2.4rem; }
 .donation-thanks h3 { margin: 0 0 6px; color: #fff; font-size: 1.1rem; }

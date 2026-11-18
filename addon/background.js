@@ -198,8 +198,8 @@ App.maybeWeeklyBackup=()=>{
    och när du vill, med knappen i Inställningar.
 
    Det som INTE rensas är medvetet: kön (pending), journalen (records), minnet av
-   redan hanterade mejl (done), provkörningens räknare (trialKeys) och
-   säkerhetsbromsens historik (brakeHistory). De är inte cache – de är minne som
+   redan hanterade mejl (done) och provkörningens räknare (trialKeys).
+   De är inte cache – de är minne som
    skyddar mot att samma mejl hanteras två gånger. */
 App.lastCacheDay='';
 App.lastCacheClear=0;
@@ -251,43 +251,9 @@ App.emptySweep={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0
 /* Senaste svepet sparas i lagringen, inte bara i minnet: efter en omstart ska SortBro veta
    om datorn varit avstängd länge och i så fall ta igen det direkt i stället för att vänta
    en hel timme. Tiden skrivs som ett litet tal, inget annat följer med. */
-/* Säkerhetsbromsens minne: hur många mejl en regel brukar flytta per svep.
-   Bara de tio senaste talen per regel sparas, inget annat. */
-App.brakeHistory={};
-App.brakeMedian=ruleId=>{
- const list=App.brakeHistory[ruleId]||[];
- if(!list.length)return 0;
- const sorted=[...list].sort((a,b)=>a-b);
- return sorted[Math.floor(sorted.length/2)];
-};
-/* Gränsen: tio gånger det vanliga, men aldrig under 50 mejl i ett svep. */
-App.brakeLimit=rule=>{
- if(App.engine?.config.brake===false)return null;
- const median=App.brakeMedian(rule.id);
- return {limit:median>0?Math.max(50,Math.ceil(median*10)):50,median};
-};
-App.saveBrakeHistory=()=>{
- clearTimeout(App.brakeTimer);
- App.brakeTimer=setTimeout(()=>{
-  const ids=new Set((App.engine?.config.rules||[]).map(r=>r.id));
-  const clean={};
-  for(const [id,list] of Object.entries(App.brakeHistory))if(ids.has(id)&&Array.isArray(list)&&list.length)clean[id]=list.slice(-10);
-  App.write(()=>B.storage.local.set({brake:clean})).catch(()=>{});
- },1200);
-};
-/* Ett avslutat svep utan broms blir regelns nya normalnivå. */
-App.brakeRecord=(rule,result)=>{
- /* Provkörning: resultatet är en räkning, inte en flytt. Den sparas som sådan och
-    får aldrig bli regelns normalnivå för säkerhetsbromsen. */
- if(result?.trial){
-  App.write(()=>B.storage.local.set({trial:App.engine.trialList()})).catch(()=>{});
-  return;
- }
- if(App.engine?.config.brake===false||result?.held)return;
- const n=Number(result?.wouldQueue);
- if(!Number.isFinite(n)||n<=0)return;
- App.brakeHistory[rule.id]=[...(App.brakeHistory[rule.id]||[]),n].slice(-10);
- App.saveBrakeHistory();
+/* Trial counters remain persistent; there is no count-based move brake. */
+App.recordSweep=(rule,result)=>{
+ if(result?.trial)App.write(()=>B.storage.local.set({trial:App.engine.trialList()})).catch(()=>{});
 };
 /* ── "Lär av din flytt" ────────────────────────────────────────────────────
    När du själv drar mejl till en mapp sparas bara domän, källmapp, målmapp och
@@ -921,8 +887,7 @@ App.snapshot=()=>{
  return {config:e.config,prefs:App.prefs,readerPause:App.readerPauseState(),stats:e.stats,queued:e.pending.size,blocked:e.blocked(),inflight:e.inflight.size,
    health:e.healthState?.()||{global:null,holds:[]},fault:e.fault,lastCheck:e.lastCheck,moveMode:e.config.moveMode,hourly:e.config.hourly,sweepMinutes:e.config.sweepMinutes,newInboxDirect:e.config.newInboxDirect,openWindow:e.config.openWindow,
    lastSweep:e.lastSweep||null,lastAutoSweep:App.lastAutoSweep,nextAutoSweep:e.config.hourly?((App.lastAutoSweep||e.lastSweep||Date.now())+e.config.sweepMinutes*60000):null,
-   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,brake:e.config.brake!==false,
-   brakeHolds:(e.heldList?.()||[]).map(h=>{const rule=e.config.rules.find(r=>r.id===h.ruleId);return {...h,name:rule?.name||h.ruleId,target:rule?.target||''};}),
+   enabledRules:e.config.rules.filter(r=>r.enabled).length,installType:App.selfInfo.installType,paths:App.paths,
    backups:App.backups.map((x,i)=>({index:i,time:x.time,count:x.config.rules.length})),
    /* Provkörning och inlärda förslag följer med i statusen så att gränssnittet
       kan visa dem utan ett extra anrop. */
@@ -1069,52 +1034,6 @@ App.handle=async msg=>{
    App.invalidateScan();
    return r;
   }
-  case 'brakeRelease':{
-   const e=App.engine;
-   const rule=e.config.rules.find(r=>r.id===msg.ruleId);
-   const held=rule?e.heldRule(rule.id):null;
-   if(!rule||!held)throw new C.RuleError('bad_rule');
-   /* Släpp spärren i en egen skrivning – mutatet pausar motorn och då kan inget svep köras. */
-   await App.mutate(async()=>{
-    e.releaseRule(rule.id);
-    /* Nivån användaren godkände blir regelns normalnivå, så bromsen inte slår till igen direkt. */
-    App.brakeHistory[rule.id]=[...(App.brakeHistory[rule.id]||[]),held.matched].slice(-10);
-    App.saveBrakeHistory();
-    App.log('debug',0,'sakerhetsbromsen slappt: du godkande att regeln "'+(rule.name||rule.id)+'" flyttar '+held.matched+' mejl');
-   });
-   const r=await e.sweepRule(rule,{includeInboxUnread:true,force:true});
-   for(const j of e.pending.values())if(j.hiddenSince===null)j.hiddenSince=Date.now()-2500;
-   App.kick();App.invalidateScan();
-   await Promise.race([e.tick().catch(()=>{}),new Promise(res=>setTimeout(res,350))]);
-   return {result:r,status:App.snapshot()};
-  }
-  case 'brakeCancel':return App.mutate(async()=>{
-   const e=App.engine;
-   const rule=e.config.rules.find(r=>r.id===msg.ruleId);
-   if(!rule||!e.heldRule(rule.id))throw new C.RuleError('bad_rule');
-   e.releaseRule(rule.id);
-   const rules=e.config.rules.map(r=>r.id===rule.id?{...r,enabled:false}:r);
-   await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
-   App.log('debug',0,'sakerhetsbromsen: regeln "'+(rule.name||rule.id)+'" stangdes av efter ditt svar');
-   App.invalidateScan();App.scheduleAutoBackup();
-   return App.snapshot();
-  });
-  /* Tredje svaret på säkerhetsbromsen: regeln ska bort. Samma villkor som de
-     andra två – det måste finnas en spärr att släppa – och samma skrivning med
-     backup, så regeln går att få tillbaka under Regelkopior. */
-  case 'brakeDelete':return App.mutate(async()=>{
-   const e=App.engine;
-   const rule=e.config.rules.find(r=>r.id===msg.ruleId);
-   if(!rule||!e.heldRule(rule.id))throw new C.RuleError('bad_rule');
-   e.releaseRule(rule.id);
-   const rules=e.config.rules.filter(r=>r.id!==rule.id);
-   await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
-   delete App.brakeHistory[rule.id];
-   App.saveBrakeHistory();
-   App.log('debug',0,'sakerhetsbromsen: regeln "'+(rule.name||rule.id)+'" togs bort efter ditt svar');
-   App.invalidateScan();App.scheduleAutoBackup();
-   return App.snapshot();
-  });
   /* Manuell cache-rensning. Auto-rensningen kan stängas av; den här knappen
      fungerar ändå, det är användarens eget val. */
   case 'clearCache':{
@@ -1138,8 +1057,7 @@ App.handle=async msg=>{
    const key=C.fingerprint(message);
    /* Tål att motorn är på väg upp: då finns varken kön eller journalen ännu. */
    const recordsContains=!!(key&&((e.records?.has?.(key))||(e.done?.has?.(key))));
-   const heldIds=(e.heldList?.()||[]).map(h=>h.ruleId);
-   const result=C.whyHere(e.config.rules,message,{moveMode:e.config.moveMode,displayed,queueContains,recordsContains,heldIds});
+   const result=C.whyHere(e.config.rules,message,{moveMode:e.config.moveMode,displayed,queueContains,recordsContains});
    /* Mappnamnen behövs för att kunna skriva "skulle flyttas till Fakturor" i klartext. */
    const folders=await App.folderList().catch(()=>[]);
    const nameOf=id=>folders.find(f=>f.id===id)?.label||'';
@@ -1152,13 +1070,11 @@ App.handle=async msg=>{
   }
   case 'setOptions':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
-   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean'||typeof msg.autoClear!=='boolean'||typeof msg.brake!=='boolean')throw new C.RuleError('bad_schema');
+   if(!['read','direct'].includes(msg.moveMode)||typeof msg.hourly!=='boolean'||!Number.isInteger(msg.sweepMinutes)||msg.sweepMinutes<15||msg.sweepMinutes>1440||msg.sweepMinutes%15||typeof msg.newInboxDirect!=='boolean'||typeof msg.openWindow!=='boolean'||typeof msg.verbose!=='boolean'||typeof msg.fileLog!=='boolean'||typeof msg.autoBackup!=='boolean'||typeof msg.autoClear!=='boolean')throw new C.RuleError('bad_schema');
    const modeChanged=msg.moveMode!==e.config.moveMode;
    const verboseChanged=msg.verbose!==e.config.verbose;
    const backupChanged=msg.autoBackup!==e.config.autoBackup;
-   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,autoClear:msg.autoClear,brake:msg.brake,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});
-   /* Stängs bromsen av släpps alla stoppade regler direkt – annars skulle de ligga kvar stoppade utan broms. */
-   if(msg.brake===false)for(const h of e.heldList())e.releaseRule(h.ruleId);
+   await App.save({...e.config,moveMode:msg.moveMode,hourly:msg.hourly,sweepMinutes:msg.sweepMinutes,newInboxDirect:msg.newInboxDirect,openWindow:msg.openWindow,verbose:msg.verbose,fileLog:msg.fileLog,autoBackup:msg.autoBackup,autoClear:msg.autoClear,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+(modeChanged?1:0)},{discard:modeChanged});
    App.scheduleSweep();
    if(backupChanged&&msg.autoBackup)App.scheduleAutoBackup();
    if(msg.verbose&&verboseChanged)App.log('debug',0,'detaljlogg aktiverad: svep, trafik och avvisningar visas utan mejlinnehall');
@@ -1180,8 +1096,6 @@ App.handle=async msg=>{
   case 'saveRules':return App.mutate(async()=>{
    App.checkRevision(msg.revision);const rules=C.validateRules(msg.rules);await App.checkRules(rules);
    await App.save({...e.config,rules,revision:e.config.revision+1,rulesVersion:e.config.rulesVersion+1},{backup:true,discard:true});
-   /* En borttagen regel ska inte lämna en spärr efter sig i varningsraden. */
-   for(const h of e.heldList())if(!rules.some(r=>r.id===h.ruleId))e.releaseRule(h.ruleId);
    /* Borttagen regel eller avslutad provkörning: räkningen ska inte ligga kvar
       och spöka om samma regel börjar provköras igen. */
    let trialDropped=false;
@@ -1298,7 +1212,7 @@ App.open=async tab=>{
  const created=await B.tabs.create({url:B.runtime.getURL('ui.html')});App.uiTab=created.id;
 };
 App.ready=(async()=>{
- const data=await B.storage.local.get(['config','work','health','logs','errorLogs','backups','prefs','sweepAt','brake','backupWeek','cacheDay','trial','learned','beforeReaderMigration','readerPauseUntil']);
+ const data=await B.storage.local.get(['config','work','health','logs','errorLogs','backups','prefs','sweepAt','backupWeek','cacheDay','trial','learned','beforeReaderMigration','readerPauseUntil']);
  /* Vilken vecka som senast fick en daterad kopia – avgör om nästa körning ska skriva en. */
  if(typeof data.backupWeek==='string'&&/^\d{4}-W\d{2}$/.test(data.backupWeek))App.lastBackupWeek=data.backupWeek;
  if(typeof data.cacheDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(data.cacheDay))App.lastCacheDay=data.cacheDay;
@@ -1327,7 +1241,7 @@ App.ready=(async()=>{
  if(['auto',...SEASONS].includes(p.season))App.prefs.season=p.season;
  App.applySeasonIcon();
  App.engine=new LasEngine(B,cfg,{persist:App.persistWork,persistHealth:App.persistHealth,log:App.log,change:App.changed,kick:App.kick,debug:t=>{if(App.engine.config.verbose||App.engine.config.fileLog)App.log('debug',0,t);},
-  notify:App.openUnread,beforeMove:App.beforeMove,windowOpen:App.windowOpen,brakeLimit:App.brakeLimit,ruleDone:App.brakeRecord});
+  notify:App.openUnread,beforeMove:App.beforeMove,windowOpen:App.windowOpen,ruleDone:App.recordSweep});
  try{App.engine.restoreHealth?.(data.health);}catch{fault='invalid_storage';}
  App.engine.trialRestore?.(data.trial);
  App.learned=App.cleanLearned(data.learned);
@@ -1337,10 +1251,6 @@ App.ready=(async()=>{
  await App.readTbVersion();
  await App.readSelfInfo();
  /* Senaste svepet från förra gången, så att starten vet om det är dags att ta igen något. */
- App.brakeHistory={};
- if(data.brake&&typeof data.brake==='object'&&!Array.isArray(data.brake)){
-  for(const [id,list] of Object.entries(data.brake))if(Array.isArray(list))App.brakeHistory[id]=list.filter(n=>Number.isFinite(n)&&n>0).slice(-10);
- }
  const savedSweep=Number(data.sweepAt);
  if(Number.isFinite(savedSweep)&&savedSweep>0){App.lastAutoSweep=savedSweep;if(!App.engine.lastSweep)App.engine.lastSweep=savedSweep;}
  App.log('start');

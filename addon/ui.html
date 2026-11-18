@@ -12,7 +12,6 @@
     <div id="demoBanner" class="demo-banner" data-i18n="demoBanner" hidden="">
       FÖRHANDSVISNING · Fiktiva data. Inga mejl läses eller flyttas.
     </div>
-    <div id="brakeWarns" class="brake-warns" role="alert" hidden=""></div>
     <div id="installWarn" class="install-warn" role="status" hidden="">
       <span class="install-warn-icon" aria-hidden="true">⚠</span>
       <div class="install-warn-body">
@@ -1353,19 +1352,7 @@ order@fortnox.se, nyheter@klarna.se"
                   föreslår SortBro en regel. Bara domän, mapp och antal sparas,
                   i högst sju dagar – aldrig ämne, namn eller mejltext.
                 </p>
-                <label class="toggle-label">
-                  <input id="brake" type="checkbox" checked="" />
-                  <span data-i18n="brakeLabel"
-                    >Säkerhetsbroms: stanna en regel som plötsligt matchar
-                    onormalt många mejl</span
-                  >
-                </label>
-                <p class="muted" data-i18n="brakeNote">
-                  Om en regel vill flytta tio gånger fler mejl än vanligt – och
-                  minst 50 – stoppas den innan något flyttas. Du får då välja:
-                  flytta ändå eller stäng av regeln. Nya regler har gränsen 50
-                  mejl per svep.
-                </p>
+                <p class="muted" data-i18n="moveCountNote">Ingen antalsbroms: alla matchande mejl kan flyttas. Kön hanterar högst 100 väntande jobb åt gången; resten tas i fortsatta svep. Paus, läsvillkor och spärrar vid osäkra flyttar eller fel gäller fortfarande.</p>
                 <p class="muted" data-i18n="shortcutsNote">
                   Alt+Shift+L öppnar Läsfilter även om verktygsikonen inte syns.
                   Ctrl+Shift+L kör ett svep direkt.

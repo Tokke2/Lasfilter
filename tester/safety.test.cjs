@@ -328,7 +328,7 @@ test('säkerhetskopian skrivs en gång per vecka',()=>{
 });
 
 /* Cache-rensningen får bara tömma det som är cache. Kön, journalen, minnet av
-   redan hanterade mejl, provkörningens räknare och bromsens historik är inte
+   redan hanterade mejl och provkörningens räknare är inte
    cache – de skyddar mot att samma mejl hanteras två gånger. */
 test('cache-rensningen rör bara cache',()=>{
  const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
@@ -338,7 +338,7 @@ test('cache-rensningen rör bara cache',()=>{
  assert.match(body,/invalidateFolders\?\.\(\)/,'mappcachen ska tömmas');
  assert.match(body,/yearFolderIds\?\.clear\(\)/,'årsmapparnas karta ska tömmas');
  assert.match(body,/invalidateScan\(\)/,'sökningen ska räknas om');
- for(const skyddad of ['done.clear','records.clear','pending.clear','trialKeys.clear','brakeHistory=']){
+ for(const skyddad of ['done.clear','records.clear','pending.clear','trialKeys.clear']){
    assert.equal(body.includes(skyddad),false,'cache-rensningen får aldrig röra '+skyddad);
  }
  /* Mitt i en flytt är mappbilden på väg att ändras – då väntar vi. */

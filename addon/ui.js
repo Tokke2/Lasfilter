@@ -6,6 +6,7 @@ let state=null,folders=[],selectedId='',dirty=false,editRevision=0,editToken='',
 
 const I18N={
  sv:{
+  moveCountNote:'Ingen antalsbroms: alla matchande mejl kan flyttas. Kön hanterar högst 100 väntande jobb åt gången; resten tas i fortsatta svep. Paus, läsvillkor och spärrar vid osäkra flyttar eller fel gäller fortfarande.',
   donationTagline:"En lugnare inkorg. Mer tid till annat.",
   donationBadgeFree:"Alla funktioner gratis",
   donationBadgeOptional:"Inga nivåer eller krav",
@@ -123,7 +124,7 @@ const I18N={
   senderFull:"Regeln har redan åtta villkor. Välj en annan regel eller skapa en ny.",
   senderInvalid:"Mejlet saknar en giltig avsändaradress. Ingen regel kan skapas här.",
   senderStale:"Reglerna har ändrats sedan rutan öppnades. Avbryt och högerklicka på mejlet igen för att granska den nya versionen.",
-  senderRunConfirm:"Spara ändringen i ”{name}” och kör regeln? Detta kontrollerar alla mejl i regelns källa, inte bara det högerklickade mejlet. Testläge, paus, läsläge och säkerhetsbroms gäller fortfarande.",
+  senderRunConfirm:"Spara ändringen i ”{name}” och kör regeln? Detta kontrollerar alla mejl i regelns källa, inte bara det högerklickade mejlet. Testläge, paus, läsläge och spärrar vid fel gäller fortfarande.",
   senderSaved:"Avsändaren har lagts till. Regeln är sparad.",
   senderRunFailed:"Regeln sparades, men körningen misslyckades: ",
   senderRunning:"Regeln sparades. Kontrollerar mejl…",
@@ -522,18 +523,6 @@ const I18N={
   storageNote:'Automatiska filer och vanliga exporter hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer. Med Spara logg som… under Aktivitet väljer du själv mapp för en manuell kopia.',
   fileLogNote:'Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.',
   autoBackupLabel:'Backa upp reglerna automatiskt en gång per vecka till Hämtade filer/Lasfilter/Regelbackuper/',
-  brakeLabel:'Säkerhetsbroms: stanna en regel som plötsligt matchar onormalt många mejl',
-  toastBrakeOn:'Säkerhetsbromsen är på: en regel som plötsligt matchar för många stoppas innan något flyttas.',
-  toastBrakeOff:'Säkerhetsbromsen är av. En felaktig regel kan då flytta hela inkorgen utan att fråga.',
-  brakeNote:'Om en regel vill flytta tio gånger fler mejl än vanligt – och minst 50 – stoppas den innan något flyttas. Du får då välja: flytta ändå eller stäng av regeln. Nya regler har gränsen 50 mejl per svep.',
-  brakeWarnTitle:'Säkerhetsbromsen stoppade en regel',
-  brakeWarnText:'Regeln "{name}" ville flytta {n} mejl. Gränsen är {limit} och regeln brukar flytta {median}. Inget mer flyttas förrän du väljer.',
-  brakeWarnNever:'inget',
-  brakeWarnMove:'Flytta ändå',
-  brakeWarnStop:'Stäng av regeln',
-  brakeWarnDelete:'Ta bort regeln',
-  brakeDeleteConfirm:'"{name}" tas bort helt. Ingenting flyttas, och regeln slutar leta efter mejl.\n\nEn kopia av reglerna sparas först, så den går att hämta tillbaka under Regelkopior & säkerhet.\n\nTa bort regeln?',
-  brakeDeleted:'Regeln "{name}" togs bort. Ingenting flyttades.',
   cacheTitle:'Cache',
   cacheSub:'SortBro minns varje mapps meddelandetal så att ett svep kan hoppa över mappar som inte ändrats. Det gör svepen snabba. Cachen töms automatiskt en gång i dygnet, så att den aldrig kan visa en gammal bild av inkorgen.',
   autoClearLabel:'Rensa cachen automatiskt en gång per dygn',
@@ -546,8 +535,6 @@ const I18N={
   cacheCleared:'Cachen rensad: {n} mappar läses om vid nästa svep.',
   cacheBusy:'Vänta tills flytten är klar – då rensas cachen direkt.',
   cacheOff:'Automatisk rensning är avstängd. Knappen fungerar ändå.',
-  brakeReleased:'Regeln "{name}" släpptes och flyttar nu {n} mejl.',
-  brakeStopped:'Regeln "{name}" stängdes av. Inget flyttades.',
   conflictTitle:'Kan krocka med "{name}" – båda kan matcha samma mejl ({fields}).',
   conflictWinner:'Den här regeln ligger först och vinner.',
   conflictLoser:'Den regeln ligger först och vinner. Flytta upp den här om den ska gälla i stället.',
@@ -557,7 +544,6 @@ const I18N={
   whySubject:'"{subject}" från {author}',
   whyNoRule:'Ingen aktiv regel matchar det här mejlet. Det ligger där det ligger.',
   whyWinner:'Regeln "{name}" gäller och skulle flytta mejlet till {target}.',
-  whyWinnerHeld:'Regeln "{name}" gäller men är stoppad av säkerhetsbromsen – inget flyttas förrän du svarar.',
   whyAlready:'Mejlet ligger i målmappen {target} – det är hit regeln "{name}" skickar det.',
   whyArrived:'Mejlet ligger redan på plats.',
   whyNoTarget:'Regeln "{name}" gäller men målmappen hittades inte.',
@@ -912,6 +898,7 @@ const I18N={
   }
  },
  en:{
+  moveCountNote:'No count-based brake: all matching messages can be moved. The queue holds up to 100 pending jobs at a time; the rest are handled in subsequent sweeps. Pause, read conditions and locks for uncertain moves or failures still apply.',
   donationTagline:"A calmer inbox. More time for everything else.",
   donationBadgeFree:"All features are free",
   donationBadgeOptional:"No tiers or obligations",
@@ -1029,7 +1016,7 @@ const I18N={
   senderFull:"This rule already has eight conditions. Choose another rule or create a new one.",
   senderInvalid:"The message has no valid sender address. No rule can be created here.",
   senderStale:"Rules have changed since this dialog opened. Cancel and right-click the message again to review the new version.",
-  senderRunConfirm:"Save the change to “{name}” and run this rule? This checks all messages in the rule’s source, not just the right-clicked message. Test mode, pause, read settings and the safety brake still apply.",
+  senderRunConfirm:"Save the change to “{name}” and run this rule? This checks all messages in the rule’s source, not just the right-clicked message. Test mode, pause, read settings and failure locks still apply.",
   senderSaved:"Sender added. The rule is saved.",
   senderRunFailed:"The rule was saved, but running it failed: ",
   senderRunning:"Rule saved. Checking messages…",
@@ -1428,18 +1415,6 @@ const I18N={
   storageNote:'Automatic files and regular exports land in subfolders of the app folder Downloads/Lasfilter/: logs (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads. Save log as… under Activity lets you choose a folder for a manual copy.',
   fileLogNote:'Also writes sortbro-fellogg.txt in the same folder: a combined error log for the last 30 days (up to 5,000 entries). No message bodies are stored. You can also save it under Activity.',
   autoBackupLabel:'Back up the rules automatically once a week to Downloads/Lasfilter/Regelbackuper/',
-  brakeLabel:'Safety brake: stop a rule that suddenly matches an abnormal number of emails',
-  toastBrakeOn:'The safety brake is on: a rule that suddenly matches too many emails is stopped before anything is moved.',
-  toastBrakeOff:'The safety brake is off. A mistaken rule can then move the whole inbox without asking.',
-  brakeNote:'If a rule wants to move ten times more emails than usual – and at least 50 – it is stopped before anything is moved. You then choose: move anyway or switch the rule off. New rules have a limit of 50 emails per sweep.',
-  brakeWarnTitle:'The safety brake stopped a rule',
-  brakeWarnText:'The rule "{name}" wanted to move {n} emails. The limit is {limit} and the rule usually moves {median}. Nothing more moves until you choose.',
-  brakeWarnNever:'nothing',
-  brakeWarnMove:'Move anyway',
-  brakeWarnStop:'Switch the rule off',
-  brakeWarnDelete:'Delete the rule',
-  brakeDeleteConfirm:'"{name}" will be deleted completely. Nothing is moved, and the rule stops looking for mail.\n\nA copy of your rules is saved first, so you can bring it back under Rule copies & safety.\n\nDelete the rule?',
-  brakeDeleted:'The rule "{name}" was deleted. Nothing was moved.',
   cacheTitle:'Cache',
   cacheSub:'SortBro remembers each folder\'s message counts so a sweep can skip folders that have not changed. That keeps sweeps fast. The cache is cleared automatically once a day, so it can never show a stale picture of your inbox.',
   autoClearLabel:'Clear the cache automatically once a day',
@@ -1452,8 +1427,6 @@ const I18N={
   cacheCleared:'Cache cleared: {n} folders will be re-read on the next sweep.',
   cacheBusy:'Wait until the move finishes – the cache is then cleared at once.',
   cacheOff:'Automatic clearing is off. The button still works.',
-  brakeReleased:'The rule "{name}" was released and now moves {n} emails.',
-  brakeStopped:'The rule "{name}" was switched off. Nothing was moved.',
   conflictTitle:'May collide with "{name}" – both can match the same email ({fields}).',
   conflictWinner:'This rule comes first and wins.',
   conflictLoser:'That rule comes first and wins. Move this one up to let it apply instead.',
@@ -1463,7 +1436,6 @@ const I18N={
   whySubject:'"{subject}" from {author}',
   whyNoRule:'No active rule matches this email. It is where it is.',
   whyWinner:'The rule "{name}" applies and would move the email to {target}.',
-  whyWinnerHeld:'The rule "{name}" applies but is stopped by the safety brake – nothing moves until you answer.',
   whyAlready:'The email is in the target folder {target} – that is where the rule "{name}" sends it.',
   whyArrived:'The email is already in place.',
   whyNoTarget:'The rule "{name}" applies but the target folder was not found.',
@@ -1970,7 +1942,7 @@ function applyTheme(prefs){
   if($('langSv'))$('langSv').classList.toggle('active',currentLang==='sv');
   if($('langEn'))$('langEn').classList.toggle('active',currentLang==='en');
  }
- if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;$('autoBackup').checked=state.config.autoBackup!==false;$('brake').checked=state.config.brake!==false;}
+ if(state.moveMode!==undefined){$('moveMode').value=state.moveMode;$('openWindow').checked=state.openWindow!==false;$('hourly').checked=!!state.hourly;$('sweepMinutes').value=String(state.sweepMinutes||60);$('newInboxDirect').checked=state.newInboxDirect!==false;$('verbose').checked=!!state.config.verbose;$('fileLog').checked=state.config.fileLog!==false;$('autoBackup').checked=state.config.autoBackup!==false;}
  applyAppearance(prefs);
  /* Veckostatus: när den senaste automatiska veckokopian skrevs. */
  renderCache(state);
@@ -2401,60 +2373,6 @@ function currentToken(){return JSON.stringify(state.config.rules);}
 /* SortBro avinstallerar aldrig sig självt – men Thunderbird stänger av tillfälliga och
    sidoladdade tillägg. Då säger vi det rakt ut i stället för att användaren ska gissa. */
 let installWarnDismissed=false;
-/* Säkerhetsbromsen: en rad per stoppad regel, med de två svaren. Inget flyttas
-   förrän användaren har svarat, så raden ligger kvar tills dess. */
-function renderBrakeWarns(){
- const box=$('brakeWarns');if(!box)return;
- const holds=Array.isArray(state.brakeHolds)?state.brakeHolds:[];
- box.replaceChildren();
- if(!holds.length){box.hidden=true;return;}
- box.hidden=false;
- for(const h of holds){
-  const row=el('div','brake-warn');
-  row.append(el('span','brake-warn-icon','⚠'));
-  const body=el('div','brake-warn-body');
-  body.append(el('strong','',T('brakeWarnTitle')));
-  body.append(el('span','',T('brakeWarnText')
-   .replace('{name}',h.name||h.ruleId)
-   .replace('{n}',String(h.matched))
-   .replace('{limit}',String(h.limit))
-   .replace('{median}',h.median?String(h.median):T('brakeWarnNever'))));
-  const actions=el('div','brake-warn-actions');
-  const move=el('button','button small secondary',T('brakeWarnMove'));move.type='button';move.dataset.brakeMove=h.ruleId;
-  const stop=el('button','button small secondary',T('brakeWarnStop'));stop.type='button';stop.dataset.brakeStop=h.ruleId;
-  const del=el('button','button small secondary',T('brakeWarnDelete'));del.type='button';del.dataset.brakeDelete=h.ruleId;
-  actions.append(move,stop,del);
-  row.append(body,actions);
-  box.append(row);
- }
-}
-function brakeName(ruleId){
- const h=(state.brakeHolds||[]).find(x=>x.ruleId===ruleId);
- return h?.name||ruleId;
-}
-async function brakeAnswer(ruleId,action){
- try{
-  if(action==='move'){
-   const name=brakeName(ruleId);
-   const r=await rpc('brakeRelease',{ruleId});
-   renderStatus(r.status);
-   toast(T('brakeReleased').replace('{name}',name).replace('{n}',String(r.result?.queued??0)));
-  }else if(action==='delete'){
-   /* Raderingen är den enda av de tre som inte går att ångra i stunden, så den
-      frågar en gång till – med regelns namn i frågan, inte en anonym bekräftelse. */
-   const name=brakeName(ruleId);
-   if(!confirm(T('brakeDeleteConfirm').replace('{name}',name)))return;
-   const status=await rpc('brakeDelete',{ruleId});
-   renderStatus(status);
-   toast(T('brakeDeleted').replace('{name}',name));
-  }else{
-   const name=brakeName(ruleId);
-   const status=await rpc('brakeCancel',{ruleId});
-   renderStatus(status);
-   toast(T('brakeStopped').replace('{name}',name));
-  }
- }catch(err){alertError(err);}
-}
 function renderInstallWarning(next){
  const box=$('installWarn');if(!box)return;
  const type=next?.installType==='development'?'temporary':next?.installType==='sideload'?'sideload':'';
@@ -2546,7 +2464,6 @@ function renderStatus(next){
  $('sweepNow').disabled=!!state.fault||cfg.paused||!rulesReady;$('sweepNow').textContent=state.queued?T('sweepQueueNow'):T('sweepRunNow');
  if($('clearFault'))$('clearFault').hidden=!state.fault&&!state.blocked&&!state.health?.holds?.length;
  renderInstallWarning(state);
- renderBrakeWarns();
  $('notice').hidden=!state.fault;$('notice').className='notice error';$('notice').textContent=state.fault?T('noticeStoppedPrefix')+Terr(state.fault)+T('noticeStoppedSuffix'):'';
  $('lastCheck').textContent=state.lastCheck?T('lastCheckPrefix')+new Date(state.lastCheck).toLocaleTimeString(locale())+' · '+state.stats.checks+T('lastCheckCountSuffix'):T('lastCheckWaiting');
  if($('autoRunInfo')){
@@ -3805,9 +3722,7 @@ async function whyIsHere(){
  /* 1. Den regel som gäller – eller beskedet att ingen gör det. */
  const winner=ruleById(r.winner);
  if(winner){
-  const held=(winner.state||[]).some(x=>/bromsen/.test(x.text));
-  if(held)lines.push([T('whyWinnerHeld').replace('{name}',winner.name),'wait']);
-  else if(winner.arrived)lines.push([T('whyAlready').replace('{name}',winner.name).replace('{target}',r.winnerName||winner.target||'?'),'ok']);
+  if(winner.arrived)lines.push([T('whyAlready').replace('{name}',winner.name).replace('{target}',r.winnerName||winner.target||'?'),'ok']);
   else if(winner.target)lines.push([T('whyWinner').replace('{name}',winner.name).replace('{target}',r.winnerName||winner.target),'ok']);
   else lines.push([T('whyNoTarget').replace('{name}',winner.name),'wait']);
  }else{
@@ -4092,16 +4007,10 @@ handle('lang','change',async()=>switchLanguage($('lang').value));
 function optionsPayload(){
  return {revision:state.config.revision,moveMode:$('moveMode').value,hourly:$('hourly').checked,sweepMinutes:Number($('sweepMinutes').value),
   newInboxDirect:$('newInboxDirect').checked,openWindow:$('openWindow').checked,verbose:$('verbose').checked,fileLog:$('fileLog').checked,
-  autoBackup:$('autoBackup').checked,autoClear:$('autoClear').checked,brake:$('brake').checked};
+  autoBackup:$('autoBackup').checked,autoClear:$('autoClear').checked};
 }
 handle('moveMode','change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));toast($('moveMode').value==='direct'?T('toastModeDirect'):T('toastModeRead'));});
-for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog','autoBackup','autoClear','brake'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));if(id==='autoBackup')toast($('autoBackup').checked?T('toastAutoBackupOn'):T('toastAutoBackupOff'));if(id==='brake')toast($('brake').checked?T('toastBrakeOn'):T('toastBrakeOff'));});
-if($('brakeWarns'))$('brakeWarns').addEventListener('click',e=>{
- const move=e.target.closest('[data-brake-move]'),stop=e.target.closest('[data-brake-stop]'),del=e.target.closest('[data-brake-delete]');
- if(move)brakeAnswer(move.dataset.brakeMove,'move');
- else if(stop)brakeAnswer(stop.dataset.brakeStop,'stop');
- else if(del)brakeAnswer(del.dataset.brakeDelete,'delete');
-});
+for(const id of ['openWindow','hourly','sweepMinutes','newInboxDirect','verbose','fileLog','autoBackup','autoClear'])handle(id,'change',async()=>{renderStatus(await rpc('setOptions',optionsPayload()));if(id==='openWindow')toast($('openWindow').checked?T('toastOpenWindowOn'):T('toastOpenWindowOff'));if(id==='verbose')toast($('verbose').checked?T('toastVerboseOn'):T('toastVerboseOff'));if(id==='fileLog')toast($('fileLog').checked?T('toastFileLogOn'):T('toastFileLogOff'));if(id==='sweepMinutes')toast(T('toastSweepIntervalPrefix')+$('sweepMinutes').value+T('toastSweepIntervalSuffix'));if(id==='newInboxDirect')toast($('newInboxDirect').checked?T('toastInboxDirectOn'):T('toastInboxDirectOff'));if(id==='autoBackup')toast($('autoBackup').checked?T('toastAutoBackupOn'):T('toastAutoBackupOff'));});
 handle('backupNow','click',async()=>{
  const r=await rpc('backupNow');
  const info=$('backupInfo');

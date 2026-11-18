@@ -319,7 +319,7 @@ function validatePair(source,target,sourceCaps,targetCaps){
  if(source.id===target.id)fail('same_folder');
  if(sourceCaps.canDeleteMessages!==true||targetCaps.canAddMessages!==true)fail('read_only');
 }
-function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,brake:true,rules:[]};}
+function defaults(){return {schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,rules:[]};}
 function config(raw){
  if(!raw||raw.schema!==1)fail('bad_schema');
  if(!Number.isSafeInteger(raw.revision)||raw.revision<0||!Number.isSafeInteger(raw.rulesVersion)||raw.rulesVersion<0)fail('bad_schema');
@@ -331,12 +331,10 @@ function config(raw){
  /* Cache-rensningen är på som standard, som de andra automatiska rutinerna.
     Konfigurationer från tidigare versioner saknar fältet och får true. */
  const autoClear=raw.autoClear===undefined?true:raw.autoClear;if(typeof autoClear!=='boolean')fail('bad_schema');
- /* Säkerhetsbromsen är på som standard. Konfigurationer från tidigare versioner
-    saknar fältet och får då true, precis som när det infördes. */
- const brake=raw.brake===undefined?true:raw.brake;if(typeof brake!=='boolean')fail('bad_schema');
+ // Legacy brake settings are ignored, including those in saved backups.
  const sweepMinutes=raw.sweepMinutes===undefined?60:raw.sweepMinutes;if(!Number.isInteger(sweepMinutes)||sweepMinutes<15||sweepMinutes>1440||sweepMinutes%15)fail('bad_schema');
  const newInboxDirect=raw.newInboxDirect===undefined?true:raw.newInboxDirect;if(typeof newInboxDirect!=='boolean')fail('bad_schema');
- return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,autoBackup,autoClear,brake,rules:validateRules(raw.rules)};
+ return {schema:1,revision:raw.revision,rulesVersion:raw.rulesVersion,paused:raw.paused,dryRun:raw.dryRun,moveMode:raw.moveMode,hourly:raw.hourly,sweepMinutes,newInboxDirect,openWindow:raw.openWindow,verbose:raw.verbose,fileLog,autoBackup,autoClear,rules:validateRules(raw.rules)};
 }
 
 /* ── Konfliktvarning: kan två regler matcha samma mejl? ────────────────────
@@ -510,8 +508,7 @@ function explainRule(rule,message,{now=Date.now(),moveMode='read',displayed=fals
   conditions:rows,state,reason:reason?reason.value:'',target,arrived:!!arrived};
 }
 /* Vilken regel som faktiskt skulle flytta mejlet: första aktiva träff i listordning. */
-function whyHere(rules,message,{now=Date.now(),moveMode='read',displayed=false,queueContains=false,recordsContains=false,heldIds=[],sourceOk=true}={}){
- const held=new Set(heldIds);
+function whyHere(rules,message,{now=Date.now(),moveMode='read',displayed=false,queueContains=false,recordsContains=false,sourceOk=true}={}){
  const list=Array.isArray(rules)?rules:[];
  const here=message.folder?.id||'';
  /* Ligger mejlet redan i en regels målmapp? Då är det den regelns förklaring –
@@ -520,9 +517,8 @@ function whyHere(rules,message,{now=Date.now(),moveMode='read',displayed=false,q
  const all=list.map(r=>{
   const arrived=!!here&&targetsOf(r).includes(here);
   const item=explainRule(r,message,{now,moveMode,displayed,queueContains,recordsContains,arrived});
-  if(held.has(r.id)&&item.matches&&!item.reason)item.state=[...item.state,{text:'regeln är stoppad av säkerhetsbromsen',ok:false}];
   /* blocked räknas om sist, när alla lägesvillkor är på plats – annars kan en regel
-     se fri ut trots att den stoppas av läget (oläst, visad, bromsad). */
+     se fri ut trots att den stoppas av läget (oläst, visad). */
   item.blocked=!!(item.reason||item.state.some(x=>!x.ok));
   return item;
  });
@@ -535,6 +531,7 @@ function whyHere(rules,message,{now=Date.now(),moveMode='read',displayed=false,q
   rules:all};
 }
 function fingerprint(m){return typeof m.headerMessageId==='string'&&m.headerMessageId.length<=4096&&m.headerMessageId?JSON.stringify([m.headerMessageId,+new Date(m.date),m.size]):'';}
+// Keep the historical brake event readable; no new count-brake events are emitted.
 const EVENTS=new Set(['start','settings_saved','rules_saved','restored','queued','simulated','moved','skipped','error','queue_full','backup_restored','catchup','debug','brake']);
 function event(name,count=0,now=Date.now(),detail=''){
  if(!EVENTS.has(name))return null;

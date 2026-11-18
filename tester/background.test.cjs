@@ -96,7 +96,7 @@ function fakeEngine(app,over={}){
   sweepAll:async()=>({scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0}),
   tick:async()=>{},debug(){},stop(code){engine.fault=code;},
   clearPending:async()=>{},invalidateFolders(){},recordList:()=>[],blocked:()=>0,validateRuleFolders:async()=>{},
-  heldRule:()=>null,heldList:()=>[],releaseRule(){},sweepRule:async()=>({scanned:0,queued:0}),...over};
+  sweepRule:async()=>({scanned:0,queued:0}),...over};
  app.engine=engine;
  return engine;
 }
@@ -776,96 +776,6 @@ test('importen vägrar dubbletter, tom text och okänd regel',async()=>{
  await assert.rejects(()=>app.handle({type:'importConditions',revision:0,ruleId:'finns-inte',text:'x.se'}),err=>err.code==='bad_id');
 });
 
-/* ── Säkerhetsbromsen: gränsen, minnet och svaren i gränssnittet ───────── */
-
-test('bromsens gräns: tio gånger det vanliga, aldrig under 50 mejl',async()=>{
- const {app}=await loadBackground();
- fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,rules:[{id:'r1',name:'A',enabled:true},{id:'r2',name:'B',enabled:true}]}});
- assert.equal(app.brakeLimit({id:'r1'}).limit,50,'utan historik gäller golvet 50');
- app.brakeHistory={r1:[4,4,4,4],r2:[100,100,100]};
- assert.equal(app.brakeLimit({id:'r1'}).limit,50,'fyra mejl i snitt ger ändå 50');
- assert.equal(app.brakeLimit({id:'r1'}).median,4);
- assert.equal(app.brakeLimit({id:'r2'}).limit,1000,'etthundra i snitt ger 1000');
- app.engine.config.brake=false;
- assert.equal(app.brakeLimit({id:'r1'}),null,'avstängd broms har ingen gräns');
-});
-
-test('bromsens minne: tio tal per regel, aldrig noll eller stoppade regler',async()=>{
- const {app}=await loadBackground();
- fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,rules:[{id:'r1',name:'A',enabled:true}]}});
- for(let i=0;i<14;i++)app.brakeRecord({id:'r1'},{wouldQueue:5+i});
- assert.equal(app.brakeHistory.r1.length,10,'bara de tio senaste sparas');
- assert.equal(app.brakeHistory.r1[9],18,'det senaste talet ligger sist');
- app.brakeRecord({id:'r1'},{wouldQueue:900,held:true});
- assert.equal(app.brakeHistory.r1[9],18,'en stoppad regel ändrar inte minnet – annars vore bromsen verkningslös nästa gång');
- app.brakeRecord({id:'r1'},{wouldQueue:0});
- assert.equal(app.brakeHistory.r1[9],18,'noll flyttar säger ingenting om nivån');
- app.brakeRecord({id:'r2'},{wouldQueue:7});
- assert.equal(app.brakeHistory.r2[0],7,'nya regler får eget minne');
-});
-
-test('bromsens svar: Flytta ändå släpper regeln och kör den direkt',async()=>{
- const {app}=await loadBackground();
- let held={ruleId:'r1',matched:300,limit:50,median:5};
- const calls=[];
- const engine=fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,rules:[{id:'r1',name:'Google',enabled:true,target:'f'}]},
-  heldRule:id=>held&&held.ruleId===id?held:null,
-  heldList:()=>held?[held]:[],
-  releaseRule:id=>{calls.push(['release',id]);held=null;},
-  sweepRule:async(rule,opts)=>{calls.push(['sweep',rule.id,opts.force]);return {scanned:9,queued:8};}});
- const out=await app.handle({type:'brakeRelease',ruleId:'r1'});
- assert.equal(calls[0][0],'release','spärren släpps först');
- assert.equal(calls.some(c=>c[0]==='sweep'&&c[1]==='r1'&&c[2]===true),true,'regeln körs direkt och läser om allt');
- assert.equal(app.brakeHistory.r1.slice(-1)[0],300,'nivån du godkände blir regelns nya normalnivå');
- assert.equal(out.result.queued,8,'resultatet från körningen följer med');
- assert.equal(out.status.brakeHolds.length,0,'ingen stoppad regel kvar i statusen');
- assert.equal(engine.heldRule('r1'),null);
-});
-
-test('bromsens svar: Stäng av regeln stänger av den i stället',async()=>{
- const {app}=await loadBackground();
- let held={ruleId:'r1',matched:300,limit:50,median:5};
- const engine=fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,
-  rules:[{id:'r1',name:'Google',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'gmail.com'}]}]},
-  heldRule:id=>held&&held.ruleId===id?held:null,
-  heldList:()=>held?[held]:[],releaseRule:()=>{held=null;}});
- const status=await app.handle({type:'brakeCancel',ruleId:'r1'});
- assert.equal(status.config.rules[0].enabled,false,'regeln stängs av');
- assert.equal(engine.config.rules[0].enabled,false,'och det sparas i konfigurationen');
- assert.equal(status.brakeHolds.length,0,'spärren är släppt');
-});
-
-test('bromsens svar: Ta bort regeln tar bort den helt',async()=>{
- const {app}=await loadBackground();
- let held={ruleId:'r1',matched:51,limit:50,median:0};
- const engine=fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,
-  rules:[{id:'r1',name:'Mejl från fortnox.se',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'fortnox.se'}]},
-         {id:'r2',name:'Nyhetsbrev',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'nytt',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'nyhetsbrev.se'}]}]},
-  heldRule:id=>held&&held.ruleId===id?held:null,
-  heldList:()=>held?[held]:[],
-  releaseRule:id=>{if(held&&held.ruleId===id)held=null;}});
- app.brakeHistory.r1=[2,3,4];
- const status=await app.handle({type:'brakeDelete',ruleId:'r1'});
- assert.equal(status.config.rules.length,1,'bara den stoppade regeln försvinner');
- assert.equal(status.config.rules[0].id,'r2','grannregeln är kvar');
- assert.equal(engine.config.rules.length,1,'och det sparades i konfigurationen');
- assert.equal(status.brakeHolds.length,0,'spärren är släppt');
- assert.equal(app.brakeHistory.r1,undefined,'minnet för en borttagen regel städas');
-});
-
-test('bromsens svar avvisas för en regel som inte är stoppad',async()=>{
- const {app}=await loadBackground();
- fakeEngineWithRules(app,{heldRule:()=>null,heldList:()=>[]});
- await assert.rejects(()=>app.handle({type:'brakeRelease',ruleId:'r1'}),'inget att släppa');
- await assert.rejects(()=>app.handle({type:'brakeCancel',ruleId:'nope'}),'okänd regel');
- await assert.rejects(()=>app.handle({type:'brakeDelete',ruleId:'r1'}),'inget att ta bort');
-});
-
 /* ── Cachen ───────────────────────────────────────────────────────────────
    Mappcachen gör svepen snabba men kan bli gammal. Den töms automatiskt en gång
    i dygnet. Det farliga vore att tömma något annat på vägen: kön, journalen
@@ -942,35 +852,9 @@ test('avstängd automatisk rensning rör ingenting, men knappen fungerar',async(
  assert.equal(app.snapshot().cache.on,false,'statusen säger att automatiken är av');
 });
 
-test('statusen visar stoppade regler med namn och antal',async()=>{
- const {app}=await loadBackground();
- fakeEngine(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,rules:[{id:'r1',name:'Google',enabled:true,target:'f'}]},
-  heldList:()=>[{ruleId:'r1',matched:837,limit:50,median:5}],heldRule:()=>({matched:837})});
- const snap=app.snapshot();
- assert.equal(snap.brakeHolds.length,1);
- assert.equal(snap.brakeHolds[0].name,'Google','namnet följer med så gränssnittet kan förklara');
- assert.equal(snap.brakeHolds[0].matched,837);
- assert.equal(snap.brake,true);
-});
-
-test('minnet fylls på när ett svep blir klart – annars vore gränsen alltid 50',async()=>{
- const {app}=await loadBackground();
- const engine=fakeEngineWithRules(app,{config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:false,moveMode:'read',hourly:false,sweepMinutes:60,
-  newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,brake:true,rules:[{id:'r1',name:'A',enabled:true}]}});
- /* Motorn anropar kroken efter varje avslutat svep. */
- app.brakeRecord({id:'r1'},{wouldQueue:12});
- app.brakeRecord({id:'r1'},{wouldQueue:14});
- assert.equal(app.brakeHistory.r1.length,2);
- assert.equal(app.brakeLimit({id:'r1'}).limit,140,'medianen 14 ger tio gånger, alltså 140 – över golvet 50');
- app.brakeRecord({id:'r1'},{wouldQueue:40});
- assert.equal(app.brakeLimit({id:'r1'}).limit,140,'14 i median ger 140 – alltså inte 10x14=140');
- assert.equal(engine.config.brake,true);
-});
-
 /* ── Hela vägen: bakgrunden + den riktiga motorn + lagringen ───────────── */
 
-test('bromsen fungerar hela vägen från svep till statusruta',async()=>{
+test('äldre konfiguration med brake=true tillåter över 50 träffar vid start',async()=>{
  const Engine=require(path.join(ROOT,'addon','engine.js'));
  const api=stubApi();
  const inbox=[];
@@ -983,23 +867,23 @@ test('bromsen fungerar hela vägen från svep till statusruta',async()=>{
  api.folders.get=async id=>({id,accountId:'a',name:id,specialUse:[]});
  api.folders.getFolderCapabilities=async()=>({canAddMessages:true,canDeleteMessages:true});
  api.messages.query=async q=>({messages:q.folderId==='inbox'?inbox:[]});
+ api.messages.get=async id=>structuredClone(inbox.find(m=>m.id===id));
  api.messages.continueList=async()=>({messages:[]});
  api.messages.abortList=async()=>{};
  api.tabs.query=async()=>[];
- const stored={config:{...C.defaults(),dryRun:true,brake:true,hourly:false,
+ const stored={brake:{r1:[1,2,3]},config:{...C.defaults(),dryRun:true,brake:true,hourly:false,
   rules:[{id:'r1',name:'Lojal',enabled:true,scope:'folder',source:'inbox',sourceAccount:'',target:'fin',match:'all',readFilter:'both',unreadAction:'keep',yearFolders:false,branches:[],conditions:[{field:'domain',op:'equals',value:'lojal.se'}]}]}};
  api.storage={local:{get:async keys=>{const out={};for(const k of [].concat(keys||[]))if(k in stored)out[k]=stored[k];return out;},set:async o=>{Object.assign(stored,o);}}};
  const {app,tick}=await loadBackground(api,{LasEngine:Engine});
  /* Låt startens svep köra klart. */
  await tick.flush(50);
  const snap=await app.handle({type:'status'});
- assert.equal(snap.brakeHolds.length,1,'den riktiga motorn stoppade regeln och bakgrunden ser det');
- assert.equal(snap.brakeHolds[0].name,'Lojal','namnet följer med till rutan');
- assert.equal(snap.brakeHolds[0].limit,50,'första svepet har golvet 50');
- assert.equal(snap.brakeHolds[0].matched,51,'bromsen slog till på det 51:a mejlet');
- assert.equal(app.logs.some(l=>l.event==='brake'),true,'händelsen finns i loggen');
- assert.equal(app.engine.pending.size,0,'ingenting ligger kvar i kön');
- assert.equal(app.brakeHistory.r1,undefined,'en stoppad regel skriver ingen ny normalnivå – annars vore bromsen verkningslös nästa svep');
+ assert.equal(snap.brakeHolds,undefined);
+ assert.equal(snap.config.brake,undefined);
+ assert.equal(snap.stats.simulated,60,'alla 60 provsorteras trots det äldre brake-fältet');
+ assert.equal(app.logs.some(l=>l.event==='brake'),false);
+ assert.equal(app.engine.pending.size,0);
+ assert.equal(app.engine.fault,'');
 });
 
 /* ── Veckovis säkerhetskopia + manuell knapp ───────────────────────────── */
@@ -1937,4 +1821,29 @@ test('corrupt journal is retained verbatim until an explicit confirmed clear',as
  assert.equal(app.engine.fault,'invalid_storage');
  await app.handle({type:'setMode',paused:false,dryRun:true,revision:app.engine.config.revision});assert.deepEqual(stored.work,work);
  await app.handle({type:'clearBlocked',confirmed:true});assert.deepEqual(stored.work,[]);
+});
+
+test('trial counters still persist after sweep without count history',async()=>{
+ const api=stubApi(),writes=[];api.storage.local.set=async value=>writes.push(value);
+ const {app}=await loadBackground(api);
+ fakeEngine(app,{trialList:()=>[{ruleId:'r1',keys:['trial-key']}]});
+ app.recordSweep({id:'r1'},{trial:true});await app.write(async()=>{});
+ assert.ok(writes.some(w=>w.trial?.[0]?.keys?.[0]==='trial-key'));
+ assert.equal(writes.some(w=>'brake' in w),false);
+});
+test('obsolete count-brake RPCs cannot enable, delete or run a disabled rule',async()=>{
+ const {app}=await loadBackground();const rules=[{id:'d7899044-1685-40ca-8e2c-8531e4110683',enabled:false}];
+ fakeEngine(app,{config:{...C.defaults(),rules}});
+ for(const type of ['brakeRelease','brakeCancel','brakeDelete'])await assert.rejects(()=>app.handle({type,ruleId:rules[0].id}),e=>e.code==='bad_request');
+ assert.deepEqual(app.engine.config.rules,rules);assert.equal(app.engine.config.rules[0].enabled,false);
+});
+test('restoring a legacy backup never restores a count brake or enables its disabled rule',async()=>{
+ const {app}=await loadBackground();
+ fakeEngineWithRules(app,{config:{...C.defaults(),rules:[]}});
+ const rule={...exportRule,id:'d7899044-1685-40ca-8e2c-8531e4110683',name:'Fortnox',enabled:false,source:'inbox'};
+ app.backups=[{time:Date.now(),config:{...C.defaults(),brake:true,rules:[rule]}}];
+ const out=await app.handle({type:'restoreBackup',revision:0,index:0});
+ assert.equal(out.config.rules[0].enabled,false);assert.equal(out.config.rules[0].id,rule.id);
+ assert.equal('brake' in out.config,false);assert.equal(out.config.paused,true);assert.equal(out.config.dryRun,true);
+ assert.equal(out.brakeHolds,undefined);
 });

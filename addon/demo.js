@@ -6,13 +6,13 @@ globalThis.LasDemo=(()=>{
   {id:'demo-buy',accountId:'demo',label:'Exempelkonto · Inköp',name:'Inköp'},
   {id:'demo-arkiv',accountId:'demo',label:'Exempelkonto · Arkiv',name:'Arkiv'}];
  for(const f of folders){f.accountName='Exempelkonto';f.path='/'+f.label.split(' · ').slice(1).join(' · ').replaceAll(' / ','/');f.parentId='demo-root';}
- let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,brake:true,rules:[
+ let state={config:{schema:1,revision:0,rulesVersion:0,paused:false,dryRun:true,moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,verbose:true,fileLog:true,autoBackup:true,autoClear:true,rules:[
   {id:'demo-1',name:'Fortnox fakturor',enabled:true,source:'demo-in',target:'demo-fin',match:'all',conditions:[{field:'domain',op:'equals',value:'fortnox.se'}],branches:[{condition:{field:'subject',op:'contains',value:'Faktura'},target:'demo-fin'},{condition:{field:'subject',op:'contains',value:'Order'},target:'demo-buy'}]},
   {id:'demo-2',name:'Webbsupport',enabled:true,source:'demo-in',target:'demo-web',match:'all',conditions:[{field:'domain',op:'equals',value:'support.example'}]},
   {id:'demo-3',name:'Arkivera äldre mejl',enabled:true,source:'demo-in',target:'demo-arkiv',match:'any',readFilter:'read',conditions:[{field:'date',op:'older',value:'90'}]}]},
   prefs:{theme:'light',fontSize:14,density:'comfortable',lineSpacing:'normal',introCollapsed:false,lastRule:'demo-1',lang:'sv'},installType:'normal',
   paths:{root:'Lasfilter/',logs:'Lasfilter/logs/',backups:'Lasfilter/Regelbackuper/',rules:'Lasfilter/Regler/',filters:'Lasfilter/Filterfiler/'},
-  brake:true,brakeHolds:[],lastBackupWeek:'2026-W42',cache:{on:true,at:0,day:''},trials:[],learn:{off:false,suggestions:[]},
+  lastBackupWeek:'2026-W42',cache:{on:true,at:0,day:''},trials:[],learn:{off:false,suggestions:[]},
   moveMode:'read',hourly:true,sweepMinutes:60,newInboxDirect:true,openWindow:true,stats:{checks:8,matched:3,moved:0,simulated:3,skipped:0},queued:2,blocked:0,inflight:0,health:{global:null,holds:[]},fault:'',lastCheck:Date.now(),backups:[],logs:[LasCore.event('start'),LasCore.event('simulated',3)]};
  const selected={author:'Demoavsändare <faktura@fortnox.se>',subject:'Faktura 1042 – fiktivt testmeddelande',read:true,source:'demo-in',sourceAccount:'demo',email:'faktura@fortnox.se',domain:'fortnox.se'};
  const snapshots=[];let mockPrefill=null;
@@ -205,37 +205,17 @@ globalThis.LasDemo=(()=>{
        från Thunderbird. Normalisera här så att uppslaget räknar på samma sak. */
     const raw=m.message&&typeof m.message==='object'?m.message:selected;
     const msg={...raw,folder:raw.folder||{id:raw.source||raw.folderId||'demo-in',accountId:raw.sourceAccount||'demo'}};
-    const result=LasCore.whyHere(state.config.rules,msg,{moveMode:state.moveMode,displayed:false,queueContains:false,recordsContains:false,heldIds:(state.brakeHolds||[]).map(h=>h.ruleId)});
+    const result=LasCore.whyHere(state.config.rules,msg,{moveMode:state.moveMode,displayed:false,queueContains:false,recordsContains:false});
     const nameOf=id=>folders.find(f=>f.id===id)?.label||'';
     data={...result,message:{id:msg.id||1,author:msg.author||'',subject:msg.subject||'',read:msg.read===true,folderId:msg.folder?.id||msg.source||'',folderName:nameOf(msg.folder?.id||msg.source||'')},
      winnerName:nameOf(result.winnerTarget),folderNames:folders.map(f=>({id:f.id,label:f.label}))};break;
-   }
-   case 'brakeRelease':{
-    const hold=(state.brakeHolds||[]).find(h=>h.ruleId===m.ruleId);
-    if(!hold)throw new LasCore.RuleError('bad_rule');
-    state.brakeHolds=state.brakeHolds.filter(h=>h.ruleId!==m.ruleId);
-    data={result:{queued:hold.matched},status:state};break;
-   }
-   case 'brakeCancel':{
-    const hold=(state.brakeHolds||[]).find(h=>h.ruleId===m.ruleId);
-    if(!hold)throw new LasCore.RuleError('bad_rule');
-    state.brakeHolds=state.brakeHolds.filter(h=>h.ruleId!==m.ruleId);
-    state.config.rules=state.config.rules.map(r=>r.id===m.ruleId?{...r,enabled:false}:r);
-    data=state;break;
-   }
-   case 'brakeDelete':{
-    const hold=(state.brakeHolds||[]).find(h=>h.ruleId===m.ruleId);
-    if(!hold)throw new LasCore.RuleError('bad_rule');
-    state.brakeHolds=state.brakeHolds.filter(h=>h.ruleId!==m.ruleId);
-    state.config.rules=state.config.rules.filter(r=>r.id!==m.ruleId);
-    data=state;break;
    }
    case 'clearCache':{
     const day=new Date().toISOString().slice(0,10);
     state.cache={on:state.config.autoClear!==false,at:Date.now(),day};
     data={result:{ok:true,folders:12,day,at:Date.now()},status:state};break;
    }
-   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.autoClear=m.autoClear!==false;state.config.brake=m.brake!==false;state.cache={...state.cache,on:state.config.autoClear!==false};state.config.revision++;data=state;break;
+   case 'setOptions':state.moveMode=m.moveMode;state.hourly=m.hourly;state.sweepMinutes=m.sweepMinutes;state.newInboxDirect=m.newInboxDirect;state.config.sweepMinutes=m.sweepMinutes;state.config.newInboxDirect=m.newInboxDirect;state.openWindow=m.openWindow;state.config.verbose=!!m.verbose;state.config.fileLog=m.fileLog!==false;state.config.autoBackup=m.autoBackup!==false;state.config.autoClear=m.autoClear!==false;state.cache={...state.cache,on:state.config.autoClear!==false};state.config.revision++;data=state;break;
    case 'backupNow':data=state.config.autoBackup===false?{written:false,reason:'off'}:{written:true,filename:'Lasfilter/Regelbackuper/sortbro-regler-backup.json',dated:'',count:state.config.rules.length};break;
    default:throw new LasCore.RuleError('bad_request');
   }return {success:true,data:structuredClone(data)};

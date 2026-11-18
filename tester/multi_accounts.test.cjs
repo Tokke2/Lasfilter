@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../addon/core.js'),Engine=require('../addon/engine.js'),F=require('../addon/filters.js');
 const raw=()=>({id:'multi',name:'Shared invoices',enabled:true,scope:'account',source:'a-in',sourceAccount:'a',sourceAccounts:['a','b'],target:'shared',match:'all',conditions:[{field:'domain',op:'equals',value:'example.se'}],readFilter:'read',unreadAction:'keep',openTiming:'before'});
 const msg=(id,account='a',read=true)=>({id,read,folder:{id:account+'-in',accountId:account},author:'Test <test@example.se>',subject:'Invoice',size:500,date:new Date('2026-10-01'),headerMessageId:'multi-'+id+'@example.invalid'});
-function fixture({dryRun=false,targetAccount='c',brake=false}={}){
+function fixture({dryRun=false,targetAccount='c'}={}){
  const nodes=new Map(),accounts=[];let now=Date.UTC(2026,9,12),e;
  for(const id of ['a','b','c']){
   const folders=[{id:id+'-in',name:'Inbox',accountId:id,specialUse:['inbox']},{id:id+'-sub',name:'Sub',accountId:id},{id:id+'-junk',name:'Junk',accountId:id,specialUse:['junk']}];
@@ -16,7 +16,7 @@ function fixture({dryRun=false,targetAccount='c',brake=false}={}){
  get:async id=>structuredClone(messages.get(id)),query:async q=>{queries.push(q.folderId);return {messages:[...messages.values()].filter(m=>m.folder.id===q.folderId&&(q.unread===undefined||m.read===!q.unread)&&(q.headerMessageId===undefined||m.headerMessageId===q.headerMessageId))};},abortList:async()=>{},
  move:async(ids,target)=>{calls.push({ids,target});for(const id of ids){const before=messages.get(id),after={...before,id:id+1000,folder:nodes.get(target)};messages.delete(id);messages.set(after.id,after);await e.onMoved({messages:[before]},{messages:[after]});}}
  }};
- e=new Engine(api,{...C.defaults(),dryRun,rules:[C.validateRule(raw())]},{now:()=>now,ackTimeout:1,persist:async()=>persisted.push(structuredClone(e.recordList())),brakeLimit:brake?()=>({limit:1,median:1}):undefined});
+ e=new Engine(api,{...C.defaults(),dryRun,rules:[C.validateRule(raw())]},{now:()=>now,ackTimeout:1,persist:async()=>persisted.push(structuredClone(e.recordList()))});
  return {e,api,accounts,nodes,messages,calls,queries,persisted,advance:()=>now+=2100};
 }
 test('legacy single-account rules and folder rules do not gain extra accounts',()=>{
@@ -79,8 +79,11 @@ test('Thunderbird filter export refuses to silently drop multi-account scope',()
  const r=C.validateRule(raw()),out=F.buildFilterFile([r],{uriOf:{multi:{uriPrefix:'imap://x/',folderPath:'Shared'}}});assert.equal(out.report.written,0);assert.equal(out.report.skipped,1);assert(out.report.notes.includes('multipleAccounts'));assert(!out.text.includes('action='));
 });
 
-test('safety brake counts the combined sweep and clears pending jobs from both accounts',async()=>{
- const f=fixture({brake:true});const result=await f.e.sweepRule(f.e.config.rules[0],{force:true});assert.equal(result.held,true);assert.equal(f.e.heldRule('multi').matched,2);assert.equal(f.e.pending.size,0);await f.e.tick();assert.equal(f.calls.length,0);
+test('combined source accounts are not subject to the old count brake',async()=>{
+ const f=fixture();f.e.config.brake=true;f.e.hooks.brakeLimit=()=>{throw Error('obsolete hook must not run');};
+ for(let i=1;i<=80;i++)f.messages.set(i,msg(i,i%2?'a':'b'));
+ const result=await f.e.sweepRule(f.e.config.rules[0],{force:true});assert.equal(result.queued,80);assert.equal(result.held,undefined);
+ await f.e.tick();assert.equal(f.calls.length,80);assert.equal(f.e.fault,'');
 });
 test('global queue limit stays at 100 across selected accounts',async()=>{
  const f=fixture();f.messages.clear();for(let i=1;i<=101;i++)f.messages.set(i,msg(i,i%2?'a':'b'));

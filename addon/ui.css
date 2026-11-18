@@ -1307,53 +1307,6 @@ th {
   line-height: 1.7;
 }
 
-/* Säkerhetsbromsen: raden högst upp som kräver ett svar innan något flyttas. */
-.brake-warns {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px 0;
-}
-
-.brake-warn {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #f0c36d;
-  border-left-width: 4px;
-  border-radius: 6px;
-  background: #fff6e0;
-  color: #5b3d05;
-  font-size: var(--text-body);
-  line-height: 1.45;
-}
-
-.brake-warn-icon {
-  font-size: 1.15rem;
-  line-height: 1;
-  margin-top: 1px;
-}
-
-.brake-warn-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.brake-warn-body strong {
-  font-size: var(--text-body);
-}
-
-.brake-warn-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
 /* Cache-kortet under Inställningar: knappen och raden om när den senast tömdes. */
 .cache-actions {
   display: flex;
@@ -1378,12 +1331,6 @@ th {
   color: #6b4a06;
   font-size: var(--text-small);
   line-height: 1.45;
-}
-
-body.dark .brake-warn {
-  background: #3a2c07;
-  border-color: #7a5c12;
-  color: #f6e2ac;
 }
 
 :root[data-theme="dark"] .rule-conflict {

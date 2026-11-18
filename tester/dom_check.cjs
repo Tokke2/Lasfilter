@@ -693,46 +693,15 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
 
  /* --- ⚠ Installationen: tillägget avinstallerar sig inte, men kan stängas av --- */
  const pausedNow=()=>el('pause').textContent;
- /* --- Säkerhetsbromsen: raden som kräver ett svar --- */
- check(el('brakeWarns')!==null,'det finns en rad för säkerhetsbromsen');
- check(el('brakeWarns').hidden===true,'den är tyst när ingen regel är stoppad');
- check(el('brake')!==null&&el('brake').checked===true,'säkerhetsbromsen är på som standard');
- el('brake').checked=false;fire(el('brake'),'change');
- await until(()=>/Säkerhetsbromsen är av/.test(txt('toast')),'avstängd broms kvitteras',false,6000);
- check(w.LasDemo.setState({}).config.brake===false,'inställningen sparades när rutan kryssades ur');
- el('brake').checked=true;fire(el('brake'),'change');
- await until(()=>/Säkerhetsbromsen är på/.test(txt('toast')),'påslagen broms kvitteras',false,6000);
- check(w.LasDemo.setState({}).config.brake===true,'och när den kryssades i igen');
- w.LasDemo.setState({brakeHolds:[{ruleId:'demo-1',matched:837,limit:50,median:5,at:Date.now(),name:'Fortnox fakturor',target:'demo-fin'}]});
- el('pause').click();
- await until(()=>el('brakeWarns').hidden===false,'stoppad regel syns',false,6000);
- check(/Säkerhetsbromsen stoppade en regel/.test(el('brakeWarns').textContent),'rubriken säger att bromsen slog till');
- check(/Fortnox fakturor/.test(el('brakeWarns').textContent),'regelns namn står där: "'+el('brakeWarns').textContent.slice(0,120)+'…"');
- check(/837/.test(el('brakeWarns').textContent)&&/50/.test(el('brakeWarns').textContent),'antalet och gränsen syns');
- check(/brukar flytta 5/.test(el('brakeWarns').textContent),'och vad regeln brukar göra');
- check(!/undefined|\{n\}|\{median\}/.test(el('brakeWarns').textContent),'inga ofyllda platshållare');
- const brakeBtns=[...el('brakeWarns').querySelectorAll('button')];
- check(brakeBtns.length===3,'tre svar: flytta ändå, stäng av eller ta bort');
- check(/Flytta ändå/.test(brakeBtns[0].textContent)&&/Stäng av regeln/.test(brakeBtns[1].textContent),'knapparna säger vad de gör');
- check(/Ta bort regeln/.test(brakeBtns[2].textContent),'den tredje knappen tar bort regeln');
-
- /* Ta bort frågar en gång till. Säger man nej händer ingenting alls. */
- let asked='';
- const realConfirm=w.confirm;
- w.confirm=(text)=>{asked=text;return false;};
- brakeBtns[2].click();
- await until(()=>asked.length>0,'borttagningen frågar först',false,6000);
- check(/Fortnox fakturor/.test(asked),'frågan nämner regeln vid namn');
- check(/[Rr]egelkopior/.test(asked),'och var den går att få tillbaka');
- check(/Ta bort regeln\?/.test(asked),'och vad knappen gör');
- check(el('brakeWarns').hidden===false,'ett nej lämnar varningen kvar');
- check(w.LasDemo.setState({}).brakeHolds.length===1,'och regeln finns kvar');
- w.confirm=realConfirm;
-
- brakeBtns[0].click();
- await until(()=>el('brakeWarns').hidden===true,'svaret tar bort raden',false,6000);
- check(el('brakeWarns').hidden===true,'ingen stoppad regel kvar efter svaret');
- check(!/Säkerhetsbromsen stoppade/.test(el('brakeWarns').textContent),'raden är tom efter svaret');
+ /* Antalsbromsen är borttagen; andra stopp och paus ska finnas kvar. */
+ check(!el('brake')&&!el('brakeWarns'),'inga reglage eller varningsrader för antalsbromsen');
+ check(/Ingen antalsbroms/.test(doc.querySelector('[data-i18n="moveCountNote"]').textContent),'inställningarna förklarar att ingen antalsspärr finns');
+ check(/100/.test(doc.querySelector('[data-i18n="moveCountNote"]').textContent),'kögränsen beskrivs som väntande jobb, inte max antal flyttar');
+ check(!!el('pause')&&!!el('clearFault')&&!!el('healthGuide'),'paus och felskyddens kontroller finns kvar');
+ const savedMoveConfig=JSON.stringify(w.LasDemo.setState({}).config);
+ w.LasDemo.setState({brakeHolds:[{ruleId:'demo-1',matched:837,limit:50}]});await w.refresh();
+ check(!el('brakeWarns')&&JSON.stringify(w.LasDemo.setState({}).config)===savedMoveConfig,'äldre antalshistorik skapar inte spärrar eller ändrar regler');
+ w.applyLanguage('en');check(/No count-based brake/.test(doc.querySelector('[data-i18n="moveCountNote"]').textContent),'förklaringen är översatt till engelska');w.applyLanguage('sv');
 
  /* Cache-kortet: reglaget speglar konfigurationen och knappen tömmer cachen. */
  check(el('autoClear')!==null,'det finns ett reglage för automatisk cache-rensning');

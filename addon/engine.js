@@ -16,10 +16,6 @@ class Engine {
   /* Årsmappar: mål som Arkiv/<år> hittas eller skapas en gång och återanvänds. */
   this.yearFolderIds=new Map();this.yearCreated=0;
   this.stats={checks:0,matched:0,moved:0,simulated:0,skipped:0};this.lastCheck=null;this.lastSweep=null;
-  /* Säkerhetsbromsen: en regel som plötsligt matchar onormalt många mejl stoppas
-     och ligger kvar stoppad tills användaren svarar. Ingenting flyttas medan den
-     är stoppad – varken av svepet eller av inkommande mejl. */
-  this.ruleHolds=new Map();
   /* Provkörning: vilka mejl en regel i testläge skulle ha flyttat. Fingeravtrycken
      sparas så att samma mejl inte räknas om vid varje svep. */
   this.trialKeys=new Map();
@@ -66,29 +62,6 @@ class Engine {
  debug(t){this.hooks.debug?.(t);}
  change(){this.hooks.change?.();}
  async persist(detail={phase:'journal_before',called:false}){try{await this.hooks.persist?.();}catch{this.stop('storage_error',{...detail,reason:'storage_error'});throw new C.RuleError('storage_error');}}
- /* Bromsens gräns för en regel: {limit, median} eller null när den är avstängd. */
- brakeFor(rule){
-  try{const b=this.hooks.brakeLimit?.(rule);return b&&Number.isFinite(b.limit)&&b.limit>0?b:null;}catch{return null;}
- }
- heldRule(ruleId){return this.ruleHolds.get(ruleId)||null;}
- heldList(){return [...this.ruleHolds.entries()].map(([ruleId,h])=>({ruleId,...h}));}
- releaseRule(ruleId){this.ruleHolds.delete(ruleId);this.change();}
- /* Stoppa en regel och släpp de jobb som ännu inte påbörjats. Redan flyttade mejl
-    rörs aldrig – de är borta ur kön och kan inte tas tillbaka härifrån. */
- holdRule(rule,info){
-  this.ruleHolds.set(rule.id,{matched:info.matched,limit:info.limit,median:info.median||0,at:this.now()});
-  let dropped=0;
-  for(const [id,job] of this.pending){
-   if(job.record.ruleId!==rule.id)continue;
-   if(job.record.stage!=='pending')continue;
-   this.pending.delete(id);this.records.delete(job.record.key);job.record.stage='held';dropped++;
-  }
-  this.log('brake',info.matched,'regeln "'+(rule.name||rule.id)+'" stoppades: '+info.matched+' mejl matchade (vanligtvis '+(info.median||'inget')+', gräns '+info.limit+'). '+(dropped?dropped+' väntande jobb släpptes. ':'')+'Inget mer flyttas förrän du svarar.');
-  this.debug('sakerhetsbromsen: regel '+rule.id+' matchade '+info.matched+' (grans '+info.limit+', median '+info.median+'), '+dropped+' jobb slappta');
-  this.change();
-  if(dropped)this.persist().catch(()=>{});
-  return dropped;
- }
  healthState(){return {global:this.failure,holds:[...this.faultHolds.values()]};}
  restoreHealth(raw){const state=H.cleanState(raw);this.failure=state.global;this.faultHolds=new Map(state.holds.map(x=>[x.scope+':'+(x.scope==='account'?x.accountId:x.folderId),x]));if(this.failure)this.fault=this.failure.code;}
  async saveHealth(){
@@ -253,7 +226,6 @@ class Engine {
  }
  firstMatchingRule(message,{allowUnread=false,inboxArrival=false}={}){
   return this.config.rules.find(r=>{
-   if(this.ruleHolds.has(r.id))return false; /* stoppad av säkerhetsbromsen */
    if(this.trialActive(r))return false; /* provkörning flyttar ingenting */
    if(!C.match(r,message)||this.sameTarget(r,message))return false;
    const rf=this.ruleMode(r);
@@ -490,9 +462,8 @@ class Engine {
    if(this.routeHeld(rule.scope==='account'?'':rule.source,rule.target))return {...ZERO_SWEEP,isolated:true};
    const {excluded,folders}=await this.ruleFolders(rule,{isolateMissing:true});
    let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
-   const brake=trial?null:this.brakeFor(rule);
-   let wouldQueue=0,tripped=false,trialNew=0;
-   foldersLoop:for(const folder of folders){
+   let wouldQueue=0,trialNew=0;
+   for(const folder of folders){
     if(!this.enabled())break;
     if(this.routeHeld(folder.id,rule.target,folder.accountId))continue;
     const isInbox=this.inboxFolder(folder);
@@ -516,6 +487,7 @@ class Engine {
     const q={folderId:folder.id};
     if(rf==='unread')q.unread=true;
     else if(!folderDirect)q.unread=false;
+    const deferredBefore=deferred;
     let page=null,finished=false;
     try{
      page=await this.step('folder_query',()=>this.withTimeout(this.api.messages.query(q),this.hooks.queryTimeout??10000),{folderId:folder.id,accountId:folder.accountId});searchedFolders++;
@@ -534,8 +506,7 @@ class Engine {
        const target=await this.step('target_resolve',async()=>trial?(await this.resolveTarget(rule,m,{create:false}))||C.targetFor(rule,m):await this.resolveTarget(rule,m));
        if(!target)continue;
        if(target===m.folder.id){inTarget++;continue;}
-       /* Provkörning: räkna mejlet och gå vidare. Inget köas, inget flyttas,
-          och säkerhetsbromsen rörs inte – den vaktar flyttar, inte räkning. */
+       /* Provkörning: räkna mejlet och gå vidare. Inget köas eller flyttas. */
        if(trial){wouldQueue++;trialNew+=this.noteTrial(rule,m);continue;}
        const fk=C.fingerprint(m);
        if(!fk||this.done.has(fk)||this.records.has(fk)||this.pending.has(m.id)){handled++;continue;}
@@ -553,13 +524,7 @@ class Engine {
         }
         if(this.records.size>=C.LIMITS.queue){deferred++;continue;}
        }
-       /* Säkerhetsbromsen räknar de mejl som faktiskt skulle flyttas – inte alla
-          träffar, för de som redan ligger i målmappen kostar ingenting. */
        wouldQueue++;
-       if(brake&&wouldQueue>brake.limit){
-        this.holdRule(rule,{matched:wouldQueue,limit:brake.limit,median:brake.median});
-        tripped=true;break foldersLoop;
-       }
        if(await this.enqueue(m,{rule,target,allowUnread:folderDirect,notify:folderDirect&&(m.read!==true||rf==='both'),fromSweep:true})){
         queued++;
         if(this.hooks.ackTimeout===undefined&&!this.config.dryRun){
@@ -579,11 +544,12 @@ class Engine {
      skippedFolders++;
     }finally{
      if(page?.id)await this.withTimeout(this.api.messages.abortList(page.id),2000,()=>{}).catch(()=>{});
-     if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true,rulesVersion:this.config.rulesVersion});
+     // Queue overflow must be revisited even if message counts stay unchanged
+     // (for example in test mode). It is batching, not a permanent count limit.
+     if(info)this.folderCache.set(folder.id,{total:info.total,unread:info.unread,scanned:finished===true&&deferred===deferredBefore,rulesVersion:this.config.rulesVersion});
     }
    }
    if(folders.length&&searchedFolders===0&&emptyFolders+cachedFolders+skippedFolders===0)throw new C.RuleError('sweep_error');
-   if(tripped)return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,wouldQueue,held:true};
    if(trial){
     const trialTotal=this.trialCount(rule.id);
     this.log('simulated',trialNew);
@@ -599,19 +565,18 @@ class Engine {
  async sweepAll({force=false}={}){
   if(this.sweeping>0){if(this.pending.size)this.hooks.kick?.();return {...ZERO_SWEEP};}
   this.lastSweep=this.now();
-  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0,held=0;
-  const heldRules=[],trialRules=[];
+  let scanned=0,queued=0,deferred=0,searchedFolders=0,skippedFolders=0,emptyFolders=0,cachedFolders=0,matched=0,inTarget=0,handled=0;
+  const trialRules=[];
   for(const rule of this.config.rules.filter(r=>r.enabled)){
    if(this.trialActive(rule))trialRules.push(rule.id);
    if(!this.enabled())break;
-   if(this.ruleHolds.has(rule.id)){heldRules.push(rule.id);continue;}
-   try{const r=await this.sweepRule(rule,{includeInboxUnread:true,force});held+=r.held?1:0;
-    /* Ett avslutat svep blir regelns normalnivå – det är den bromsen jämför mot. */
+   try{const r=await this.sweepRule(rule,{includeInboxUnread:true,force});
+    /* Persist trial counters after a completed sweep. */
     try{this.hooks.ruleDone?.(rule,r);}catch{}
     scanned+=r.scanned;queued+=r.queued;deferred+=r.deferred||0;searchedFolders+=r.searchedFolders||0;skippedFolders+=r.skippedFolders||0;emptyFolders+=r.emptyFolders||0;cachedFolders+=r.cachedFolders||0;matched+=r.matched||0;inTarget+=r.inTarget||0;handled+=r.handled||0;}
    catch(error){if(!this.fault)this.stop('sweep_error',{phase:error.phase||'unknown',reason:H.reason(error),called:false,ruleId:rule.id});throw new C.RuleError('sweep_error');}
   }
-  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,heldRules,trialRules,held};
+  return {scanned,queued,deferred,searchedFolders,skippedFolders,emptyFolders,cachedFolders,matched,inTarget,handled,trialRules};
  }
  async catchUp(ruleId){
   return this.sweepRule(this.config.rules.find(r=>r.id===ruleId),{includeInboxUnread:false});
@@ -673,7 +638,7 @@ class Engine {
   return shown;
  }
  async process(job,epoch,batchState=null){
-  /* Jobbet kan ha släppts av säkerhetsbromsen efter att ticken tog sin lista. */
+  /* A setting change may have removed this job after tick took its snapshot. */
   if(this.pending.get(job.id)!==job||job.record.stage!=='pending')return;
   let called=false,op=null,phase='message_read';
   try{

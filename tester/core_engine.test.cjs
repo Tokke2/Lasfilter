@@ -37,7 +37,6 @@ function fixture(options={}){
  if(options.folderInfoReject)api.folders.getFolderInfo=async()=>{throw Error('folder info offline');};
  if(options.folderInfo){const queryInfo=api.folders.getFolderInfo;const queries=[];api.infoCalls=queries;api.folders.getFolderInfo=async id=>{queries.push(id);return queryInfo(id);};}
  engine=new Engine(api,cfg,{now:()=>now,ackTimeout:5,log:(n,c,d)=>logs.push(C.event(n,c,now,d)),notify:(...a)=>{notifications.push(a[0]);notifyArgs.push(a);},debug:t=>debugs.push(t),persist:async()=>{if(options.persistReject)throw Error('disk SECRET');saved.push(structuredClone(engine.recordList()));},
-  brakeLimit:options.brake?()=>options.brake:undefined,
   ruleDone:options.onRuleDone});
  return {e:engine,api,messages,shown,logs,saved,notifications,notifyArgs,debugs,advance:(ms=2100)=>now+=ms,ready:async()=>{await engine.enqueue(messages.get(1));await engine.tick();now+=2100;await engine.tick();}};
 }
@@ -1095,74 +1094,6 @@ test('konflikt: flera par rapporteras i listordning',()=>{
  assert.equal(JSON.stringify(conflictIds([a,b,c])),JSON.stringify(['a/b','a/c','b/c']),'alla tre paren');
 });
 
-/* ── Säkerhetsbromsen: en regel som plötsligt matchar för många ────────── */
-
-function brakeFixture(limit,count){
- const fx=fixture({brake:{limit,median:0}});
- for(let i=2;i<=count;i++)fx.messages.set(i,{...msg(i),headerMessageId:'fake-'+i+'@example.invalid'});
- return fx;
-}
-
-test('säkerhetsbromsen stoppar regeln och släpper de väntande jobben',async()=>{
- const fx=brakeFixture(3,7);
- const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
- assert.equal(r.held,true,'regeln stoppades');
- assert.equal(r.wouldQueue,4,'det fjärde mejlet utlöser bromsen');
- assert.equal(fx.e.pending.size,0,'inga väntande jobb lämnas kvar');
- assert.equal(fx.messages.get(1).folder.id,'inbox','ingenting flyttades');
- const holds=fx.e.heldList();
- assert.equal(holds.length,1);
- assert.equal(holds[0].ruleId,'rule1');
- assert.equal(holds[0].matched,4,'antalet som utlöste bromsen sparas');
- assert.equal(holds[0].limit,3);
- assert.equal(fx.logs.filter(l=>l.event==='brake').length,1,'exakt en rad i loggen');
- assert.match(fx.logs.find(l=>l.event==='brake').data.detail,/stoppades/,'raden förklarar vad som hände');
-});
-
-test('en stoppad regel svepas inte och tar inga inkommande mejl',async()=>{
- const fx=brakeFixture(1,3);
- await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
- assert.equal(fx.e.heldList().length,1,'regeln är stoppad');
- const before=fx.e.pending.size;
- const sweep=await fx.e.sweepAll({force:true});
- assert.equal(JSON.stringify(sweep.heldRules),JSON.stringify(['rule1']),'svepet hoppar över regeln och säger det');
- assert.equal(sweep.queued,0,'inget köas av en stoppad regel');
- assert.equal(fx.e.pending.size,before,'kön rörs inte');
- assert.equal(fx.e.firstMatchingRule(msg(1)),null,'inkommande mejl tas inte av en stoppad regel');
-});
-
-test('bromsen kan släppas och regeln sveper då som vanligt',async()=>{
- const fx=brakeFixture(2,5);
- await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
- assert.equal(fx.e.heldList().length,1);
- fx.e.releaseRule('rule1');
- assert.equal(fx.e.heldList().length,0,'spärren är släppt');
- const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
- assert.equal(r.held,true,'men bromsen slår till igen om nivån inte godkänts');
- assert.equal(fx.e.heldList()[0].matched,3);
-});
-
-test('utan broms (avstängd) hålls ingen regel',async()=>{
- const fx=fixture({brake:null});
- for(let i=2;i<=9;i++)fx.messages.set(i,{...msg(i),headerMessageId:'fake-'+i+'@example.invalid'});
- const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
- assert.equal(r.held,undefined,'ingen broms är ingen broms');
- assert.equal(fx.e.heldList().length,0);
- assert.ok(r.wouldQueue>=8,'alla mejl räknas');
- assert.equal(fx.e.pending.size,9,'alla nio mejl köades');
-});
-
-test('bromsen räknar bara mejl som faktiskt skulle flyttas',async()=>{
- /* Två av mejlen ligger redan i målmappen: de ska inte knuffa regeln över gränsen. */
- const fx=fixture({brake:{limit:3,median:0}});
- for(let i=2;i<=5;i++)fx.messages.set(i,{...msg(i),headerMessageId:'fake-'+i+'@example.invalid'});
- fx.messages.set(6,{...msg(6),headerMessageId:'fake-6@example.invalid',folder:{id:'archive',accountId:'a'}});
- fx.messages.set(7,{...msg(7),headerMessageId:'fake-7@example.invalid',folder:{id:'archive',accountId:'a'}});
- const r=await fx.e.sweepRule(fx.e.config.rules[0],{force:true});
- assert.equal(r.held,true,'fyra riktiga flyttar utlöser en gräns på 3');
- assert.equal(r.wouldQueue,4);
-});
-
 /* ── "Varför ligger det här mejlet här?" ──────────────────────────────── */
 
 const whyMsg=(over={})=>({id:1,read:true,folder:{id:'inbox',accountId:'a'},author:'Anna <anna@example.se>',
@@ -1239,11 +1170,11 @@ test('whyHere: en förgrening kan också förklara var mejlet ligger',()=>{
  assert.ok(out.rules[0].arrived);
 });
 
-test('whyHere: en stoppad regel sägs vara stoppad',()=>{
+test('whyHere: äldre antalsstopp ignoreras',()=>{
  const rule=mkRule('stoppad',{target:'fin',conditions:[cmp('domain','equals','example.se')]});
  const out=C.whyHere([rule],whyMsg(),{heldIds:['stoppad']});
- assert.ok(out.rules[0].state.some(s=>/säkerhetsbromsen/.test(s.text)),'bromsen nämns');
- assert.equal(out.rules[0].blocked,true);
+ assert.equal(out.rules[0].state.some(s=>/säkerhetsbromsen/.test(s.text)),false);
+ assert.equal(out.rules[0].blocked,false);
 });
 
 test('whyHere: visar vilka villkor som stämde, villkor för villkor',()=>{
@@ -1569,4 +1500,40 @@ test('unknown tab list cannot masquerade as closed tabs',async()=>{
 test('restart retains a previously recorded exact move failure rather than overwriting its phase',async()=>{
  const f=fixture({moveReject:true});await f.ready();const g=fixture();g.e.restoreHealth(f.e.healthState());await g.e.restore(f.e.recordList());
  assert.equal(g.e.failure.phase,'move_call');assert.equal(g.e.failure.called,true);assert.equal(g.e.failure.id,f.e.failure.id);assert.equal(g.e.blocked(),1);
+});
+
+/* Removing the count brake must not remove queue batching or any safety guard. */
+for(const dryRun of [false,true])test(`250 matches complete across bounded batches, dryRun=${dryRun}`,async()=>{
+ const f=fixture({dryRun,folderInfo:true});
+ f.e.config=C.config({...f.e.config,brake:true});
+ f.e.hooks.brakeLimit=()=>{throw Error('obsolete count hook called');};
+ for(let i=1;i<=250;i++)f.messages.set(i,msg(i));
+ let rounds=0,total=0;
+ while(total<250&&rounds++<5){
+  const result=await f.e.sweepAll();
+  assert.equal(result.held,undefined);assert.equal(result.heldRules,undefined);
+  assert.ok(result.queued>0);assert.ok(f.e.pending.size<=100);assert.ok(f.e.records.size<=100);
+  total+=result.queued;
+  await f.e.tick();f.advance();await f.e.tick();
+  assert.equal(f.e.pending.size,0);assert.equal(f.e.fault,'');
+ }
+ assert.equal(total,250);assert.equal(rounds,3);
+ assert.equal(dryRun?f.e.stats.simulated:f.e.stats.moved,250);
+ assert.equal(f.api.calls.length,dryRun?0:250);
+ assert.equal(new Set(f.api.calls.map(c=>c.ids[0])).size,f.api.calls.length,'no double moves');
+ assert.equal(f.logs.some(l=>l.event==='brake'),false);
+});
+for(const brake of [true,false,{legacy:true}])test(`legacy config/backup brake ${JSON.stringify(brake)} is ignored without enabling Fortnox`,()=>{
+ const rule={...base(),id:'d7899044-1685-40ca-8e2c-8531e4110683',name:'Fortnox',enabled:false};
+ const cfg=C.config(JSON.parse(JSON.stringify({...C.defaults(),brake,paused:true,rules:[rule]})));
+ assert.equal('brake' in cfg,false);assert.equal(cfg.paused,true);
+ assert.equal(cfg.rules[0].enabled,false);assert.equal(cfg.rules[0].id,rule.id);
+ assert.equal(C.firstMatch(cfg.rules,msg()),null);
+});
+test('disabled Fortnox remains disabled in sweep and incoming mail',async()=>{
+ const f=fixture();f.e.config=C.config({...f.e.config,brake:true,rules:[{...base(),id:'d7899044-1685-40ca-8e2c-8531e4110683',enabled:false}]});
+ for(let i=1;i<=60;i++)f.messages.set(i,msg(i));
+ const result=await f.e.sweepAll();assert.equal(result.queued,0);
+ assert.equal(await f.e.enqueue(msg()),false);await f.e.tick();
+ assert.equal(f.api.calls.length,0);assert.equal(f.e.config.rules[0].enabled,false);
 });

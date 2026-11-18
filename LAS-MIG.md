@@ -42,7 +42,7 @@ I regelredigeraren finns **Konton som regeln ska läsa**. Kryssa i de konton som
 - Endast uttryckligen markerade konton ingår. Nya konton läggs inte till automatiskt. Minst ett konto krävs; ett saknat sparat konto visas som saknat och ersätts inte med ett annat konto.
 - Gamla regler behåller sitt enda konto. Flerkontovalet sparas i ett extra fält, **sourceAccounts**, medan det första kontot behålls i **sourceAccount** för befintliga arbetsflöden. Stöd för flera konton kräver **SortBro 1.0.30 eller senare**.
 - JSON-export/import och veckobackuper bevarar hela kontovalet. Vid import måste de uttryckligen angivna kontona finnas; tillägget gissar inte ersättningskonton i en annan profil. Thunderbirds egna filterfiler gäller per konto och kan inte bevara detta val: flerkontoregler hoppas därför över med en tydlig förklaring i **msgFilterRules.dat-exporten**. Använd SortBros JSON-export för dessa regler.
-- Kögräns, säkerhetsbroms, testläge och läsfönstrets säkerhetskontroller gäller även när fler konton används. Kontrollera först regeln i testläge, särskilt vid flytt mellan konton.
+- Kögräns, felskydd, testläge och läsfönstrets säkerhetskontroller gäller även när fler konton används. Kontrollera först regeln i testläge, särskilt vid flytt mellan konton.
 
 ## Snabbare vägar till en färdig regel
 
@@ -192,24 +192,15 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
 - **Hjälp → Donationer** öppnar en egen dialog i appen med **Swish standard-QR** till **0721817177** samt enbart knappar till **paypal.me/Rickard3dPrint** och **ko-fi.com/tokke2**. PayPal och Ko-fi har inga QR-koder. Ingen separat stödsida. Mottagaruppgifterna är fasta i appen och gåvor är frivilliga; inget låses upp. Swish-beloppet gäller bara Swish. För PayPal/Ko-fi väljs beloppet hos tjänsten.
 
-## Säkerhetsbromsen – när en regel plötsligt matchar för mycket
+## Ingen antalsbroms – större körningar delas upp
 
-Ett enda stavfel i en regel kan flytta tusentals mejl. Säkerhetsbromsen finns för att det aldrig ska hända utan att du får säga till.
+Från **1.0.34** finns ingen spärr baserad på antalet matchande mejl. Varken den tidigare gränsen på 50 mejl eller jämförelsen med tidigare körningar används. Det gäller alla regler, även regler för flera konton. Reglaget och svarsknapparna för antalsbromsen är borttagna.
 
-**Så fungerar den.** SortBro minns hur många mejl varje regel brukar flytta per svep (de tio senaste körningarna, bara antal – inget annat). Vill en regel plötsligt flytta **tio gånger fler** än vanligt, och minst **50** mejl, stoppas den mitt i svepet. Inget mer köas, väntande jobb som ännu inte påbörjats släpps, och en rad högst upp i fönstret säger vad som hänt:
-
-> ⚠ **Säkerhetsbromsen stoppade en regel**
-> Regeln "Google" ville flytta 837 mejl. Gränsen är 50 och regeln brukar flytta 5. Inget mer flyttas förrän du väljer.
-> **[Flytta ändå] [Stäng av regeln] [Ta bort regeln]**
-
-- **Flytta ändå** släpper spärren, kör regeln direkt och gör den nivån till regelns nya normalnivå – bromsen slår inte till igen för samma sak.
-- **Stäng av regeln** stänger av den i stället. Inget mer flyttas, och regeln ligger kvar med alla inställningar så att du kan rätta och slå på den igen.
-- **Ta bort regeln** tar bort den helt, för den som redan vet att regeln var fel. Den frågar en gång till och nämner regelns namn, vad som händer och att en kopia sparas först – säger du nej händer ingenting alls.
-- Den stoppade regeln **sveps inte** och tar inte heller **inkommande mejl** förrän du har svarat. Andra regler fortsätter som vanligt.
-- Nya regler har ingen historik. Deras gräns är därför 50 mejl i första svepet – det är precis då ett stavfel brukar upptäckas.
-- Antalet räknar bara mejl som **faktiskt skulle flyttas**: sådant som redan ligger i målmappen kostar ingenting.
-- Bromsen stängs av under **Inställningar → Sortering & säkerhet**. Stängs den av släpps också alla stoppade regler direkt. Kvittot säger rakt ut vad som då kan hända: *"En felaktig regel kan då flytta hela inkorgen utan att fråga."*
-- Stoppet skrivs i loggen som händelsen **Säkerhetsbromsen stoppade en regel**, med regelns namn, antalet, gränsen och hur många väntande jobb som släpptes.
+- **En felaktig regel kan flytta hela inkorgen utan extra antalsspärr.** Granska källa, mål och villkor och använd testläge/provkörning först.
+- **Kön är fortfarande begränsad till 100 jobb åt gången**, inte 100 flyttar totalt. När kön töms kan fler tas in; kvarvarande mejl tas i fortsatta svep. Om automatiken är avstängd kan du köra regeln igen manuellt. En mapp med uppskjutna jobb markeras inte som färdig i cachen, även om meddelandeantalet är oförändrat i testläge.
+- **Övriga skydd är kvar:** paus, läsvillkor, läsfönstrets väntan, testläge, journalföring och stopp vid lagringsfel eller osäkra flyttar. Sådana stopp släpps inte av den här ändringen.
+- **Avstängda regler förblir avstängda.** Uppdateringen aktiverar inte Fortnox eller någon annan regel som du har stängt av. Slå på den själv om den ska köras igen.
+- Äldre inställningar, regelkopior och antalshistorik kan inte återinföra antalsbromsen. Gamla bromshändelser går fortfarande att läsa i loggen; de betyder inte att en ny antalsspärr är aktiv.
 
 ## "Varför ligger det här mejlet här?"
 
@@ -218,7 +209,7 @@ Knappen **🔍 Varför ligger mejlet här?** i regellistan svarar på den fråga
 Panelen svarar på tre saker:
 
 1. **Vilken regel som gäller** och vart mejlet skulle flyttas: *"Regeln 'Fakturor' gäller och skulle flytta mejlet till Jobb · Fakturor."*
-2. **Vad som stoppar flytten**, om något gör det: mejlet är oläst men regeln flyttar bara lästa, mejlet visas just nu, det ligger redan i kön, det är redan hanterat, regeln är stoppad av säkerhetsbromsen, eller målmappen hittades inte.
+2. **Vad som stoppar flytten**, om något gör det: mejlet är oläst men regeln flyttar bara lästa, mejlet visas just nu, det ligger redan i kön, det är redan hanterat, målmappen hittades inte.
 3. **Varför ingen regel matchar**, när ingen gör det – med de tre närmaste reglerna och de villkor som fällde avgörandet: *"'Nyhetsbrev' – 1 av 3 villkor stämmer · Ämne innehåller nyhetsbrev – matchar inte."*
 
 Under **Alla regler som prövas** listas varje regel med en rad: *matchar*, *matchar inte*, *annan mapp*, *avstängd* eller *stoppad*. Där ser man direkt om en annan regel tog mejlet före.
@@ -250,7 +241,7 @@ En ny regel är den enda som är osäker. Därför kan du i steg 3 kryssa **Prov
 
 - **Provkörningen påverkar inte dina andra regler.** En regel i provkörning hoppas över när mejlen ska sorteras, så ett mejl som skulle ha fångats av en provkörande regel går vidare till nästa regel precis som om den inte fanns. Inget mejl blir liggande för att du testar.
 - **Räkningen är ärlig.** SortBro sparar fingeravtrycket på varje mejl som regeln skulle ha flyttat, så samma mejl räknas bara en gång – även om svepet går varje timme i en vecka.
-- **Säkerhetsbromsen rörs inte.** En provkörning flyttar inget, och räknas därför aldrig som regelns normalnivå.
+- **Ingen flytt under provkörningen.** Räknarna sparas separat och ändrar inte läsvillkor, paus eller felskydd.
 - **I regellistan** bär regeln märket **TEST · 3 dagar kvar**.
 - **När veckan är slut** dyker en rad upp ovanför regellistan: *Regeln "Fakturor" skulle ha flyttat 34 mejl.* med tre val – **Aktivera regeln**, **Förläng 7 dagar** eller **Stäng av regeln**. Ingenting händer förrän du svarar.
 
@@ -325,7 +316,7 @@ SortBro tömmer cachen när den **vet** att något ändrats: ett mejl flyttas, e
 - **Rensa cachen nu** – knappen fungerar även om du stängt av den automatiska rensningen. Kvittot säger hur många mappar som läses om vid nästa svep.
 - Raden bredvid säger när det senast hände: *"Senast rensad i dag 09:12"*, *"…i går 21:40"* eller *"…för 3 dagar sedan"*. Är automatiken avstängd står det också.
 
-**Vad som aldrig rensas.** Kön, journalen och minnet av redan hanterade mejl är inte cache – de är det som hindrar samma mejl från att hanteras två gånger. Inte heller provkörningens räknare eller säkerhetsbromsens historik rörs. Ett test i `tester/safety.test.cjs` avvisar ändringar som skulle tömma något av dem.
+**Vad som aldrig rensas.** Kön, journalen och minnet av redan hanterade mejl är inte cache – de är det som hindrar samma mejl från att hanteras två gånger. Inte heller provkörningens räknare rörs. Ett test i `tester/safety.test.cjs` avvisar ändringar som skulle tömma något av dem.
 
 **Mitt i en flytt väntar rensningen.** Skulle cachen rensas medan mejl är på väg ut ur kön kan nästa svep hoppa över en mapp som faktiskt ändrats. Därför rensas ingenting så länge kön inte är tom – den automatiska väntar till nästa minut, den manuella säger *"Vänta tills flytten är klar"*.
 
@@ -582,6 +573,16 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.34
+
+- **Antalsbromsen borttagen för alla regler.** Inga stopp vid 51 träffar eller på grund av tidigare normalnivå. Inga gamla reglage eller svarsknappar finns kvar.
+- **Kögränsen 100 är kvar som batchning.** Uppskjutna mejl läses om vid nästa svep även i testläge med oförändrat mappantal.
+- **Dina val och övriga skydd bevaras.** Avstängda regler aktiveras inte. Paus, läsfönster, läsvillkor, lagringsskydd, osäkra flyttar, provkörningsräknare och veckobackuper är kvar. Donationsdialogen är oförändrad.
+
+Verifierat med **595 automatiska tester, 557 DOM-kontroller och 64 Chromium-layouter** (SV/EN, ljust/mörkt, 360/600/840/1280 px, 12/14/20/24 px; inställningar och donationsdialog). Regressionstester täcker 250 träffar i tre batcher i både flytt- och testläge, 80 träffar över flera konton, äldre konfiguration/regelkopior, avstängd Fortnox-regel och sparade provkörningsräknare. De gamla bromstesterna är ersatta med tester av det nya beteendet. **Ingen native Thunderbird-/IMAP-körning har gjorts här.** Installera ovanpå befintlig version utan att avinstallera.
+
+Äldre versionsnyheter nedan beskriver dåtidens funktioner; uppgifter om antalsbromsen gäller inte från 1.0.34.
 
 ## Nyheter i 1.0.33
 

@@ -1717,55 +1717,74 @@ order@fortnox.se, nyheter@klarna.se"
 
     <div id="donationModal" class="modal" hidden>
       <section class="modal-card donation-dialog" role="dialog" aria-modal="true" aria-labelledby="donationTitle" aria-describedby="donationIntro" tabindex="-1">
-        <header class="donation-heading">
-          <span class="donation-heart" aria-hidden="true">♡</span>
-          <div><p class="donation-eyebrow" data-i18n="donationEyebrow">EN FRIVILLIG GÅVA</p>
-          <h2 id="donationTitle" data-i18n="donationTitle">Stöd SortBro</h2></div>
-        </header>
         <div class="donation-body">
-          <p id="donationIntro" data-i18n="donationIntro">En lugnare inkorg, lite mer tid över. Om SortBro gör din vardag enklare får du gärna stödja arbetet bakom appen. Din gåva hjälper mig att lägga tid på förbättringar, felsökning och stöd för nya Thunderbird-versioner. Tack för att du använder SortBro!</p>
-          <p class="donation-note" data-i18n="donationFree">Alla funktioner är gratis. Donationer är helt frivilliga – inga nivåer, inga extra funktioner och inga krav.</p>
-          <section class="donation-online" aria-labelledby="donationOtherTitle">
-            <h3 id="donationOtherTitle" data-i18n="donationOther">Andra sätt att stödja</h3>
-            <p class="muted" data-i18n="donationExternal">Öppna en tjänst med knappen eller skanna dess QR-kod med mobilkameran. Belopp väljer du hos PayPal eller Ko-fi – Swish-beloppet nedan följer inte med.</p>
-            <div class="donation-services">
-              <article class="donation-service donation-paypal">
-                <h4>PayPal</h4>
-                <p class="donation-address">paypal.me/Rickard3dPrint</p>
-                <a id="donationPaypalLink" class="button donation-link" href="https://paypal.me/Rickard3dPrint" target="_blank" rel="noopener noreferrer" data-i18n="donationPaypal">Öppna PayPal ↗</a>
-                <button id="donationPaypalToggle" type="button" class="button secondary" aria-expanded="false" aria-controls="donationPaypalCode" aria-label="Visa eller dölj QR-koden till PayPal" data-i18n-aria="donationPaypalQr">Visa QR-kod</button>
-                <div id="donationPaypalCode" class="donation-link-qr" hidden role="img" aria-label="QR-länk till paypal.me/Rickard3dPrint" data-i18n-aria="donationPaypalAlt"></div>
-              </article>
-              <article class="donation-service donation-kofi">
-                <h4>Ko-fi</h4>
-                <p class="donation-address">ko-fi.com/tokke2</p>
-                <a id="donationKofiLink" class="button donation-link" href="https://ko-fi.com/tokke2" target="_blank" rel="noopener noreferrer" data-i18n="donationKofi">Öppna Ko-fi ↗</a>
-                <button id="donationKofiToggle" type="button" class="button secondary" aria-expanded="false" aria-controls="donationKofiCode" aria-label="Visa eller dölj QR-koden till Ko-fi" data-i18n-aria="donationKofiQr">Visa QR-kod</button>
-                <div id="donationKofiCode" class="donation-link-qr" hidden role="img" aria-label="QR-länk till ko-fi.com/tokke2" data-i18n-aria="donationKofiAlt"></div>
-              </article>
+          <header class="donation-heading">
+            <span class="donation-heart" aria-hidden="true">♡</span>
+            <p class="donation-eyebrow" data-i18n="donationEyebrow">EN FRIVILLIG GÅVA</p>
+            <h2 id="donationTitle" data-i18n="donationTitle">Stöd SortBro</h2>
+            <p class="donation-tagline" data-i18n="donationTagline">En lugnare inkorg. Mer tid till annat.</p>
+            <div class="donation-badges">
+              <span data-i18n="donationBadgeFree">Alla funktioner gratis</span>
+              <span data-i18n="donationBadgeOptional">Inga nivåer eller krav</span>
+              <span data-i18n="donationBadgeLocal">Lokala QR-koder</span>
             </div>
-            <p class="muted donation-camera" data-i18n="donationCamera">Skanna med mobilkameran för att öppna länken. Kontrollera mottagaren hos tjänsten innan du betalar.</p>
-          </section>
-          <fieldset class="donation-amounts">
-            <legend data-i18n="donationAmount">Swish – välj belopp (SEK)</legend>
-            <div class="beloppsrad" id="beloppsrad">
-              <button type="button" class="bchip" data-kr="25" aria-pressed="false">25 kr</button>
-              <button type="button" class="bchip vald" data-kr="50" aria-pressed="true">50 kr</button>
-              <button type="button" class="bchip" data-kr="100" aria-pressed="false">100 kr</button>
-              <button type="button" class="bchip" data-kr="200" aria-pressed="false">200 kr</button>
+          </header>
+          <div class="donation-content">
+            <p id="donationIntro" data-i18n="donationIntro">En lugnare inkorg, lite mer tid över. Om SortBro gör din vardag enklare får du gärna stödja arbetet bakom appen. Din gåva hjälper mig att lägga tid på förbättringar, felsökning och stöd för nya Thunderbird-versioner. Tack för att du använder SortBro!</p>
+            <p class="donation-note" data-i18n="donationFree">Alla funktioner är gratis. Donationer är helt frivilliga – inga nivåer, inga extra funktioner och inga krav.</p>
+            <div class="donation-payment-grid">
+              <section class="donation-swish" aria-labelledby="donationSwishTitle">
+                <p class="donation-kicker" data-i18n="donationChoose">VÄLJ DET SOM PASSAR DIG</p>
+                <h3 id="donationSwishTitle"><span aria-hidden="true">♡</span> Swish</h3>
+                <fieldset class="donation-amounts">
+                  <legend data-i18n="donationAmount">Swish – välj belopp (SEK)</legend>
+                  <div class="beloppsrad" id="beloppsrad">
+                    <button type="button" class="bchip" data-kr="25" aria-pressed="false">25 kr</button>
+                    <button type="button" class="bchip vald" data-kr="50" aria-pressed="true">50 kr</button>
+                    <button type="button" class="bchip" data-kr="100" aria-pressed="false">100 kr</button>
+                    <button type="button" class="bchip" data-kr="200" aria-pressed="false">200 kr</button>
+                  </div>
+                  <label class="donation-custom"><span data-i18n="donationCustom">Eget belopp (hela kronor)</span>
+                    <input id="donateCustomKr" type="number" min="1" max="99999" step="1" inputmode="numeric" aria-describedby="donateAmountInfo">
+                  </label>
+                </fieldset>
+                <p id="donateAmountInfo" class="belopp-info" role="status"></p>
+                <div id="qrbox" class="qrbox">
+                  <h3 data-i18n="donationQrTitle">Skanna med Swish-appen</h3>
+                  <div id="qrSvgWrap" role="img" aria-label="Swish-QR för valt belopp till 0721817177" data-i18n-aria="donationQrAlt"></div>
+                  <p class="donation-recipient">Swish · <strong>0721817177</strong></p>
+                  <p class="muted" data-i18n="donationScan">Öppna Swish på mobilen och välj Skanna. Kontrollera mottagare och belopp i Swish innan du godkänner. Belopp och meddelandet SortBro kan ändras där.</p>
+                </div>
+              </section>
+              <section class="donation-online" aria-labelledby="donationOtherTitle">
+                <h3 id="donationOtherTitle" data-i18n="donationOther">Andra sätt att stödja</h3>
+                <p class="muted" data-i18n="donationExternal">Öppna en tjänst med knappen eller skanna dess QR-kod med mobilkameran. Belopp väljer du hos PayPal eller Ko-fi – Swish-beloppet följer inte med.</p>
+                <div class="donation-services">
+                  <article class="donation-service donation-paypal">
+                    <h4>PayPal</h4>
+                    <p class="donation-address">paypal.me/Rickard3dPrint</p>
+                    <a id="donationPaypalLink" class="button donation-link" href="https://paypal.me/Rickard3dPrint" target="_blank" rel="noopener noreferrer" data-i18n="donationPaypal">Öppna PayPal ↗</a>
+                    <button id="donationPaypalToggle" type="button" class="button secondary" aria-expanded="false" aria-controls="donationPaypalCode" aria-label="Visa eller dölj QR-koden till PayPal" data-i18n-aria="donationPaypalQr">Visa QR-kod</button>
+                    <div id="donationPaypalCode" class="donation-link-qr" hidden role="img" aria-label="QR-länk till paypal.me/Rickard3dPrint" data-i18n-aria="donationPaypalAlt"></div>
+                  </article>
+                  <article class="donation-service donation-kofi">
+                    <h4>Ko-fi</h4>
+                    <p class="donation-address">ko-fi.com/tokke2</p>
+                    <a id="donationKofiLink" class="button donation-link" href="https://ko-fi.com/tokke2" target="_blank" rel="noopener noreferrer" data-i18n="donationKofi">Öppna Ko-fi ↗</a>
+                    <button id="donationKofiToggle" type="button" class="button secondary" aria-expanded="false" aria-controls="donationKofiCode" aria-label="Visa eller dölj QR-koden till Ko-fi" data-i18n-aria="donationKofiQr">Visa QR-kod</button>
+                    <div id="donationKofiCode" class="donation-link-qr" hidden role="img" aria-label="QR-länk till ko-fi.com/tokke2" data-i18n-aria="donationKofiAlt"></div>
+                  </article>
+                </div>
+                <p class="muted donation-camera" data-i18n="donationCamera">Skanna med mobilkameran för att öppna länken. Kontrollera mottagaren hos tjänsten innan du betalar.</p>
+              </section>
             </div>
-            <label class="donation-custom"><span data-i18n="donationCustom">Eget belopp (hela kronor)</span>
-              <input id="donateCustomKr" type="number" min="1" max="99999" step="1" inputmode="numeric" aria-describedby="donateAmountInfo">
-            </label>
-          </fieldset>
-          <p id="donateAmountInfo" class="belopp-info" role="status"></p>
-          <div id="qrbox" class="qrbox">
-            <h3 data-i18n="donationQrTitle">Skanna med Swish-appen</h3>
-            <div id="qrSvgWrap" role="img" aria-label="Swish-QR för valt belopp till 0721817177" data-i18n-aria="donationQrAlt"></div>
-            <p class="donation-recipient">Swish · <strong>0721817177</strong></p>
-            <p class="muted" data-i18n="donationScan">Öppna Swish på mobilen och välj Skanna. Kontrollera mottagare och belopp i Swish innan du godkänner. Belopp och meddelandet SortBro kan ändras där.</p>
+            <section class="donation-thanks" aria-labelledby="donationThanksTitle">
+              <span aria-hidden="true">♡</span>
+              <div><h3 id="donationThanksTitle" data-i18n="donationThanksTitle">Tack för att du hjälper SortBro vidare</h3>
+                <p data-i18n="donationThanksText">Din gåva ger mer tid för förbättringar, felsökning och stöd för nya Thunderbird-versioner. Att tipsa en vän om SortBro är också ett fint sätt att hjälpa.</p></div>
+            </section>
+            <p class="muted donation-privacy" data-i18n="donationPrivacy">QR-koderna skapas lokalt. Mottagare och länkar är fasta i appen. Betalningen görs hos Swish, PayPal eller Ko-fi; SortBro tar inte emot betaluppgifter och kan inte se om en gåva har betalats. Externa tjänster har egna villkor och integritetspolicyer.</p>
           </div>
-          <p class="muted donation-privacy" data-i18n="donationPrivacy">QR-koderna skapas lokalt. Mottagare och länkar är fasta i appen. Betalningen görs hos Swish, PayPal eller Ko-fi; SortBro tar inte emot betaluppgifter och kan inte se om en gåva har betalats. Externa tjänster har egna villkor och integritetspolicyer.</p>
         </div>
         <div class="modal-actions"><button id="donationClose" type="button" class="button secondary" data-i18n="donationClose">Stäng</button><span>© Rickard Längkvist</span></div>
       </section>

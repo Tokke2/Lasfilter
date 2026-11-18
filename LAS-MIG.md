@@ -583,6 +583,14 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.32
+
+- **Ny stil i Hjälp → Donationer.** Stödsidesexemplet är anpassat till SortBro, i den befintliga dialogen: grönt och varmt guld, tydliga kort för Swish, PayPal och Ko-fi, beloppsknappar och personlig tacktext. Inga recepttexter, påhittade procenttal eller nya betalningsvillkor har följt med.
+- **Ljust, mörkt och smala fönster.** Betalningskorten ligger bredvid varandra när det finns plats och staplas annars. Hela innehållet, även rubriken, kan rullas medan Stäng-knappen finns kvar. Tangentbordsfokus, Escape och återgång till menyn är bevarade. Dekorativa knappövergångar används bara när minskad rörelse inte har valts.
+- **Oförändrad betalning och integritet.** Swish använder samma lokala C-format till **0721817177**, valfritt helt belopp och meddelandet SortBro. PayPal-/Ko-fi-knappar och deras lokala QR-länkar är kvar; belopp väljs hos respektive tjänst. Ingen extern QR-tjänst, nätverkskod, ny behörighet eller separat stödsida. Flyttmotor, spärrar, regler och veckobackuper är oförändrade.
+
+Verifierat med **598 automatiska tester, 576 DOM-kontroller och 64 Chromium-layouter** (SV/EN, ljust/mörkt, 360/600/840/1280 px, 12/14/20/24 px). QR-formatet avkodas av en oberoende QR-avkodare. **Ingen riktig Swish-, PayPal- eller Ko-fi-betalning har genomförts här; ingen ny native Thunderbird-körning.** Installera ovanpå befintlig version utan att avinstallera.
+
 ## Nyheter i 1.0.31
 
 Endast de valda förslagen **1, 3 och 4** från den senaste förslagslistan:

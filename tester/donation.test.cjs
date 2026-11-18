@@ -39,3 +39,21 @@ test('donationer använder ingen extern QR-tjänst, lagring eller betalningsrapp
  assert.match(manifest.content_security_policy,/connect-src 'none'/);
  assert.deepEqual(manifest.permissions,['accountsRead','accountsFolders','messagesRead','messagesMove','messagesUpdate','menus','storage','downloads']);
 });
+test('stödsidestilen ligger i en enda appdialog med alla befintliga betalningsval',()=>{
+ const page=new JSDOM(html),doc=page.window.document,dialog=doc.querySelector('#donationModal');
+ assert.equal(doc.querySelectorAll('#donationModal').length,1);
+ for(const id of ['donationTitle','donationPaypalLink','donationKofiLink','donateCustomKr','qrSvgWrap','donationClose'])assert.equal(doc.querySelectorAll('#'+id).length,1);
+ assert.equal(dialog.querySelectorAll('.donation-payment-grid > section').length,2);
+ assert(dialog.querySelector('.donation-body .donation-heading'));
+ assert.equal(dialog.querySelector('#donationClose').closest('.donation-body'),null);
+ assert.doesNotMatch(dialog.textContent,/Mitt Maskinkök|~55%|80\+|ÖPPEN KÄLLKOD/);
+ assert.equal(dialog.querySelectorAll('script,iframe,img').length,0);page.window.close();
+});
+test('donationsstilen har mörkt tema och begränsar rörelse och chipstilar till dialogen',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../addon/ui.css'),'utf8');
+ const section=css.slice(css.indexOf('/* Donationer under Hjälp:'),css.indexOf('.copy-errors-fallback'));
+ assert.match(section,/:root\[data-theme="dark"\] \.donation-dialog/);
+ assert.match(section,/@media \(prefers-reduced-motion: no-preference\)/);
+ assert.doesNotMatch(section,/(?:^|\n)\.bchip[ .{]/);
+ assert.match(section,/\.donation-dialog :focus-visible/);
+});

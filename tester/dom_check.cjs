@@ -92,6 +92,10 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(el('donationOpen').closest('.view')===el('view-help')&&!el('view-support')&&!el('footerSupportBtn'),'ingen separat stödsida eller stödflik finns kvar');
  check(doc.activeElement===el('donationClose'),'fokus placeras på Stäng när dialogen öppnas');
  check(el('donationModal').querySelector('[role="dialog"]').getAttribute('aria-labelledby')==='donationTitle','dialogen har tillgängligt namn');
+ check(doc.querySelector('.donation-heading').closest('.donation-body')!==null,'donationsrubriken kan rullas på små skärmar');
+ check(el('qrbox').closest('.donation-swish')!==null&&doc.querySelector('.donation-payment-grid').contains(el('donationPaypalLink')),'Swish och betaltjänster har egna visuella kort');
+ check(doc.querySelectorAll('.donation-badges span').length===3,'frivilligt stöd och lokal QR framgår i rubriken');
+ check(/SortBro/.test(txt('donationThanksTitle'))&&!/55%|25%|20%|Maskinkök|provlagade/.test(el('donationModal').textContent),'tacktexten är SortBro-anpassad utan påhittad fördelning');
  const donationConfig=JSON.stringify(w.LasDemo.setState({}).config);
  check(w.eval('currentSwishQrPayload()')==='C0721817177;50;SortBro;6'&&el('qrSvgWrap').querySelector('svg'),'standard-Swish med fast mottagare och lokal SVG');
  check(!el('qrModeCam'),'Swish har endast standardläget');
@@ -105,7 +109,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
   toggle.click();check(box.firstElementChild===qr,'QR återanvänds utan nätverk: '+service);
  }
  check(/Swish/.test(doc.querySelector('.donation-amounts legend').textContent)&&/följer inte med/.test(doc.querySelector('[data-i18n="donationExternal"]').textContent),'beloppsväljaren gäller bara Swish');
- const donationFirst=el('donationPaypalLink');
+ const donationFirst=el('beloppsrad').querySelector('button');
  el('donationClose').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
  check(doc.activeElement===donationFirst,'Tab på sista kontrollen stannar i donationer');
  donationFirst.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
@@ -122,6 +126,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await w.refresh();check(el('donateCustomKr').value==='75'&&w.eval('currentSwishQrPayload()').includes(';75;'),'statusuppdatering behåller donationsbelopp');
  w.eval('applyLanguage("en");updateDonationView()');
  check(txt('donationPaypalLink')==='Open PayPal ↗'&&txt('donationKofiToggle')==='Hide QR code','externa knappar och QR-val översätts');
+ check(/calmer inbox/.test(doc.querySelector('.donation-tagline').textContent)&&txt('donationThanksTitle')==='Thank you for helping SortBro grow','ny rubrik och tacktext översätts i öppen dialog');
  check(txt('donationTitle')==='Support SortBro'&&txt('donateAmountInfo').includes('75 SEK')&&txt('donationClose')==='Close','donationsdialogen är översatt till engelska');
  w.eval('applyLanguage("sv");updateDonationView()');
  check(w.eval('openSenderModal({})')===false,'avsändardialog får inte öppnas ovanpå donationer');

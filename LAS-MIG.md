@@ -187,8 +187,12 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 
 ## Design, språk och årstider
 
+- **Ren och lugn yta:** lokala systemteckensnitt, tydlig rubrikhierarki, jämna avstånd och mjuka kort. Inga externa teckensnitt eller ikonfiler hämtas; gränssnittet fungerar helt offline.
+- **Enhetliga linjeikoner:** flikar, sökfältet, temaknappen och donationsknappen använder samma lokala SVG-ikoner i 24 px-rutnät. De ärver textfärgen och har dolda för skärmläsaren när en synlig etikett redan räcker.
+- **Skärmbredden används bättre:** arbetsytan kan bli 1 480 px och 1 560 px i mycket breda fönster, medan formulär och inställningstexter hålls smala nog att läsas. Smala fönster staplar innehållet och flikarna radbryts i stället för att gömmas bakom sidkanten.
+- **Ljust, mörkt eller följ systemet** väljs under **Inställningar → Utseende**. Färgerna är kontrollerade för läsbarhet i båda lägena, och fokusmarkeringen syns tydligt vid tangentbordsnavigering. Årstidstemat finns kvar som frivillig färgaccent.
 - **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
-- **Ljust och mörkt läge** samt **årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
+- **Årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
 - **Hjälp → Donationer** öppnar en egen dialog i appen med **Swish standard-QR** till **0721817177** samt enbart knappar till **paypal.me/Rickard3dPrint** och **ko-fi.com/tokke2**. PayPal och Ko-fi har inga QR-koder. Ingen separat stödsida. Mottagaruppgifterna är fasta i appen och gåvor är frivilliga; inget låses upp. Swish-beloppet gäller bara Swish. För PayPal/Ko-fi väljs beloppet hos tjänsten.
 
@@ -573,6 +577,16 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.35
+
+- **Ny, renare design med bättre typografi.** Lokala systemteckensnitt, tydligare rubriker och läsbar radhöjd. Inga externa teckensnitt, inga nya behörigheter och inga nätanrop.
+- **Enhetliga ikoner.** Flikarna, sökfältet, temaknappen och donationsknappen använder samma lokala linjeikoner i stället för blandade textglyfer. Temaknappen visar sol eller måne beroende på nästa val.
+- **Bättre användning av skärmbredden.** Regellistan och arbetsytan kan bli 1 480 px bred (1 560 px i mycket breda fönster), medan formulär och inställningstexter hålls läsbara. Vid smala fönster radbryts flikarna i stället för att skymmas.
+- **Tema med kontrast.** Ljust, mörkt eller följ systemet har genomarbetade ytor, statusfärger och fokusmarkering i båda lägena. Årstidstemat finns kvar som frivillig accent.
+- **Tydligare detaljer.** Fullbreddsplus och emojier som kunde bli tomma rutor i vissa teckensnitt är ersatta med vanliga tecken eller SVG-ikoner. Rörelser respekterar inställningen för minskad rörelse.
+
+Verifierat med **600 automatiska tester, 561 DOM-kontroller samt 96 Chromium-layouter och 3 donationslayouter**. Layouterna täcker 360–1 920 px, ljust/mörkt, 12/14/20/24 px text, svenska/engelska samt alla fem flikar. Kontrast, fokus, ikonstorlek, horisontell overflow och formulärbredd kontrolleras automatiskt. **Ingen native Thunderbird-körning har gjorts här.** Installera ovanpå befintlig version utan att avinstallera.
 
 ## Nyheter i 1.0.34
 

@@ -68,6 +68,12 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  /* --- En uppgift per flik; navigering får aldrig spara eller kasta utkast. --- */
  check(!el('rulesLibrary').hidden&&el('ruleEditor').hidden,'starten visar bara regellistan, inte en tom editor');
  check(doc.querySelectorAll('.app-tabs [role="tab"]').length===5,'fem namngivna flikar i stället för en ikonmeny');
+ check(doc.querySelectorAll('.app-tabs .nav use').length===5&&[...doc.querySelectorAll('.app-tabs .nav use')].every(u=>/^#i-/.test(u.getAttribute('href'))),'flikarna använder enhetliga linjeikoner från ikonbiblioteket');
+ check(doc.querySelectorAll('.icon-sprite symbol').length>=7,'ikonbiblioteket innehåller flik-, hjälp- och temikoner');
+ check(el('themeIconUse').getAttribute('href')==='#i-moon','ljust läge visar månen som nästa tema');
+ w.eval('applyTheme({...state.prefs,theme:"dark"})');
+ check(doc.documentElement.dataset.theme==='dark'&&el('themeIconUse').getAttribute('href')==='#i-sun','mörkt läge visar solen som återgång till ljust');
+ w.eval('applyTheme({...state.prefs,theme:"light"})');
  check(el('quickRuleBox').closest('.view')===el('view-suggestions')&&el('quickChips').closest('.view')===el('view-suggestions'),'snabbregel och Inkorgschips hör bara till Föreslagna regler');
  check(el('learnBar').closest('.view')===el('view-suggestions')&&el('templateBar').closest('.view')===el('view-suggestions'),'inlärda förslag och mallar har samma egna flik');
  check(el('quickHintsBtn')?.closest('.view')===el('view-suggestions'),'Läs Inkorgen igen finns kvar som riktig knapp');

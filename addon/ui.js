@@ -190,6 +190,7 @@ const I18N={
   learnEmptyOff:"Inlärningen är avstängd. Du kan slå på den under Inställningar → Sortering & säkerhet.",
   resumeEditor:"Fortsätt redigera",
   backToRules:"← Alla regler",
+  backToStart:"← Tillbaka till startsidan",
   editorDraftNote:"Ändringar sparas först när du väljer Spara.",
   ruleFilesTitle:"Importera & exportera regler",
   activityToolsTitle:"Kontroller & felsökning",
@@ -750,6 +751,8 @@ const I18N={
   condPlaceholderDate:'Antal dagar eller årtal, t.ex. 90 eller 2025',
   condPlaceholderRecipient:'t.ex. faktura@ eller min adress',
   condPlaceholderCc:'t.ex. ekonomi@',
+  runAllNow:'Kör alla regler nu',
+  runAllNowTitle:'Kör alla regler manuellt',
   runAllRulesBtn:'▶ Kör alla regler nu',
   runAllRulesCount:'▶ Kör alla regler nu ({n})',
   runAllScanned:'Granskade {n} mejl i {f} mappar.',
@@ -1082,6 +1085,7 @@ const I18N={
   learnEmptyOff:"Learning is off. Enable it under Settings → Sorting & safety.",
   resumeEditor:"Continue editing",
   backToRules:"← All rules",
+  backToStart:"← Back to start",
   editorDraftNote:"Changes are saved only when you choose Save.",
   ruleFilesTitle:"Import & export rules",
   activityToolsTitle:"Checks & troubleshooting",
@@ -1642,6 +1646,8 @@ const I18N={
   condPlaceholderDate:'Number of days or a year, e.g. 90 or 2025',
   condPlaceholderRecipient:'e.g. invoice@ or my address',
   condPlaceholderCc:'e.g. finance@',
+  runAllNow:'Run all rules now',
+  runAllNowTitle:'Run all rules manually',
   runAllRulesBtn:'▶ Run all rules now',
   runAllRulesCount:'▶ Run all rules now ({n})',
   runAllScanned:'Checked {n} emails in {f} folders.',
@@ -3136,7 +3142,9 @@ function openRuleEditor(){
  setRulePanel('editor');showView('rules');
  if(opening)$('ruleName').focus();
 }
-handle('backToRules','click',()=>{setRulePanel('list');$('resumeEditor').focus();});
+function backToStart(){setRulePanel('list');$('resumeEditor').focus();}
+handle('backToRules','click',backToStart);
+handle('backToRulesBottom','click',backToStart);
 handle('resumeEditor','click',()=>{openRuleEditor();$('ruleName').focus();});
 for(const tab of document.querySelectorAll('.app-tabs [role="tab"]'))tab.addEventListener('keydown',event=>{
  const tabs=[...document.querySelectorAll('.app-tabs [role="tab"]')],i=tabs.indexOf(tab);let next;
@@ -3669,12 +3677,13 @@ handle('learnOn','change',async()=>{
 });
 handle('showActivity','click',()=>showView('activity'));
 handle('runAllRulesBtn','click',async()=>runAllRules());
+handle('runAllNow','click',async()=>runAllRules());
 if($('sweepNow'))handle('sweepNow','click',async()=>runAllRules());
 
 /* Kör samtliga aktiva regler direkt och berätta exakt vad som hände. */
 async function runAllRules(){
- const button=$('runAllRulesBtn'),guide=$('sweepNow');
- if(button)button.disabled=true;
+ const buttons=[$('runAllRulesBtn'),$('runAllNow')].filter(Boolean),guide=$('sweepNow');
+ for(const button of buttons)button.disabled=true;
  if(guide){guide.disabled=true;guide.textContent=T('sweepChecking');}
  try{
   const r=await rpc('sweepNow');renderStatus(await rpc('status'));
@@ -3696,7 +3705,7 @@ async function runAllRules(){
   toast(parts.join(' '));
  }catch(err){alertError(err);}
  finally{
-  if(button)button.disabled=false;
+  for(const button of buttons)button.disabled=false;
   if(guide){guide.disabled=!!state?.fault||state?.config.paused||!(state?.config.rules||[]).some(x=>x.enabled);guide.textContent=state?.queued?T('sweepQueueNow'):T('sweepRunNow');}
  }
 }

@@ -191,6 +191,8 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 - **Enhetliga linjeikoner:** flikar, sökfältet, temaknappen och donationsknappen använder samma lokala SVG-ikoner i 24 px-rutnät. De ärver textfärgen och har dolda för skärmläsaren när en synlig etikett redan räcker.
 - **Skärmbredden används bättre:** arbetsytan kan bli 1 480 px och 1 560 px i mycket breda fönster, medan formulär och inställningstexter hålls smala nog att läsas. Smala fönster staplar innehållet och flikarna radbryts i stället för att gömmas bakom sidkanten.
 - **Ljust, mörkt eller följ systemet** väljs under **Inställningar → Utseende**. Färgerna är kontrollerade för läsbarhet i båda lägena, och fokusmarkeringen syns tydligt vid tangentbordsnavigering. Årstidstemat finns kvar som frivillig färgaccent.
+- **Kör alla regler nu** finns i den alltid synliga statusraden på startsidan, bredvid Pausa och flyttläget. Knappen använder samma manuella körning som regellistans knapp och respekterar paus, stopp och testläge.
+- **Tillbaka till startsidan** finns både högst upp och längst ned i regelredigeraren. Båda sparar ingenting, behåller utkastet och sätter fokus på en synlig kontroll.
 - **Svenska & Engelska** växlas direkt i toppbaren (*SV · Svenska* / *EN · English*).
 - **Årstidsteman** (*Auto · 🌸 Vår · ☀️ Sommar · 🍂 Höst · ❄️ Vinter*). Årstiden färgar gränssnittet, hälsningen, det dynamiska SVG-landskapet i hero-kortet, SortBro-logotypen och verktygsfältsikonen. *Auto* följer kalendern; ett manuellt val ligger kvar tills du ändrar det.
 - **Animerad puls** på sifferkorten när antalet regler, köade mejl, flyttar eller matchningar ändras.
@@ -577,6 +579,14 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.36
+
+- **Två vägar tillbaka från en regel.** Regelredigeraren har nu en tillbaka-knapp både högst upp och längst ned. Båda går till startsidan (regellistan), sparar ingenting och behåller ett osparat utkast. Fokus landar på **Fortsätt redigera**.
+- **Kör alla regler nu på startsidan.** Den alltid synliga statusraden har fått en egen knapp för den manuella körningen, bredvid Pausa och flyttläget. Den använder samma körning som knappen i regellistan och rapporterar granskade mejl, matchningar och köade flyttar. Paus, stopp och testläge respekteras precis som förut.
+- **Oförändrade skydd och behörigheter.** Inga nya behörigheter, inga ändrade regler och ingen ändrad donationsdialog.
+
+Verifierat med **600 automatiska tester, 568 DOM-kontroller och 111 Chromium-kontroller** vid 360–1 600 px i ljust och mörkt läge. Kontrollerna täcker båda tillbaka-knapparna, fokus, utkast, den manuella körningen och horisontell overflow. **Ingen native Thunderbird-körning har gjorts här.** Installera ovanpå befintlig version utan att avinstallera.
 
 ## Nyheter i 1.0.35
 

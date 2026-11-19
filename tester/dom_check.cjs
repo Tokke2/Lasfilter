@@ -452,12 +452,26 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  await until(()=>!el('diagnosePanel').hidden,'diagnosen ritas');
  check(/Varför|flyttas|mapp/i.test(txt('diagnosePanel')),'diagnosen svarar i klartext: "'+txt('diagnosePanel').slice(0,70)+'"');
 
+ /* --- Tillbaka överst och längst ned i regelredigeraren. --- */
+ if(el('ruleEditor').hidden)doc.querySelector('.rule-open').click();
+ check(!el('ruleEditor').hidden&&!el('backToRules').closest('[hidden]')&&!el('backToRulesBottom').closest('[hidden]'),'båda tillbaka-knapparna syns när en regel är öppen');
+ check(el('backToRules').closest('.editor-nav')!==null&&el('backToRulesBottom').closest('.editor-back-bottom')!==null,'en ligger överst och en längst ned');
+ el('backToRulesBottom').click();
+ check(!el('rulesLibrary').hidden&&el('ruleEditor').hidden,'den nedre knappen går tillbaka till startsidan');
+ check(doc.activeElement===el('resumeEditor'),'den nedre knappen lämnar fokus på en synlig kontroll');
+ el('resumeEditor').click();check(!el('ruleEditor').hidden,'fortsatt redigering öppnar regeln igen');
+
  /* --- Förslagskortet och kör-knappen --- */
  check(el('suggestCard')===null&&el('suggestRulesBtn')===null,'förslagskortet är borta ur gränssnittet');
  check(!/Föreslå regler från Inkorgen/.test(doc.body.textContent),'och ingen text om det ligger kvar');
+ check(el('runAllNow').closest('.run-actions')!==null&&txt('runAllNow').trim()==='Kör alla regler nu','startsidans statusrad har en manuell kör-knapp');
+ el('runAllNow').click();
+ await until(()=>/Granskade/.test(txt('toast')),'kör alla regler från statusraden');
+ check(/matchade och köades/.test(txt('toast')),'den manuella körningen rapporterar vad som hände: "'+txt('toast')+'"');
+ el('toast').textContent='';
  el('runAllRulesBtn').click();
- await until(()=>/Granskade/.test(txt('toast')),'kör alla regler');
- check(/matchade och köades/.test(txt('toast')),'körningen rapporterar vad som hände: "'+txt('toast')+'"');
+ await until(()=>/Granskade/.test(txt('toast')),'kör alla regler från regellistan');
+ check(/matchade och köades/.test(txt('toast')),'även listans knapp kör och rapporterar');
  check(!/Kontrollen är klar/.test(txt('toast')),'ingen dubblerad rapporttext');
 
  /* --- Sökning i regellistan --- */

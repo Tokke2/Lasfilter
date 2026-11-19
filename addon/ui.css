@@ -3206,3 +3206,20 @@ textarea:focus {
     min-height: 40px;
   }
 }
+
+/* Regelredigeraren: en tydlig väg tillbaka även efter de långa formulären. */
+.editor-back-bottom {
+  display: flex;
+  justify-content: flex-start;
+  padding: 4px 22px 22px;
+  margin-top: 6px;
+}
+
+@media (max-width: 700px) {
+  .editor-back-bottom {
+    padding-inline: 16px;
+  }
+  .editor-back-bottom .button {
+    width: 100%;
+  }
+}

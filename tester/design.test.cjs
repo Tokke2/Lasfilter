@@ -52,7 +52,7 @@ test('arbetsytan använder skärmbredden men håller formulär läsbara',()=>{
 
 test('ikoner är enhetliga, lokala och dolda för skärmläsaren när etiketten räcker',()=>{
  const symbols=[...html.matchAll(/<symbol id="(i-[a-z]+)"/g)].map(m=>m[1]);
- assert.deepEqual([...new Set(symbols)].sort(),['i-activity','i-heart','i-help','i-moon','i-rules','i-search','i-settings','i-suggestions','i-sun']);
+ assert.deepEqual([...new Set(symbols)].sort(),['i-activity','i-heart','i-help','i-moon','i-play','i-rules','i-search','i-settings','i-suggestions','i-sun']);
  const uses=[...html.matchAll(/<use(?: id="[^"]+")? href="#(i-[a-z]+)"/g)].map(m=>m[1]);
  for(const id of uses)assert.ok(symbols.includes(id),'okänd ikon: '+id);
  assert.equal([...html.matchAll(/class="nav-icon"/g)].length,8,'fem flikikoner, temaknapp och två statistikikoner');

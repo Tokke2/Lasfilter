@@ -63,7 +63,8 @@ test('ikoner är enhetliga, lokala och dolda för skärmläsaren när etiketten 
   assert.doesNotMatch(full,/<image|href="http|style=/,'symbolen ska vara vektor och lokal');
  }
  assert.match(css,/\.nav-icon\s*\{[^}]*stroke:\s*currentColor/s,'ikonerna ska ärva textfärgen');
- assert.match(css,/\.nav-icon\s*\{[^}]*width:\s*18px/s);
+ assert.match(css,/\.nav-icon\s*\{[^}]*width:\s*20px/s);
+ assert.match(css,/\.nav-icon\s*\{[^}]*shape-rendering:\s*geometricPrecision/s,'ikonerna ska ritas skarpt');
 });
 
 test('tema, systemval och fokusmarkering är kompletta',()=>{
@@ -72,4 +73,21 @@ test('tema, systemval och fokusmarkering är kompletta',()=>{
  assert.match(css,/input:focus,[\s\S]*?outline:\s*2px solid color-mix\(in srgb, var\(--focus\)/);
  assert.match(css,/@media \(prefers-reduced-motion: reduce\)/,'rörelse ska kunna stängas av');
  assert.match(js,/themeIconUse.*#i-sun.*#i-moon|#i-sun.*#i-moon/,'temaknappen ska visa rätt nästa val');
+});
+
+test('text och ikoner ritas skarpt utan suddig antialiasing',()=>{
+ assert.doesNotMatch(css,/-webkit-font-smoothing:\s*antialiased/,'antialiasing ska inte göra texten tunn och grumlig');
+ assert.doesNotMatch(css,/text-rendering:\s*optimizeLegibility/,'ingen påtvingad textrendering');
+ assert.doesNotMatch(css,/font-weight:\s*(?:650|750|550)\b/,'endast standardvikter som teckensnittet har');
+ assert.match(css,/body,[\s\S]*?letter-spacing:\s*0;/,'brödtexten ska inte ha negativ teckenbredd');
+ assert.match(css,/shape-rendering:\s*geometricPrecision/,'SVG-kanter ska vara skarpa');
+ assert.match(css,/\.search:focus-within[\s\S]*?box-shadow:\s*none/,'fokus ska vara en skarp ram, inte en mjuk skugga');
+});
+
+test('layouten har steg för smala, vanliga och mycket breda fönster',()=>{
+ assert.match(css,/@media \(max-width: 680px\)[\s\S]*?grid-template-columns: repeat\(6/,'flikarna radbryts i två balanserade rader på smala skärmar');
+ assert.match(css,/@media \(min-width: 2000px\)[\s\S]*?max-width:\s*1680px/,'mycket breda fönster får en större arbetsyta');
+ assert.match(css,/@media \(pointer: coarse\)[\s\S]*?min-height:\s*44px/,'pekytor ska vara minst 44 px');
+ assert.match(css,/@media \(prefers-contrast: more\)/,'ökad kontrast ska stödjas');
+ assert.match(css,/@media \(forced-colors: active\)/,'tvingade systemfärger ska stödjas');
 });

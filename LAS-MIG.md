@@ -187,9 +187,10 @@ Du behöver inte vänta på nästa automatiska körning eller på att nya mejl k
 
 ## Design, språk och årstider
 
-- **Ren och lugn yta:** lokala systemteckensnitt, tydlig rubrikhierarki, jämna avstånd och mjuka kort. Inga externa teckensnitt eller ikonfiler hämtas; gränssnittet fungerar helt offline.
-- **Enhetliga linjeikoner:** flikar, sökfältet, temaknappen och donationsknappen använder samma lokala SVG-ikoner i 24 px-rutnät. De ärver textfärgen och har dolda för skärmläsaren när en synlig etikett redan räcker.
-- **Skärmbredden används bättre:** arbetsytan kan bli 1 480 px och 1 560 px i mycket breda fönster, medan formulär och inställningstexter hålls smala nog att läsas. Smala fönster staplar innehållet och flikarna radbryts i stället för att gömmas bakom sidkanten.
+- **Ren och skarp yta:** lokala systemteckensnitt, standardvikter och ingen påtvingad antialiasing. Rubriker, knappar och små etiketter ritas med jämn vikt i stället för att bli tunna eller grumliga. Inga externa teckensnitt eller ikonfiler hämtas; gränssnittet fungerar helt offline.
+- **Enhetliga linjeikoner:** flikar, sökfältet, temaknappen och donationsknappen använder samma lokala SVG-ikoner med 20 px storlek, jämn stroke och `geometricPrecision`. De ärver textfärgen och är dolda för skärmläsaren när en synlig etikett redan räcker.
+- **Skärmbredden används bättre:** arbetsytan kan bli 1 480 px, 1 560 px och 1 680 px i mycket breda fönster, medan formulär och inställningstexter hålls smala nog att läsas. Smala fönster staplar innehållet; flikarna radbryts i två balanserade rader och knapparna blir jämna två- eller enkolumnsrader i stället för att klippas.
+- **Pekytor och tillgänglighet:** minst 44 px klickytor på pekskärm, tydlig fokusram utan mjuka skuggor, stöd för ökad kontrast, tvingade systemfärger och minskad rörelse. Innehållet fungerar från 320 px till mycket breda fönster.
 - **Ljust, mörkt eller följ systemet** väljs under **Inställningar → Utseende**. Färgerna är kontrollerade för läsbarhet i båda lägena, och fokusmarkeringen syns tydligt vid tangentbordsnavigering. Årstidstemat finns kvar som frivillig färgaccent.
 - **Kör alla regler nu** finns i den alltid synliga statusraden på startsidan, bredvid Pausa och flyttläget. Knappen använder samma manuella körning som regellistans knapp och respekterar paus, stopp och testläge.
 - **Tillbaka till startsidan** finns både högst upp och längst ned i regelredigeraren. Båda sparar ingenting, behåller utkastet och sätter fokus på en synlig kontroll.
@@ -579,6 +580,14 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 - Återställning efter omstart fungerar endast för meddelanden med stabilt Message-ID och entydig träff i källmappen.
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
+
+## Nyheter i 1.0.37
+
+- **Skarpare text och ikoner.** Påtvingad antialiasing och `optimizeLegibility` är borttagna, teckenvikterna är standardvikter och brödtexten har normal teckenbredd. Ikonerna ritas i ett jämnt 20 px-rutnät med skarp SVG-rendering och full täckning. Fokus är en solid ram i stället för en mjuk skugga.
+- **Layout för hela skärmen.** Arbetsytan växer till 1 680 px på mycket breda skärmar och fungerar ned till 320 px. Flikarna radbryts i två balanserade rader på telefon, regelknapparna blir jämna två- eller enkolumnsrader och inställningsfälten anpassar antalet kolumner efter bredden. Regelredigeraren hålls på en läsbar maxbredd.
+- **Bättre pekytor och tillgänglighet.** Klickytor blir minst 44 px på pekskärm, fokusmarkeringen är skarp, och gränssnittet stödjer ökad kontrast, tvingade systemfärger samt minskad rörelse. Inga nya behörigheter och inga ändrade regler.
+
+Verifierat med **602 automatiska tester, 568 DOM-kontroller och 1 460 Chromium-kontroller** vid 15 bredder från 320 till 2 560 px, fem vyer, ljust och mörkt läge samt regelredigerare och donationsdialog. Kontrollerna omfattar horisontell overflow, klippt text, klickytor, ikonstorlek, skarp rendering och kontrast. **Ingen native Thunderbird-körning har gjorts här.** Installera ovanpå befintlig version utan att avinstallera.
 
 ## Nyheter i 1.0.36
 

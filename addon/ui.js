@@ -1989,18 +1989,30 @@ function seasonArt(season){
   ${water}
  </svg>`;
 }
+let seasonPainted='';
 function applySeason(prefs){
  const season=resolveSeason(prefs),root=document.documentElement;
- root.dataset.season=season;
- root.dataset.seasonMode=SEASON_CHOICES.includes(prefs?.season)?prefs.season:'auto';
- if($('seasonHeroArt'))$('seasonHeroArt').innerHTML=seasonArt(season);
- if($('seasonGreeting'))$('seasonGreeting').textContent=T(SEASON_KEY_NAMES[season]||'seasonGreetingAutumn');
- const logos=[['brandLogo','64']];
- for(const [id,size] of logos){
-  const img=$(id);if(!img)continue;
-  img.src='season-'+season+'-'+size+'.png';
- }
  const value=SEASON_CHOICES.includes(prefs?.season)?prefs.season:'auto';
+ root.dataset.season=season;
+ root.dataset.seasonMode=value;
+ /* Statusen kommer flera gånger i sekunden under ett svep. Säsongsteckningen
+    är en stor SVG som annars byggdes om varje gång; nu ritas den bara när
+    säsongen, språket eller valet faktiskt ändras. */
+ const signature=season+'|'+currentLang+'|'+value;
+ if(signature!==seasonPainted){
+  seasonPainted=signature;
+  if($('seasonHeroArt'))$('seasonHeroArt').innerHTML=seasonArt(season);
+  if($('seasonGreeting'))$('seasonGreeting').textContent=T(SEASON_KEY_NAMES[season]||'seasonGreetingAutumn');
+  const img=$('brandLogo');
+  if(img){
+   const base='season-'+season;
+   /* 32 px är exakt 1x och 64 px exakt 2x. Då slipper logotypen skalas
+      om från en slumpmässig 64 px-bild till 38 px och bli mjuk. */
+   img.src=base+'-32.png';
+   img.srcset=base+'-32.png 1x, '+base+'-64.png 2x';
+   img.sizes='32px';
+  }
+ }
  if($('season'))$('season').value=value;
  if($('seasonQuick'))$('seasonQuick').value=value;
 }
@@ -2428,6 +2440,8 @@ handle('readerPauseResumeNotice','click',()=>setReaderPause('resume'));
 function renderHealth(){
  const panel=$('healthGuide'),body=$('healthIssues');if(!panel||!body)return;
  const health=state.health||{global:null,holds:[]},issues=[health.global,...health.holds||[]].filter(Boolean);
+ const signature=JSON.stringify([health,state.fault,state.blocked,currentLang,folders.map(f=>[f.id,f.label,f.accountName])]);
+ if(unchanged('health',signature))return;
  panel.hidden=!issues.length&&!state.fault&&!state.blocked;body.replaceChildren();
  const label=id=>folders.find(f=>f.id===id)?.label||id||'—';
  for(const issue of issues){
@@ -2484,7 +2498,11 @@ function renderStatus(next){
  updateDonationView();
  if($('learnOn'))$('learnOn').checked=!(state.learn&&state.learn.off);
  renderTrialBar();renderLearnBar();
- renderRules();renderActivity();renderBackups();renderQuickExisting();renderTbAccounts();quickHintsOnce();updateRuleExplanation();
+ /* Tunga listor ritas bara i den vy där de syns. En dold aktivitetslogg med
+    5 000 rader ska inte byggas om medan användaren sitter i Inställningar. */
+ if(activeView==='rules')renderRules();
+ if(activeView==='activity')renderActivity();
+ renderBackups();renderQuickExisting();renderTbAccounts();quickHintsOnce();updateRuleExplanation();
 }
 function fieldShortText(field){return {sender:T('fieldSenderShort'),domain:T('fieldDomainShort'),subject:T('fieldSubjectShort'),recipient:T('fieldRecipientShort'),cc:T('fieldCcShort'),size:T('fieldSizeShort'),date:T('fieldDateShort')}[field]||T('fieldSubjectShort');}
 function ruleTagText(rule){
@@ -3128,6 +3146,8 @@ function showView(view){
  document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);
  document.querySelectorAll('.nav').forEach(n=>{const active=n.dataset.view===view;n.classList.toggle('active',active);n.setAttribute('aria-selected',String(active));n.tabIndex=active?0:-1;});
  if(changed){closeRuleMenus();document.documentElement.scrollTop=0;}
+ if(view==='rules')renderRules();
+ if(view==='activity')renderActivity();
 }
 function setRulePanel(panel){
  rulePanel=panel==='editor'?'editor':'list';
@@ -4075,17 +4095,31 @@ window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.return
 /* Statusen kan komma tiotal gånger i sekunden under ett svep. Här ligger högst
    en förfrågan i luften åt gången, och högst en till på kö – annars kunde svaren
    komma ikapp varandra och rita en äldre status över en nyare. */
-let refreshing=false,refreshQueued=false;
+let refreshing=false,refreshQueued=false,refreshTimer=0;
+/* Statusmeddelandet kan komma fyra gånger i sekunden under ett svep. Vi samlar
+   dem i 120 ms och ritar bara när fliken syns. En dold flik ska inte läsa en
+   stor statusbild (regler + upp till 5 000 loggrader) i onödan. */
+function queueRefresh(){
+ if(document.hidden){refreshQueued=true;return;}
+ clearTimeout(refreshTimer);
+ refreshTimer=setTimeout(()=>{refreshTimer=0;refresh();},120);
+}
 async function refresh(){
+ if(document.hidden){refreshQueued=true;return;}
  if(refreshing){refreshQueued=true;return;}
  refreshing=true;
  try{
-  do{refreshQueued=false;renderStatus(await rpc('status'));}while(refreshQueued);
+  do{refreshQueued=false;renderStatus(await rpc('status'));}while(refreshQueued&&!document.hidden);
  }catch(e){alertError(e);}
- finally{refreshing=false;refreshQueued=false;}
+ finally{refreshing=false;if(!document.hidden&&refreshQueued)queueRefresh();}
 }
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)return;
+ clearTimeout(refreshTimer);refreshTimer=0;
+ refresh();
+});
 if(live&&!DEMO)browser.runtime.onMessage.addListener(msg=>{
- if(msg?.event==='statusChanged')refresh();
+ if(msg?.event==='statusChanged')queueRefresh();
  if(msg?.event==='ruleFromMessage'){prefillWaiting=true;applyPrefill().catch(alertError);}
 });
 (async()=>{

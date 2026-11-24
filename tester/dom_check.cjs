@@ -305,6 +305,9 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(rowBefore!==null,'regellistan har rader att jämföra');
  w.eval('renderStatus(state)');
  check(firstRow()===rowBefore,'regellistan ritas inte om när inget har ändrats');
+ /* Aktivitetsloggen ritas bara när vyn syns; annars skulle 5 000 dolda
+    rader byggas om vid varje status. Testa den synliga vyn. */
+ w.eval('showView("activity")');
  const logFirst=doc.querySelector('#logRows tr');
  const logCount=doc.querySelectorAll('#logRows tr').length;
  w.eval("state.logs=[...state.logs,{time:new Date().toISOString(),event:'moved',level:'info',data:{count:1,detail:'rittestet'}}];renderStatus(state);");
@@ -312,6 +315,7 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(doc.querySelector('#logRows tr')!==logFirst,'den nya raden hamnar överst');
  check(logFirst.parentNode!==null,'de gamla raderna behålls i stället för att byggas om');
  check(/rittestet/.test(doc.querySelector('#logRows tr').textContent),'den nya raden syns');
+ w.eval('showView("rules")');
 
  /* Statusen får inte skickas iväg tiotal gånger i sekunden: högst en i taget. */
  let calls=0;
@@ -770,7 +774,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  /* ── Provkörning per regel ─────────────────────────────────────────────── */
  const trialCfg={...originalConfig,rules:originalConfig.rules.map((r,i)=>i===0?{...r,trialUntil:Date.now()+3*86400000}:r)};
  w.LasDemo.setState({config:trialCfg,trials:[{ruleId:originalConfig.rules[0].id,name:originalConfig.rules[0].name,left:3,until:Date.now()+3*86400000,active:true,count:5,target:originalConfig.rules[0].target}],learn:{off:false,suggestions:[]}});
- el('pause').click();
+ w.eval('showView("rules")');el('pause').click();
  await until(()=>doc.querySelectorAll('.trial-tag').length>0,'provkörningen märks i regellistan');
  check(/TEST/.test(doc.querySelector('.trial-tag')?.textContent||''),'märket säger TEST');
  check(/3 dagar kvar/.test(doc.querySelector('.trial-tag')?.textContent||''),'och hur många dagar som är kvar');

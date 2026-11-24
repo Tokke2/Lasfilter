@@ -237,7 +237,10 @@ App.log=(name,count=0,detail='',scheduleFile=true)=>{
     rad som just skrivits gallras bort av en klocka som gått olika. */
  App.logs=C.cleanLogs([...App.logs,entry],Date.now());
  if(C.cleanErrorLogs([entry]).length)App.errorLogs=C.cleanErrorLogs([...App.errorLogs,entry]);
- clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs,errorLogs:App.errorLogs})).catch(()=>{}),500);
+ /* Loggen skrivs samlat: en stor svepning kan skapa hundratals rader, och att
+    skriva hela historiken var 500:e ms kostade mer än den gav. 1,2 s ger samma
+    skydd vid omstart utan att göra lagringen till en extra arbetsbörda. */
+ clearTimeout(App.logTimer);App.logTimer=setTimeout(()=>App.write(()=>B.storage.local.set({logs:App.logs,errorLogs:App.errorLogs})).catch(()=>{}),1200);
  if(scheduleFile)App.scheduleTextLog();
 };
 /* Fånga oväntade skriptfel utan exception-text, sökvägar eller mejldata. */
@@ -246,7 +249,7 @@ globalThis.addEventListener?.('unhandledrejection',()=>App.log('error',0,'bakgru
 // Behåll alltid det första, mest specifika felet. Händelselyssnare ska inte
 // skriva över exempelvis storage_error med det mindre hjälpsamma internal_error.
 App.fail=code=>{if(App.engine&&!App.engine.fault)App.engine.stop(code);};
-App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error'));},0);};
+App.kick=()=>{if(App.kickTimer)return;App.kickTimer=setTimeout(()=>{App.kickTimer=null;App.engine?.tick().catch(()=>App.fail('internal_error')).finally(()=>App.schedulePulse());},0);};
 App.emptySweep={scanned:0,queued:0,deferred:0,searchedFolders:0,skippedFolders:0,emptyFolders:0,cachedFolders:0};
 /* Senaste svepet sparas i lagringen, inte bara i minnet: efter en omstart ska SortBro veta
    om datorn varit avstängd länge och i så fall ta igen det direkt i stället för att vänta
@@ -443,6 +446,38 @@ App.scheduleSweep=()=>{
  if(!e?.config.hourly)return;
  App.sweepTimer=setInterval(()=>{App.autoSweep();},e.config.sweepMinutes*60000);
 };
+/* Pulsen är billig när inget händer. Tidigare väckte den bakgrunden varannan
+   sekund dygnet runt, även med tom kö. Nu går den varannan sekund bara när det
+   finns jobb, en pågående läsarpaus eller en väntande uppdatering – annars var
+   femtonde sekund. Nya mejl, klick och lässtatus väcker den ändå direkt via
+   händelserna, så inget blir långsammare av den lägre frekvensen. */
+App.pulseBusyMs=2000;App.pulseIdleMs=15000;
+App.schedulePulse=()=>{
+ clearTimeout(App.timer);
+ const e=App.engine;
+ const busy=!!(e&&(e.pending?.size||e.inflight?.size))||App.readerPauseState().paused||!!App.pendingUpdate;
+ App.timer=setTimeout(()=>App.pulse(),busy?App.pulseBusyMs:App.pulseIdleMs);
+};
+App.pulse=()=>{
+ const now=Date.now(),gap=App.lastTickAt?now-App.lastTickAt:0;
+ App.lastTickAt=now;App.refreshReaderPause();
+ /* Ett glapp på över två minuter betyder att datorn sovit eller att Thunderbird stått still.
+    Har svepet hunnit bli försenat tar vi igen det direkt i stället för att vänta på timern. */
+ if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
+ App.engine?.tick().catch(()=>App.fail('internal_error'));
+ /* Cache-rensningen behöver inte frågas varannan sekund – en gång i minuten
+    räcker, och då är klockan ändå billig att läsa. */
+ if(!App.cacheTickAt||now-App.cacheTickAt>60000){
+  App.cacheTickAt=now;App.maybeClearCache();App.maybeWeeklyBackup();
+  /* En gammal inkorgsbild är bara cache. Efter två TTL:er släpps den, så en
+     stor Inkorgen inte ligger kvar i minnet när ingen frågar efter den. */
+  if(App.scanCache?.data&&now-App.scanCache.at>App.scanTtl*2)App.invalidateScan();
+ }
+ /* En nedladdad version som väntar på att inget ska pågå. */
+ App.applyPendingUpdate().catch(()=>{});
+ App.schedulePulse();
+};
+App.changedEveryMs=250;
 App.changed=()=>{
  clearTimeout(App.changeTimer);App.changeTimer=setTimeout(()=>{
   const e=App.engine;if(!e)return;
@@ -451,7 +486,7 @@ App.changed=()=>{
   B.browserAction.setBadgeText({text:badge}).catch(()=>{});
   B.browserAction.setBadgeBackgroundColor({color:e.fault?'#ac3434':e.config.dryRun?'#c28a24':'#2c776c'}).catch(()=>{});
   B.runtime.sendMessage({event:'statusChanged'}).catch(()=>{});
- },100);
+ },App.changedEveryMs);
 };
 App.folderList=async()=>{
  const accounts=await B.accounts.list(true),items=[],seen=new Set();
@@ -716,7 +751,7 @@ App.readers=new Map();
 App.readerPauseUntil=0;App.readerPausePending=0;App.readerPauseEpoch=0;App.readerPauseWasActive=false;
 App.readerPauseState=()=>{const state=C.readerPauseState(App.readerPauseUntil,Date.now());return {...state,paused:state.paused||App.readerPausePending>0,saving:App.readerPausePending>0};};
 App.readerPauseChanged=()=>{
- App.changed();B.runtime.sendMessage({event:'readerPauseChanged',readerPause:App.readerPauseState()}).catch(()=>{});
+ App.changed();App.schedulePulse();B.runtime.sendMessage({event:'readerPauseChanged',readerPause:App.readerPauseState()}).catch(()=>{});
 };
 App.refreshReaderPause=()=>{
  const active=App.readerPauseState().paused;
@@ -1267,19 +1302,7 @@ App.ready=(async()=>{
    tabbarnas adresser är dolda utan behörigheten "tabs", och den lägger vi inte till.
    I stället bär varje ärende från en sida med sig sin version (uiBuild), och
    App.reloadStaleUi laddar om den som inte matchar den här versionen. */
- App.timer=setInterval(()=>{
-  const now=Date.now(),gap=App.lastTickAt?now-App.lastTickAt:0;
-  App.lastTickAt=now;App.refreshReaderPause();
-  /* Ett glapp på över två minuter betyder att datorn sovit eller att Thunderbird stått still.
-     Har svepet hunnit bli försenat tar vi igen det direkt i stället för att vänta på timern. */
-  if(gap>120000&&App.sweepOverdue(now))App.autoSweep().catch(()=>{});
-  App.engine.tick().catch(()=>App.fail('internal_error'));
-  /* Cache-rensningen behöver inte frågas varannan sekund – en gång i minuten
-     räcker, och då är klockan ändå billig att läsa. */
-  if(!App.cacheTickAt||now-App.cacheTickAt>60000){App.cacheTickAt=now;App.maybeClearCache();App.maybeWeeklyBackup();}
-  /* En nedladdad version som väntar på att inget ska pågå. */
-  App.applyPendingUpdate().catch(()=>{});
- },2000);App.scheduleSweep();
+ App.schedulePulse();App.scheduleSweep();
  if(App.engine.pending.size)App.kick();
  App.lastTickAt=Date.now();App.startedAt=Date.now();
  /* Ett svep vid varje start när bevakningen är på: direkt (800 ms) om svepet är på tiden
@@ -1365,6 +1388,7 @@ App.requestUpdateCheck=async()=>{
   if(r&&r.status==='update_available'){
    App.pendingUpdate=String(r.version||'okand');
    App.updateDeadline=Date.now()+30*60*1000;
+   App.schedulePulse();
    await App.applyPendingUpdate();
   }
   return (r&&r.status)||'unknown';

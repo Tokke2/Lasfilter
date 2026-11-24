@@ -581,6 +581,16 @@ Tillägget kan inte automatiskt välja Dokument eller härleda mappen där XPI-f
 
 Testresultat står under respektive versionsnyhet nedan. Din egen Windows/IMAP-miljö är ett separat godkännandesteg; börja med en provmapp och testläge.
 
+## Nyheter i 1.0.38
+
+- **Skarpare på högupplösta skärmar.** Logotypen visas i exakt 32 px och väljer 32- eller 64 px-källa efter skärmens pixelkvot (`1x`/`2x`) i stället för att alltid skalas ned från 64 px. Rubrikerna har ingen negativ teckenbredd längre, och textskalningen följer systemets DPI och textstorlek.
+- **Tydligare text och kolumner.** Rubriker balanseras över raderna, längre brödtext får jämnare radbrytning och långa tabeller kan rulla i sidled i stället för att trycka ut layouten. Sifferkolumner använder redan jämna siffror.
+- **Jämnare smala layouter.** På telefon staplas statusknapparna när texten annars skulle radbrytas ojämnt, och flikikonerna linjerar med första textraden i tvåradiga etiketter.
+- **Snabbare och energisnålare.** Bakgrunden väcks varannan sekund bara när det finns jobb, läsarpaus eller en väntande uppdatering – annars var femtonde sekund. Statusmeddelanden samlas i 250 ms, gränssnittet ritar högst en status per 120 ms, dolda flikar väntar, tunga listor ritas bara i sin vy och säsongsteckningen byggs inte om vid varje status. Loggen skrivs samlat efter 1,2 s och en gammal inkorgsbild släpps ur minnet.
+- **Oförändrade skydd.** Inga nya behörigheter, inga ändrade regler och ingen ändrad donationsdialog.
+
+Verifierat med **606 automatiska tester, 568 DOM-kontroller och 3 894 Chromium-kontroller** vid 15 bredder från 320 till 2 560 px, fem vyer, ljust och mörkt läge, regelredigerare och donationsdialog samt 2x-DPI. Kontrollerna omfattar horisontell overflow, klippt text, klickytor, ikonstorlek, skarp SVG-rendering, rubrikernas teckenbredd, logotypens källa och kontrast. **Ingen native Thunderbird-körning har gjorts här.** Installera ovanpå befintlig version utan att avinstallera.
+
 ## Nyheter i 1.0.37
 
 - **Skarpare text och ikoner.** Påtvingad antialiasing och `optimizeLegibility` är borttagna, teckenvikterna är standardvikter och brödtexten har normal teckenbredd. Ikonerna ritas i ett jämnt 20 px-rutnät med skarp SVG-rendering och full täckning. Fokus är en solid ram i stället för en mjuk skugga.

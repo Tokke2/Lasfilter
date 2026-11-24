@@ -3593,3 +3593,99 @@ textarea:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ===== 1.0.38: tydlig typografi, rena kanter och jämna kolumner ===== */
+/* Textskalningen ska följa systemets DPI och textstorlek utan att webbläsaren
+   blåser upp små etiketter. Rubrikerna har ingen negativ teckenbredd: vid 125–
+   200 % skala och på högupplösta skärmar ligger bokstäverna annars för tätt. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+h1, h2, h3,
+.brand,
+.view-heading h1,
+.tabbed-workspace .brand,
+.tabbed-workspace h2 {
+  letter-spacing: 0;
+}
+
+/* Rubriker får balanseras över raderna i stället för att lämna ett ensamt ord.
+   Brödtext får jämn radbrytning; äldre Thunderbird ignorerar raderna säkert. */
+h1, h2, h3,
+.view-heading h1,
+.card-title h2 {
+  text-wrap: balance;
+}
+
+.view-heading > p,
+.settings-body > p,
+.rule-summary-main,
+.hero-copy > p {
+  text-wrap: pretty;
+}
+
+/* Logotypen visas i 32 px. 32/64 px-källorna är exakta 1x/2x, så bilden varken
+   skalas om från 64 px eller blir mjuk på en skärm med devicePixelRatio 2. */
+.tabbed-workspace .brand img {
+  width: 32px;
+  height: 32px;
+}
+
+@media (max-width: 700px) {
+  .tabbed-workspace .brand img {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Tvåradiga fliketiketter: ikonen ska linjera med första textraden, inte flyta
+   i mitten av en hög etikett. Siffran ligger redan i hörnet på smala flikar. */
+@media (max-width: 680px) {
+  .app-tabs .nav {
+    align-items: flex-start;
+  }
+  .app-tabs .nav .nav-icon {
+    margin-top: 1px;
+  }
+  .app-tabs .nav > span {
+    min-width: 0;
+  }
+}
+
+/* Långa tabeller och kolumner hålls läsbara även när textstorleken är stor. */
+.table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-pulse,
+  .stat-updated {
+    animation: none !important;
+  }
+}
+
+
+/* På smala skärmar ska statusknapparna ha samma höjd även när en etikett
+   radbryts. Under 420 px staplas Pausa och flyttläget i stället för att en
+   kort knapp hamnar bredvid en hög. */
+@media (max-width: 900px) {
+  .tabbed-workspace .run-actions {
+    align-items: stretch;
+  }
+  .tabbed-workspace .run-actions .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .tabbed-workspace .run-actions #pause,
+  .tabbed-workspace .run-actions #mode {
+    flex-basis: 100%;
+    width: 100%;
+  }
+}

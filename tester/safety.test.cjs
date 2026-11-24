@@ -323,7 +323,7 @@ test('säkerhetskopian skrivs en gång per vecka',()=>{
  assert.match(body,/const weekly=force\|\|App\.lastBackupWeek!==week/,'takten ska vara veckan');
  assert.match(body,/if\(!weekly\)return \{written:false,reason:'not_due'/,'utanför veckan skrivs ingenting');
  assert.match(bg,/App\.maybeWeeklyBackup=/,'pulsen ska kunna skriva veckokopian utan omstart');
- const tick=bg.slice(bg.indexOf('App.timer=setInterval'),bg.indexOf('},2000);',bg.indexOf('App.timer=setInterval')));
+ const tick=bg.slice(bg.indexOf('App.pulse='),bg.indexOf('App.changedEveryMs='));
  assert.match(tick,/maybeWeeklyBackup\(\)/,'pulsen ska fråga efter veckan');
 });
 
@@ -352,7 +352,7 @@ test('den dagliga rensningen är på som standard och drivs av pulsen',()=>{
  assert.match(core,/autoClear:true/,'cachen ska rensas automatiskt som standard');
  assert.match(core,/const autoClear=raw\.autoClear===undefined\?true:raw\.autoClear/,'äldre konfigurationer ska få true');
  const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
- const tick=bg.slice(bg.indexOf('App.timer=setInterval'),bg.indexOf('},2000);',bg.indexOf('App.timer=setInterval')));
+ const tick=bg.slice(bg.indexOf('App.pulse='),bg.indexOf('App.changedEveryMs='));
  assert.match(tick,/maybeClearCache\(\)/,'pulsen ska sköta den dagliga kontrollen');
  assert.match(bg,/autoClear===false\)return null/,'avstängd automatisk rensning ska vara tyst');
 });
@@ -379,8 +379,43 @@ test('dokumentationen säger hur man får två kontroller per dygn',()=>{
  assert.match(doc,/43200/,'och värdet för tolv timmar');
 });
 
-/* Listorna i gränssnittet får inte byggas om i onödan: statusen kommer högst var
-   hundrade millisekund under ett svep, och att rita om 5 000 loggrader varje gång
+/* Pulsen får inte väcka bakgrunden i onödan. Den går snabbt bara när det finns
+   jobb, läsarpaus eller en väntande uppdatering; annars sällan. */
+test('bakgrundspulsen är snabb bara när något pågår',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ assert.match(bg,/App\.pulseBusyMs=2000;App\.pulseIdleMs=15000/,'2 s respektive 15 s ska vara uttalade');
+ const fn=bg.slice(bg.indexOf('App.schedulePulse='),bg.indexOf('App.pulse='));
+ assert.match(fn,/e\.pending\?\.size\|\|e\.inflight\?\.size/,'kön ska styra den snabba takten');
+ assert.match(fn,/App\.readerPauseState\(\)\.paused/,'läsarpausen ska också styra');
+ assert.match(fn,/App\.pendingUpdate/,'väntande uppdatering ska också styra');
+ assert.match(fn,/busy\?App\.pulseBusyMs:App\.pulseIdleMs/,'takten ska väljas av läget');
+ assert.doesNotMatch(bg,/App\.timer=setInterval/,'ingen evig 2-sekundersinterval ska finnas kvar');
+});
+
+/* Även lagringen ska vara billig: loggen skrivs samlat och en gammal
+   inkorgsbild släpps när den inte längre är färsk. */
+test('logg och cache skrivs i en lugn takt',()=>{
+ const bg=fs.readFileSync(path.join(ADDON,'background.js'),'utf8');
+ assert.ok(bg.includes('errorLogs:App.errorLogs})).catch(()=>{}),1200);'),'loggen ska skrivas efter 1,2 s');
+ assert.match(bg,/App\.changedEveryMs=250/,'statusmeddelanden ska samlas i 250 ms');
+ assert.match(bg,/App\.scanTtl\*2/,'en gammal inkorgsbild ska släppas ur minnet');
+ const pulse=bg.slice(bg.indexOf('App.pulse='),bg.indexOf('App.changedEveryMs='));
+ assert.match(pulse,/invalidateScan\(\)/,'pulsen ska släppa gammal sökcache');
+});
+
+/* Statusbilden innehåller regler och upp till 5 000 loggrader. En dold flik
+   ska inte hämta och rita den fyra gånger i sekunden. */
+test('dolda flikar och täta statusmeddelanden ritas samlat',()=>{
+ const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');
+ assert.match(ui,/function queueRefresh\(\)/,'det ska finnas en samlad statuskö');
+ assert.match(ui,/document\.hidden/,'dold flik ska hoppas över');
+ assert.match(ui,/addEventListener\('visibilitychange'/,'fliken ska uppdateras när den visas igen');
+ assert.match(ui,/setTimeout\(\(\)=>\{refreshTimer=0;refresh\(\);\},120\)/,'högst en statusritning per 120 ms');
+ assert.match(ui,/if\(activeView==='activity'\)renderActivity\(\)/,'aktivitetsloggen ska bara ritas i sin vy');
+});
+
+/* Listorna i gränssnittet får inte byggas om i onödan: statusen kommer högst fyra
+   gånger i sekunden under ett svep, och att rita om 5 000 loggrader varje gång
    kostade mer än svepet. */
 test('listorna ritas bara om när deras indata ändrats',()=>{
  const ui=fs.readFileSync(path.join(ADDON,'ui.js'),'utf8');

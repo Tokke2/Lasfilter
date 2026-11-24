@@ -84,6 +84,18 @@ test('text och ikoner ritas skarpt utan suddig antialiasing',()=>{
  assert.match(css,/\.search:focus-within[\s\S]*?box-shadow:\s*none/,'fokus ska vara en skarp ram, inte en mjuk skugga');
 });
 
+test('hög DPI, tydliga rubriker och jämna kolumner utan mjuk skalning',()=>{
+ assert.match(css,/text-size-adjust:\s*100%/,'textskalningen ska följa systemet');
+ assert.match(css,/h1, h2, h3,[\s\S]*?letter-spacing:\s*0;/,'rubrikerna ska inte ha negativ teckenbredd');
+ assert.match(css,/text-wrap:\s*balance/,'rubriker ska balanseras över raderna');
+ assert.match(css,/text-wrap:\s*pretty/,'brödtexten ska få jämn radbrytning');
+ assert.match(html,/id="brandLogo"[\s\S]*?width="32"[\s\S]*?height="32"/,'logotypen ska ha exakt 32 px-ruta');
+ assert.match(js,/img\.srcset=base\+'-32\.png 1x, '\+base\+'-64\.png 2x'/,'logotypen ska välja 64 px på 2x-skärmar');
+ assert.match(js,/img\.sizes='32px'/,'bildens storlek ska vara känd för webbläsaren');
+ assert.match(css,/\.tabbed-workspace \.brand img\s*\{[^}]*width:\s*32px/s,'logotypen ska inte skalas från 38 px');
+ assert.match(css,/@media \(max-width: 680px\)[\s\S]*?\.app-tabs \.nav \{[\s\S]*?align-items:\s*flex-start/,'tvåradig flik ska linjera ikonen med första raden');
+});
+
 test('layouten har steg för smala, vanliga och mycket breda fönster',()=>{
  assert.match(css,/@media \(max-width: 680px\)[\s\S]*?grid-template-columns: repeat\(6/,'flikarna radbryts i två balanserade rader på smala skärmar');
  assert.match(css,/@media \(min-width: 2000px\)[\s\S]*?max-width:\s*1680px/,'mycket breda fönster får en större arbetsyta');

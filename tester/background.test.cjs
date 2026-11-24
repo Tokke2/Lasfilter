@@ -1537,7 +1537,7 @@ test('före: riktig motor + öppnare flyttar först efter stängt, verifierat k�
  api.messages.move=async(ids,target)=>{moves++;const old={...w.message,folder:{...w.message.folder}};w.message.id=199;w.message.folder.id=target;await engine.onMoved({messages:[old]},{messages:[{...w.message}]});};
  await engine.enqueue({...w.message});await tick.settle(engine.tick(),100);assert.equal(w.opened.length,1);assert.equal(moves,0);
  w.message.read=true;await tick.settle(engine.tick(),100);assert.equal(moves,0);assert.equal(engine.pending.size,1);
- w.tabs.clear();app.windowClosed(11);await tick.settle(engine.tick(),100);assert.equal(moves,0);
+ w.tabs.clear();app.windowClosed(11);await engine.tick();assert.equal(moves,0);
  tick.setTimeout(()=>{},2100);await tick.flush(20);await tick.settle(engine.tick(),100);
  assert.equal(moves,1);assert.equal(w.opened.length,1);assert.equal(w.message.folder.id,'fin');assert.equal(engine.fault,'');
 });

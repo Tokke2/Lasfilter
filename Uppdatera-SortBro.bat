@@ -1,5 +1,11 @@
 @echo off
 setlocal EnableExtensions
+rem  Starta om utan synligt konsolfonster nar verktyget finns bredvid filen.
+rem  /hidden ar en intern markering sa att vi inte hamnar i en oandlig loop.
+if /i not "%~1"=="/hidden" if /i not "%~2"=="/hidden" if exist "%~dp0SortBro-Uppdatera-Tyst.vbs" (
+  start "" /b wscript.exe "%~dp0SortBro-Uppdatera-Tyst.vbs" %*
+  exit /b
+)
 title SortBro - uppdatera
 
 rem  Uppdatera-SortBro.bat
@@ -113,7 +119,7 @@ if not "%SWAPPED%"=="OK" goto swapfel
 if "%SILENT%"=="0" echo  Filen:         utbytt, kopia sparad
 
 rem  ---------- 7. starta Thunderbird och se om den tar den nya versionen
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$exe=$null; try{ $exe=(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\thunderbird.exe' -ErrorAction Stop).'(default)' }catch{}; if(-not $exe -or -not (Test-Path $exe)){ $exe=$null; $c1=Join-Path $env:ProgramFiles 'Mozilla Thunderbird\thunderbird.exe'; $c2=Join-Path ${env:ProgramFiles(x86)} 'Mozilla Thunderbird\thunderbird.exe'; foreach($c in @($c1,$c2)){ if(Test-Path $c){ $exe=$c; break } } }; if(-not $exe){ Write-Output 'SAKNAS'; exit 1 }; Start-Process $exe; Write-Output 'STARTAD'" > "%WORK%\start.txt" 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$exe=$null; try{ $exe=(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\thunderbird.exe' -ErrorAction Stop).'(default)' }catch{}; if(-not $exe -or -not (Test-Path $exe)){ $exe=$null; $c1=Join-Path $env:ProgramFiles 'Mozilla Thunderbird\thunderbird.exe'; $c2=Join-Path ${env:ProgramFiles(x86)} 'Mozilla Thunderbird\thunderbird.exe'; foreach($c in @($c1,$c2)){ if(Test-Path $c){ $exe=$c; break } } }; if(-not $exe){ Write-Output 'SAKNAS'; exit 1 }; Start-Process $exe -WindowStyle Minimized; Write-Output 'STARTAD'" > "%WORK%\start.txt" 2>nul
 set "STARTED="
 if exist "%WORK%\start.txt" for /f "usebackq delims=" %%a in ("%WORK%\start.txt") do if not defined STARTED set "STARTED=%%a"
 if not "%STARTED%"=="STARTAD" goto startfel
@@ -134,6 +140,11 @@ set "RESULT=nyare"
 goto slut_ok
 
 :klart
+rem  Uppdateringen ar verifierad: ta bort den tillfalliga sakerhetskopian
+rem  for den gamla versionen och det nedladdade paketet. Regler och
+rem  installningar ligger kvar i Thunderbirds vanliga lagring.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try{ $f=Join-Path '%PROFILE%' ('Lasfilter\Backup\SortBro-' + '%INSTALLED%' + '.xpi'); if(Test-Path -LiteralPath $f){ Remove-Item -LiteralPath $f -Force -ErrorAction Stop } }catch{}" >nul 2>nul
+del "%NEW%" >nul 2>nul
 echo.
 echo  Klart. %LATESTV% ar aktiv i Thunderbird.
 echo  Dina regler och installningar ligger kvar.

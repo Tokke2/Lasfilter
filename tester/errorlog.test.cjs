@@ -6,9 +6,9 @@ test('felloggen samlar fel och äldre debugfel, inte normal aktivitet',()=>{
  const rows=[C.event('error',0,Date.now(),'move_error'),C.event('queue_full'),C.event('debug',0,Date.now(),'diagnos_query_failed'),C.event('moved',30),C.event('debug',0,Date.now(),'allt klart'),C.event('brake')];
  assert.deepEqual(C.cleanErrorLogs(rows).map(x=>x.event),['error','queue_full','debug']);
 });
-test('fel gallras efter 30 dagar och begränsas till 5000, oberoende av normal logg',()=>{
- const now=Date.now(),old=C.event('error',0,now-31*86400000,'gammalt');
- const kept=C.event('error',0,now,'behalls');
+test('fel gallras efter 7 dagar och begränsas till 5000, oberoende av normal logg',()=>{
+ const now=Date.now(),old=C.event('error',0,now-8*86400000,'gammalt');
+ const kept=C.event('error',0,now-6*86400000,'behalls');
  assert.deepEqual(C.cleanErrorLogs([old,kept,...Array(6000).fill(C.event('moved'))],now),[kept]);
  assert.equal(C.cleanErrorLogs(Array(6000).fill(kept),now).length,5000);
  assert.deepEqual(C.cleanErrorLogs([null,{},C.event('error',0,now+120000)],now),[]);

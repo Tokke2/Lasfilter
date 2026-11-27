@@ -52,7 +52,7 @@ test('arbetsytan använder skärmbredden men håller formulär läsbara',()=>{
 
 test('ikoner är enhetliga, lokala och dolda för skärmläsaren när etiketten räcker',()=>{
  const symbols=[...html.matchAll(/<symbol id="(i-[a-z]+)"/g)].map(m=>m[1]);
- assert.deepEqual([...new Set(symbols)].sort(),['i-activity','i-heart','i-help','i-moon','i-play','i-rules','i-search','i-settings','i-suggestions','i-sun']);
+ assert.deepEqual([...new Set(symbols)].sort(),['i-activity','i-clear','i-heart','i-help','i-moon','i-play','i-rules','i-search','i-settings','i-suggestions','i-sun']);
  const uses=[...html.matchAll(/<use(?: id="[^"]+")? href="#(i-[a-z]+)"/g)].map(m=>m[1]);
  for(const id of uses)assert.ok(symbols.includes(id),'okänd ikon: '+id);
  assert.equal([...html.matchAll(/class="nav-icon"/g)].length,8,'fem flikikoner, temaknapp och två statistikikoner');
@@ -89,10 +89,16 @@ test('hög DPI, tydliga rubriker och jämna kolumner utan mjuk skalning',()=>{
  assert.match(css,/h1, h2, h3,[\s\S]*?letter-spacing:\s*0;/,'rubrikerna ska inte ha negativ teckenbredd');
  assert.match(css,/text-wrap:\s*balance/,'rubriker ska balanseras över raderna');
  assert.match(css,/text-wrap:\s*pretty/,'brödtexten ska få jämn radbrytning');
- assert.match(html,/id="brandLogo"[\s\S]*?width="32"[\s\S]*?height="32"/,'logotypen ska ha exakt 32 px-ruta');
- assert.match(js,/img\.srcset=base\+'-32\.png 1x, '\+base\+'-64\.png 2x'/,'logotypen ska välja 64 px på 2x-skärmar');
- assert.match(js,/img\.sizes='32px'/,'bildens storlek ska vara känd för webbläsaren');
+ assert.match(html,/id="brandLogo"[\s\S]*?src="icon\.svg"[\s\S]*?width="32"[\s\S]*?height="32"/,'logotypen ska vara vektor och 32 px');
+ assert.match(html,/id="brandLogo"[\s\S]*?decoding="async"/,'logotypen ska inte blockera starten');
+ assert.doesNotMatch(js,/img\.srcset=base\+'-32\.png/,'logotypen ska inte bytas mot en rasterbild per säsong');
+ assert.match(js,/Applogotypen är alltid samma vektor/,'gränssnittet ska dokumentera vektorlogotypen');
  assert.match(css,/\.tabbed-workspace \.brand img\s*\{[^}]*width:\s*32px/s,'logotypen ska inte skalas från 38 px');
+ assert.match(css,/\.brand img\s*\{[^}]*object-fit:\s*contain/s,'logotypen ska behålla proportionerna');
+ assert.match(css,/\.nav-icon,[\s\S]{0,160}stroke-width:\s*2/s,'ikonerna ska ha tydligare linje');
+ assert.match(css,/#view-activity \.table-wrap\s*\{[^}]*max-height:\s*min\(64dvh/s,'aktiviteten ska rulla inom fönstret');
+ assert.match(html,/data-sort="count"/,'loggens antalskolumn ska vara sorterbar');
+ assert.match(html,/id="clearErrors"/,'åtgärdade fel ska kunna rensas');
  assert.match(css,/@media \(max-width: 680px\)[\s\S]*?\.app-tabs \.nav \{[\s\S]*?align-items:\s*flex-start/,'tvåradig flik ska linjera ikonen med första raden');
 });
 

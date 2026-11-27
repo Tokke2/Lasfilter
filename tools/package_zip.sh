@@ -20,7 +20,7 @@ cd "$ROOT"
 VERSION=$(python3 -c "import json;print(json.load(open('addon/manifest.json'))['version'])")
 OUT="dist/SortBro-$VERSION.zip"
 
-for f in SortBro-Thunderbird.xpi SortBro-Thunderbird.xpi.sha256 updates.json Uppdatera-SortBro.bat LAS-MIG.md; do
+for f in SortBro-Thunderbird.xpi SortBro-Thunderbird.xpi.sha256 updates.json Uppdatera-SortBro.bat SortBro-Uppdatera-Tyst.vbs Schemalagg-SortBro-00.bat AGENTS.md LAS-MIG.md branding/SortBro-logo.svg branding/SortBro-logo-horizontal.svg branding/SortBro-logo-horizontal.png branding/README.md; do
   [ -f "$f" ] || { echo "saknas: $f" >&2; exit 1; }
 done
 
@@ -31,6 +31,13 @@ zip -j -X -q "$OUT" \
   SortBro-Thunderbird.xpi.sha256 \
   updates.json \
   Uppdatera-SortBro.bat \
-  LAS-MIG.md
+  SortBro-Uppdatera-Tyst.vbs \
+  Schemalagg-SortBro-00.bat \
+  AGENTS.md \
+  LAS-MIG.md \
+  branding/SortBro-logo.svg \
+  branding/SortBro-logo-horizontal.svg \
+  branding/SortBro-logo-horizontal.png \
+  branding/README.md
 
 echo "$OUT"

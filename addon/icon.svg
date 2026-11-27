@@ -1,32 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SortBro masterlogotyp. Alla former är redigerbara vektorobjekt.
+     128 x 128 px ruta, avsedd för appikon, webb och tryck.
+     Se branding/README.md för färger, marginaler och export. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">SortBro</title>
+  <desc id="desc">Tre staplade brev i en mörk grön ruta med en mintgrön bock.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1b5e55"/>
-      <stop offset="55%" stop-color="#133b43"/>
-      <stop offset="100%" stop-color="#0d262d"/>
+    <linearGradient id="sortbro-bg" x1="18" y1="8" x2="112" y2="122" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14524d"/>
+      <stop offset="0.55" stop-color="#0b3539"/>
+      <stop offset="1" stop-color="#07252b"/>
     </linearGradient>
-    <linearGradient id="env" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#dff2ec"/>
+    <linearGradient id="sortbro-paper" x1="36" y1="30" x2="84" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e5f4ee"/>
     </linearGradient>
-    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#4ee6b1"/>
-      <stop offset="100%" stop-color="#1fa97c"/>
+    <linearGradient id="sortbro-mint" x1="70" y1="58" x2="108" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62e9b9"/>
+      <stop offset="1" stop-color="#1eaa7d"/>
     </linearGradient>
+    <filter id="sortbro-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#021417" flood-opacity="0.32"/>
+    </filter>
   </defs>
-  <!-- App Badge Background -->
-  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
-  <rect x="3" y="3" width="122" height="122" rx="27" fill="none" stroke="#7fd8ba" stroke-opacity="0.28" stroke-width="2"/>
-  <!-- Back Folder Tab -->
-  <path d="M22 34c0-5.5 4.5-10 10-10h22l8 8h34c5.5 0 10 4.5 10 10v44c0 5.5-4.5 10-10 10H32c-5.5 0-10-4.5-10-10V34z" fill="#256f65" opacity="0.55"/>
-  <!-- Envelope Body -->
-  <rect x="18" y="36" width="76" height="54" rx="10" fill="url(#env)" stroke="#103138" stroke-width="3"/>
-  <!-- Envelope Flap -->
-  <path d="M21 40l35 26 35-26" fill="none" stroke="#175c53" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Filter / Sort Lines on Envelope -->
-  <path d="M30 74h26M30 81h18" stroke="#175c53" stroke-width="4" stroke-linecap="round" opacity="0.65"/>
-  <!-- Mint Sort & Read Check Badge -->
-  <circle cx="92" cy="86" r="24" fill="#0f2b31"/>
-  <circle cx="92" cy="86" r="21" fill="url(#badge)"/>
-  <path d="M81 86l7.5 7.5L104 78" fill="none" stroke="#0b2822" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g id="badge">
+    <rect x="1.5" y="1.5" width="125" height="125" rx="29" fill="url(#sortbro-bg)"/>
+    <rect x="2.5" y="2.5" width="123" height="123" rx="28" fill="none" stroke="#8fe4c8" stroke-opacity="0.22" stroke-width="1.5"/>
+    <path d="M24 24h80" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+
+  <g id="mail-stack" filter="url(#sortbro-shadow)">
+    <!-- Nedre och mellersta brevet: sorteringsdjupet -->
+    <rect x="30" y="58" width="70" height="42" rx="8" fill="#1d6c61" stroke="#0a2d30" stroke-width="2"/>
+    <rect x="26" y="48" width="70" height="42" rx="8" fill="#35a888" stroke="#0a2d30" stroke-width="2"/>
+    <!-- Översta brevet -->
+    <rect x="22" y="38" width="70" height="42" rx="8" fill="url(#sortbro-paper)" stroke="#0a2d30" stroke-width="2.5"/>
+    <path d="M25 42l32 23 32-23" fill="none" stroke="#17675c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Sorteringslinjer håller märket läsbart även i 16 px -->
+    <path d="M31 66h24M31 73h15" stroke="#17675c" stroke-width="3.5" stroke-linecap="round" opacity="0.72"/>
+  </g>
+
+  <g id="check-badge">
+    <circle cx="94" cy="92" r="22" fill="#0a2d30"/>
+    <circle cx="94" cy="92" r="19" fill="url(#sortbro-mint)"/>
+    <path d="M84.5 92.2l6.8 6.8 13.2-14" fill="none" stroke="#06352d" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

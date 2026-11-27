@@ -317,6 +317,25 @@ const tbRule=(name,uri,condition)=>[`name="${name}"`,'enabled="yes"','type="17"'
  check(/rittestet/.test(doc.querySelector('#logRows tr').textContent),'den nya raden syns');
  w.eval('showView("rules")');
 
+ /* Loggkolumnerna ska gå att sortera, och åtgärdade fel ska kunna rensas
+    utan att något annat rörs. */
+ w.eval('showView("activity")');
+ const countHeader=doc.querySelector('th[data-sort="count"]');
+ check(countHeader?.getAttribute('aria-sort')==='none','Antal börjar osorterat');
+ doc.querySelector('.log-sort[data-sort="count"]').click();
+ check(countHeader.getAttribute('aria-sort')==='ascending','Antal sorteras stigande');
+ const countsAsc=[...doc.querySelectorAll('#logRows tr')].map(r=>Number(r.children[3]?.textContent)).filter(Number.isFinite);
+ check(countsAsc.every((n,i)=>i===0||countsAsc[i-1]<=n),'stigande antal: '+countsAsc.join(','));
+ doc.querySelector('.log-sort[data-sort="count"]').click();
+ const countsDesc=[...doc.querySelectorAll('#logRows tr')].map(r=>Number(r.children[3]?.textContent)).filter(Number.isFinite);
+ check(countsDesc.every((n,i)=>i===0||countsDesc[i-1]>=n),'fallande antal: '+countsDesc.join(','));
+ doc.querySelector('.log-sort[data-sort="time"]').click();
+ check(doc.querySelector('th[data-sort="time"]').getAttribute('aria-sort')==='descending','Tid återgår till nyast först');
+ check(el('clearErrors')!==null&&el('clearErrors').getAttribute('aria-describedby')==='clearErrorsHelp','åtgärdade fel har en egen, förklarad knapp');
+ const activeClear=w.eval('!!(state.fault||state.blocked||state.health?.holds?.length||state.inflight||state.queued)');
+ check(el('clearErrors').disabled===activeClear,'knappen är bara avstängd när ett aktivt fel eller jobb finns');
+ w.eval('showView("rules")');
+
  /* Statusen får inte skickas iväg tiotal gånger i sekunden: högst en i taget. */
  let calls=0;
  const demo=w.LasDemo;
@@ -630,7 +649,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
 
  w.eval('showView("activity")');
  check(txt('copyErrors')==='Kopiera alla fel'&&el('copyErrors').getAttribute('aria-describedby')==='copyErrorsHelp','Kopiera alla fel finns med tydlig omfattning');
- check(/5 000.*30 dagar/.test(txt('copyErrorsHelp')),'kopieringen lovar endast sparad felhistorik');
+ check(/5 000.*7 dagar/.test(txt('copyErrorsHelp')),'kopieringen lovar endast sparad felhistorik');
  el('copyErrors').click();await until(()=>!el('copyErrorsFallback').hidden&&!el('copyErrors').disabled,'saknad urklipps-API visar hela kopierbara texten');
  const fallbackText=el('copyErrorsText').value;
  check(el('copyErrorsText').readOnly&&/SORTBRO – SAMLAD FELLOGG/.test(fallbackText)&&/exempeldata/.test(fallbackText),'fallback är skrivskyddad text med tydligt demohuvud');
@@ -667,7 +686,7 @@ const fileSafeName='Elva villkor C:'+BS+BS+'mapp';
  check(/sortbro-fellogg\.txt/.test(doc.querySelector('[data-i18n="fileLogNote"]').textContent),'inställningen förklarar den extra filen');
  el('langEn').click();
  await until(()=>/Save combined error log/.test(txt('exportErrorLog')),'felloggsknappen översätts till engelska');
- check(/last 30 days/.test(doc.querySelector('[data-i18n="fileLogNote"]').textContent),'även historikgränsen är översatt');
+ check(/last 7 days/.test(doc.querySelector('[data-i18n="fileLogNote"]').textContent),'även historikgränsen är översatt');
  check(txt('copyErrors')==='Copy all errors'&&txt('saveErrorAsSettings')==='Save error log as…'&&/permanent folder/.test(txt('logLocationHelp')),'kopiering och loggplats översätts till engelska');
  check(txt('saveLogAs')==='Save log as…'&&/Documents.*Lasfilter.*logs/.test(txt('saveLogAsHelp')),'manuell spara-knapp och Dokument-hjälp finns också på engelska');
  el('langSv').click();

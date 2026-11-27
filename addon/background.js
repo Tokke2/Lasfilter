@@ -472,6 +472,9 @@ App.pulse=()=>{
   /* En gammal inkorgsbild är bara cache. Efter två TTL:er släpps den, så en
      stor Inkorgen inte ligger kvar i minnet när ingen frågar efter den. */
   if(App.scanCache?.data&&now-App.scanCache.at>App.scanTtl*2)App.invalidateScan();
+  /* En kontroll per dygn, strax efter midnatt. Om Thunderbird stått stilla
+     eller datorn sovit tar första pulsen efter vaknandet hand om kontrollen. */
+  App.maybeDailyUpdateCheck(now).catch(()=>{});
  }
  /* En nedladdad version som väntar på att inget ska pågå. */
  App.applyPendingUpdate().catch(()=>{});
@@ -1162,6 +1165,18 @@ App.handle=async msg=>{
    App.log('error',0,'ui: '+code);return {ok:true};
   }
   case 'exportLog':return {format:'lasfilter-technical-log',version:1,events:C.cleanLogs(App.logs)};
+  case 'clearErrors':return App.mutate(async()=>{
+   if(msg.confirmed!==true)throw new C.RuleError('bad_request');
+   /* Endast åtgärdade fel får rensas. En aktiv spärr eller ett pågående jobb
+      betyder att felet inte är utrett ännu. */
+   if(e.fault||e.failure||(e.pending?.size||0)||(e.inflight?.size||0)||(e.sweeping||0)||e.blocked()||(e.healthState?.().holds?.length||0))throw new C.RuleError('bad_request');
+   const removed=App.errorLogs.length;
+   App.errorLogs=[];
+   App.logs=App.logs.filter(x=>x.event!=='error'&&x.event!=='queue_full');
+   await App.write(()=>B.storage.local.set({logs:App.logs,errorLogs:App.errorLogs}));
+   App.log('debug',0,'atgardade fel rensades ur loggen: '+removed);
+   return App.snapshot();
+  });
   case 'backupNow':return App.autoBackup({force:true});
   case 'import':return App.mutate(async()=>{
    App.checkRevision(msg.revision);
@@ -1361,6 +1376,9 @@ App.applyPendingUpdate=async()=>{
  App.pendingUpdate='';
  App.log('debug',0,'byter till version '+version+(overdue?' (inget blev ledigt pa 30 min)':' nar inget pagick'));
  await App.flushWrites();
+ /* Spolningen kan ha hunnit starta en flytt. Kontrollera en gång till precis
+    före omladdningen; annars väntar vi hellre än att byta mitt i en flytt. */
+ if(App.engineBusy()&&!overdue){App.pendingUpdate=version;App.updateDeadline=Date.now()+30*60*1000;App.schedulePulse();return false;}
  try{B.runtime.reload();}catch{App.pendingUpdate=version;return false;}
  return true;
 };
@@ -1372,14 +1390,23 @@ try{
  });
 }catch{}
 
-/* Hur ofta det letas efter en ny version bestäms av Thunderbird, inte av oss:
-   en kontroll vid start och sedan enligt extensions.update.interval (86400 s).
-   Webbläsar-API:t för att be om en extra kontroll, runtime.requestUpdateCheck,
-   finns bara som deklaration i Thunderbird – det är märkt "unsupported" i
-   toolkit/components/extensions/schemas/runtime.json – så det går inte att
-   tvinga fram en kontroll härifrån. Finns anropet i en framtid används det,
-   tyst, var tolfte timme; annars står vi still. */
-App.updateCheckEveryMs=12*60*60*1000;
+/* En kontroll om dagen, så nära midnatt som pulsen hinner. Thunderbird äger
+   den egentliga uppdateringskontrollen; runtime.requestUpdateCheck finns bara
+   som deklaration och är märkt "unsupported" i Thunderbird. Finns anropet i en
+   framtid används det tyst här, annars loggar vi det en gång och låter
+   Thunderbirds egen kontroll (extensions.update.interval) sköta resten. */
+App.updateCheckHour=0;
+App.updateDay='';
+App.updateDayOf=(now=Date.now())=>{const d=new Date(Number.isFinite(now)?now:Date.now());return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+App.maybeDailyUpdateCheck=async(now=Date.now())=>{
+ const day=App.updateDayOf(now);
+ if(App.updateDay===day)return 'already_checked';
+ App.updateDay=day;
+ const status=await App.requestUpdateCheck();
+ if(status==='unsupported')App.log('debug',0,'uppdateringskontroll: Thunderbird har inget sadant anrop - dess egen timer skoter kontrollen');
+ else if(status!=='no_update')App.log('debug',0,'uppdateringskontroll '+day+': '+status);
+ return status;
+};
 App.requestUpdateCheck=async()=>{
  const call=B.runtime?.requestUpdateCheck;
  if(typeof call!=='function')return 'unsupported';
@@ -1395,11 +1422,8 @@ App.requestUpdateCheck=async()=>{
  }catch{return 'failed';}
 };
 App.startUpdateWatch=()=>{
- App.requestUpdateCheck().then(status=>{
-  if(status==='unsupported')App.log('debug',0,'uppdateringskontroll: Thunderbird har inget sadant anrop - dess egen timer skoter kontrollen');
-  else if(status!=='no_update')App.log('debug',0,'uppdateringskontroll: '+status);
- }).catch(()=>{});
- App.updateTimer=setInterval(()=>{App.requestUpdateCheck();},App.updateCheckEveryMs);
+ /* Första kontrollen görs vid start; därefter en gång per dygn från pulsen. */
+ App.maybeDailyUpdateCheck(Date.now()).catch(()=>{});
 };
 App.startUpdateWatch();
 

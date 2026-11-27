@@ -219,6 +219,21 @@ test('uppdateringsskriptet för Windows finns och är körbart',()=>{
  assert.ok(text.includes('lasfilter@lokala-verktyg.invalid'),'ska känna igen tilläggets id');
  assert.match(text,/Thunderbird\\Profiles/,'ska leta i Thunderbird-profilerna');
  assert.match(text,/releases\/latest\/download\/updates\.json/,'ska fråga senaste release');
+ assert.ok(text.includes('SortBro-Uppdatera-Tyst.vbs'),'en tyst startare ska finnas');
+ assert.match(text,/WindowStyle Minimized/,'Thunderbird ska startas minimerat');
+ assert.match(text,/Lasfilter\\Backup\\SortBro-/,'den tillfälliga säkerhetskopian ska pekas ut');
+ assert.ok(text.includes('Remove-Item -LiteralPath $f'),'kopian ska tas bort efter lyckad kontroll');
+ const vbs=path.join(ROOT,'SortBro-Uppdatera-Tyst.vbs');
+ assert.ok(fs.existsSync(vbs),'den tysta VBS-startaren saknas');
+ const v=fs.readFileSync(vbs,'utf8');
+ assert.match(v,/sh\.Run[\s\S]{0,80}, 0, False/,'VBS ska köra utan fönster');
+ assert.match(v,/Uppdatera-SortBro\.bat/,'VBS ska starta rätt fil');
+ const sched=path.join(ROOT,'Schemalagg-SortBro-00.bat');
+ assert.ok(fs.existsSync(sched),'schemaläggningshjälpen saknas');
+ const sch=fs.readFileSync(sched,'latin1');
+ assert.match(sch,/schtasks \/Create/,'schemaläggningen ska använda schtasks');
+ assert.match(sch,/\/ST 00:00/,'tiden ska vara midnatt');
+ assert.match(sch,/wscript\.exe/,'uppgiften ska köra den tysta startaren');
  /* Ett tappat citattecken skickar halva raden till PowerShell i stället för
     hela, och då gör skriptet något annat än det ser ut att göra. */
  for(const line of text.split(/\r?\n/)){
@@ -370,13 +385,19 @@ test('en ny version startas tyst och bara när inget pågår',()=>{
  /* Uppdateringskontrollen får bara användas om anropet finns: i Thunderbird är
     runtime.requestUpdateCheck deklarerat men märkt "unsupported" i schemat. */
  assert.match(bg,/if\(typeof call!=='function'\)return 'unsupported'/,'anropet måste kollas innan det används');
- assert.match(bg,/App\.updateCheckEveryMs=12\*60\*60\*1000/,'en kontroll var tolfte timme');
+ assert.match(bg,/App\.maybeDailyUpdateCheck=/,'en kontroll per dygn');
+ assert.match(bg,/App\.updateDayOf=/,'dagen ska jämföras');
 });
 
-test('dokumentationen säger hur man får två kontroller per dygn',()=>{
+test('dokumentationen säger hur man får en kontroll per dygn',()=>{
  const doc=fs.readFileSync(path.join(ROOT,'LAS-MIG.md'),'utf8');
  assert.match(doc,/extensions\.update\.interval/,'dygnsintervallet ska nämnas vid namn');
- assert.match(doc,/43200/,'och värdet för tolv timmar');
+ assert.match(doc,/86400/,'och värdet för ett dygn');
+});
+
+test('AGENTS.md samlar de hårda reglerna',()=>{
+ const doc=fs.readFileSync(path.join(ROOT,'AGENTS.md'),'utf8');
+ for(const rule of ['Endast en arbetsbranch','Arbeta aldrig mot `main`','Merge eller pull request är förbjudet','markeras som **Latest**','en gång per dygn, vid 00:00','Loggar sparas i **7 dagar**','Efter varje tionde chattmeddelande'])assert.ok(doc.includes(rule),'hård regel saknas: '+rule);
 });
 
 /* Pulsen får inte väcka bakgrunden i onödan. Den går snabbt bara när det finns
@@ -438,7 +459,7 @@ test('skrivningarna spolas ut innan tillägget startas om',()=>{
  assert.match(fn,/clearTimeout\(App\.fileLogTimer\)/,'och den väntande loggfilen');
  assert.match(fn,/await App\.write\(/,'allt ska skrivas');
  const apply=bg.slice(bg.indexOf('App.applyPendingUpdate='));
- assert.match(apply.slice(0,600),/await App\.flushWrites\(\)[\s\S]{0,40}runtime\.reload\(\)/,'spolningen ska ske före reload');
+ assert.match(apply.slice(0,900),/await App\.flushWrites\(\)[\s\S]{0,320}runtime\.reload\(\)/,'spolningen ska ske före reload');
 });
 
 /* Snabbmenyn var den enda platsen där språkvalet inte följde med. */
@@ -459,9 +480,16 @@ test('zippen innehåller allt som hör till releasen',()=>{
  assert.match(path.basename(out),/^SortBro-\d+\.\d+\.\d+\.zip$/,'zipnamnet ska bära versionen');
  const list=execFileSync('unzip',['-Z1',path.join(ROOT,out)],{encoding:'utf8'}).trim().split(/\r?\n/).sort();
  assert.deepEqual(list,[
+  'AGENTS.md',
   'LAS-MIG.md',
+  'README.md',
   'SortBro-Thunderbird.xpi',
   'SortBro-Thunderbird.xpi.sha256',
+  'Schemalagg-SortBro-00.bat',
+  'SortBro-Uppdatera-Tyst.vbs',
+  'SortBro-logo-horizontal.png',
+  'SortBro-logo-horizontal.svg',
+  'SortBro-logo.svg',
   'Uppdatera-SortBro.bat',
   'updates.json',
  ].sort(),'zippen ska innehålla allt och inget annat');

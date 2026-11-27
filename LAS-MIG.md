@@ -6,6 +6,20 @@
 
 Ett Thunderbird-tillägg med ett eget svenskt och engelskt gränssnitt (MV2, Thunderbird 140+). Det flyttar ett mejl som matchar dina regler först när Thunderbird har markerat det som läst **och** det inte längre visas i någon mejlflik eller något meddelandefönster. Tillägget börjar alltid i **testläge utan flyttar**.
 
+## Nyheter i 1.0.39
+
+- **Ett märke överallt:** ny, skarpare logotyp med ett gemensamt vektormärke för appikon, webbgränssnitt och verktygsfält. `branding/SortBro-logo.svg` är redigerbar master för tryck, med horisontell lockup och färg-/marginalguide i `branding/README.md`.
+- **Skarpare ikoner:** enhetligt 24 px-rutnät, 2 px linje och `geometricPrecision`; applogotypen är alltid `icon.svg` i stället för en nedskalad 32 px-rasterbild. Årstiderna färgar fortfarande verktygsfältets ikon och hero-bilden.
+- **Sorterbara loggkolumner:** klicka på **Tid**, **Händelse**, **Nivå** eller **Antal** i aktivitetstabellen. Pilen och `aria-sort` visar ordningen; tangentbord och skärmläsare fungerar. Standarden är nyast först och behåller den snabba tilläggsritningen.
+- **Rensa åtgärdade fel:** en egen knapp under Aktivitet tar bort felposter ur den separata felloggen. Den är avstängd så länge en spärr, ett pågående jobb eller en aktiv felorsak finns kvar, och rör aldrig regler, kö eller flyttjournal.
+- **Sjudagarsarkiv:** teknisk logg och fellogg behåller de senaste **7 dagarna** (högst 5 000 rader). Äldre poster gallras automatiskt. Båda loggarna skrivs fortfarande samlade till `Hämtade filer/Lasfilter/logs/`.
+- **Säkrare uppdatering:** uppdateringskontrollen försöker en gång per dygn, strax efter midnatt, och kontrollerar en extra gång att ingen flytt startat efter att skrivningarna spolats ut. Uppdateringsskriptet verifierar hash och aktiv version, startar Thunderbird **minimerat** och tar bort den tillfälliga säkerhetskopian först när den nya versionen är aktiv.
+- **Ingen terminal:** `SortBro-Uppdatera-Tyst.vbs` startar uppdateringen utan konsolfönster. `Uppdatera-SortBro.bat` startar automatiskt om sig via den när den finns. `Schemalagg-SortBro-00.bat` skapar en tyst nattlig uppgift klockan 00:00.
+- **Hårdare regler i repot:** `AGENTS.md` samlar branchregeln (endast `arena/4044d6f0-lasfilter`, aldrig `main`, aldrig merge/PR), releasekravet (alltid höjd version och **Latest**), logg-/uppdateringskraven, testkraven och regeln om 10 nya förslag efter varje tionde chattmeddelande.
+- **Inte tillämpligt i SortBro:** egen profilflik och kryssruta i en projektskapare. SortBro har varken profiler eller projekt; inga tomma platshållare har lagts in.
+
+Verifierat med **609 automatiska tester**, **575 DOM-kontroller** och **987 Chromium-layoutkontroller** (320–2 560 px, ljust/mörkt, fem vyer, redigerare, donation och 2× DPI). Riktig Thunderbird-/Windows-körning av `.bat`, `.vbs` och schemaläggningen kan inte göras i den här miljön och är därför statiskt granskad.
+
 ## Skillnaden mot vanliga filter
 
 Thunderbirds egna filter körs när mejlet kommer in. Detta tillägg körs händelsestyrt via Thunderbirds egna gränssnittsprogram (läst-markering, visning, flytthändelse) och ändrar därför **inte** `msgFilterRules.dat`, `prefs.js` eller någon profilfil. Det samexisterar med dina befintliga filter; stäng av filter som redan flyttar samma mejl vid mottagandet, eftersom tillägget inte blockerar dem. Undantaget är den frivilliga **import och export av filterfilen**: där skriver tillägget en fil åt dig och läser en fil du själv väljer, men det rör aldrig profilens egen `msgFilterRules.dat` – den byter du ut själv när Thunderbird är stängt (se *Thunderbirds egna filter* nedan).
@@ -366,7 +380,7 @@ Exporterna sparar **utan att fråga** var filen ska ligga: de går till mappen o
 Börja i **`Hämtade filer/Lasfilter/logs/sortbro-fellogg.txt`**. Filen samlar SortBros registrerade fel från sorteringsmotorn, svep och diagnos, säkerhetskopiering, filloggning och gränssnittet. Vanliga lyckade flyttar och annan normal aktivitet är bortfiltrerade. Äldre fel som skrevs som detaljrader tas också med när de känns igen.
 
 - **Senaste felet först**, med UTC-tid, händelse, antal och tillgänglig detalj/felkod. Huvudet anger SortBro-version, Thunderbird-version och installationstyp för **aktuell session**, inte versionen vid varje historiskt fel.
-- **Högst 5 000 felposter från de senaste 30 dagarna**, sparade separat i tillägget och återlästa vid omstart. En livlig vanlig logg tränger därför inte undan felhistoriken. Äldre internlogg migreras första gången; redan bortgallrade händelser kan inte återskapas.
+- **Högst 5 000 felposter från de senaste 7 dagarna**, sparade separat i tillägget och återlästa vid omstart. En livlig vanlig logg tränger därför inte undan felhistoriken. Äldre internlogg migreras första gången; redan bortgallrade händelser kan inte återskapas.
 - **Automatiskt** tillsammans med den tekniska filloggen, via den befintliga rutan under **Inställningar → Loggar & automatiska säkerhetskopior**. Stänger du av rutan skrivs ingen av filerna automatiskt. En oförändrad fellogg skrivs inte om efter varje lyckad flytt.
 - **Manuellt:** välj **Aktivitet → Spara samlad fellogg**. Det fungerar även när automatisk filloggning är av. Samma filnamn används, så du slipper många lösa rapporter.
 - Misslyckas ett filanrop sparas en felkod internt, utan att det startar en oändlig skrivloop. Nästa vanliga logghändelse ger ett nytt försök. Om disken inte går att skriva till kan förstås inte heller felloggen sparas där.
@@ -407,20 +421,13 @@ https://github.com/Tokke2/Lasfilter/releases/latest/download/SortBro-Thunderbird
 
 Thunderbird frågar den ungefär **en gång i dygnet**, och direkt när du väljer *Sök efter uppdateringar* i kugghjulsmenyn i Tillägg. Hittar den en högre version hämtas filen, kontrolleras mot hashen och installeras vid nästa omstart.
 
-### Tyst omstart – och två kontroller per dygn
+### Tyst omstart – och en kontroll per dygn
 
 När Thunderbird har hämtat en ny version tar SortBro den i bruk själv. Tillägget väntar tills ingen flytt och inget svep pågår, laddar sedan om sig självt och fortsätter med den nya koden. **Inget fönster, ingen fråga, ingen omstart av Thunderbird** — kön och reglerna ligger i lagringsutrymmet och plockas upp igen. Ett SortBro-fönster som står öppet laddar om sig självt i samma stund, så sidfoten visar den version som faktiskt körs.
 
 Hur ofta det letas efter en ny version bestämmer **Thunderbird**, inte tillägget: en kontroll vid start och sedan enligt inställningen `extensions.update.interval`, som är `86400` sekunder — ett dygn. Tillägget kan inte be om en extra kontroll. Anropet `runtime.requestUpdateCheck` finns nämligen bara som en deklaration i Thunderbird; det är märkt `"unsupported": true` i `toolkit/components/extensions/schemas/runtime.json` och har ingen implementation. SortBro använder det om det någon gång dyker upp, men i dag står det still.
 
-Vill du att det ska letas **två gånger per dygn** räcker det med en inställning i Thunderbird, en gång:
-
-1. **Inställningar → Allmänt** och rulla längst ner.
-2. **Config-editor** (avancerade inställningar).
-3. Sök upp `extensions.update.interval` och ändra `86400` till **`43200`** (tolv timmar i sekunder).
-4. Starta om Thunderbird.
-
-Inställningen gäller alla tillägg, kräver ingen behörighet och överlever både uppdateringar och nya versioner av SortBro. SortBro själv rör den aldrig.
+SortBro försöker också själv en gång per dygn, så nära midnatt som den vanliga pulsen hinner. Anropet finns dock inte implementerat i Thunderbird, så i praktiken är det `extensions.update.interval` som avgör. Vill du kontrollera exakt klockan 00:00 kan du köra **Schemalagg-SortBro-00.bat** en gång: den skapar en tyst schemalagd uppgift som startar uppdateraren varje natt. Uppgiften heter *SortBro daglig uppdatering* och kan tas bort i Aktivitetshanteraren.
 
 **Sidfoten kan ändå visa fel version — det var en riktig bugg i 1.0.1.** Texten står nämligen som reserv i `ui.html`, och den skrevs bara om när språket byttes. Kör man svenska (som är standard) byts språket aldrig, så sidfoten behöll den version som råkade stå i HTML-filen — `v1.0.0` — även om 1.0.1 var installerad. Från 1.0.2 skrivs sidfoten om direkt vid start, och `ui.html`-reserven höjs av `tools/ship.sh` tillsammans med de andra versionstalen.
 
@@ -541,7 +548,7 @@ Installationstypen läses med `management.getSelf()`, som enligt Thunderbirds eg
 
 ## Teknisk logg
 
-Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 30 dagar, högst 5000 rader.
+Händelserna skrivs till aktivitetssidan och kan exporteras som JSON under Aktivitet. Händelserna är start, sparade inställningar, sparade regler, återställda jobb, köade, simulerade prov, bekräftade flyttar, överhoppade, spärrade köer och generiska fel. Rensning sker efter 7 dagar, högst 5000 rader.
 
 Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Lasfilter/logs/lasfilter-logg.txt`** – som uppdateras varje gång något händer. Den har två uppgifter utöver aktivitetslistan:
 
@@ -550,7 +557,7 @@ Samma händelser skrivs också till en läsbar textfil – **`Hämtade filer/Las
 
 ### Kopiera alla fel till en chatt
 
-Öppna **Aktivitet → Kopiera alla fel**. När kopieringen bekräftas kan du klistra in med **Ctrl+V** (Mac: **⌘V**). Det är hela den sparade, separata felloggen – högst **5 000 fel från de senaste 30 dagarna**, inte bara de rader som syns i aktivitetstabellen. Tidsstämplar, felkoder, antal och versionsuppgifter följer med. Vanlig aktivitet och mejltexter ingår inte.
+Öppna **Aktivitet → Kopiera alla fel**. När kopieringen bekräftas kan du klistra in med **Ctrl+V** (Mac: **⌘V**). Det är hela den sparade, separata felloggen – högst **5 000 fel från de senaste 7 dagarna**, inte bara de rader som syns i aktivitetstabellen. Tidsstämplar, felkoder, antal och versionsuppgifter följer med. Vanlig aktivitet och mejltexter ingår inte.
 
 Om Thunderbird nekar urklippsåtkomst visas i stället en skrivskyddad textruta. Välj **Markera hela felloggen**, tryck **Ctrl+C** (Mac: **⌘C**) och klistra sedan in texten här i chatten. Inga extra behörigheter krävs. Texten ändras inte när aktivitetstabellen uppdateras och **Stäng texten** tömmer bara kopieringsrutan, inte felarkivet. Förhandsvisningens kopior är märkta som exempeldata.
 
@@ -838,7 +845,7 @@ Utseendevalen sparas lokalt. Snabba ändringar köas så att inställningarna in
 ## Nyheter i 1.0.12
 
 - **Samlad fellogg:** `logs/sortbro-fellogg.txt` ger en gemensam startpunkt för felsökning, med senaste felet först och aktuella versionsuppgifter.
-- **Separat felhistorik:** upp till 5 000 fel från de senaste 30 dagarna behålls över omstarter, utan att normal aktivitet tränger undan dem.
+- **Separat felhistorik:** upp till 5 000 fel från de senaste 7 dagarna behålls över omstarter, utan att normal aktivitet tränger undan dem.
 - **Spara manuellt under Aktivitet**, eller låt den befintliga inställningen för automatisk filloggning skriva båda loggfilerna.
 - Fel vid säkerhetskopiering, årsmapp, mappsökning och enskild misslyckad flytt klassas nu som fel i stället för enbart detaljlogg. Oväntade skriptfel rapporteras med fasta koder utan rå feltext.
 
@@ -895,7 +902,7 @@ Testerna är nu 353 stycken plus 188 DOM-kontroller, och de nya vaktar just det 
 ## Nyheter i 1.0.3
 
 - **Tyst omstart när en ny version har hämtats.** SortBro lyssnar på att en uppdatering finns, väntar tills ingen flytt eller inget svep pågår och laddar då om sig själv. Inget fönster, ingen fråga, ingen omstart av Thunderbird. Har något hängt i trettio minuter byts versionen ändå — kön ligger i lagringsutrymmet och plockas upp igen.
-- **Kontrollen sker när Thunderbird själv kontrollerar.** Tillägget kan inte tvinga fram en extra kontroll (anropet finns inte i Thunderbird), men det använder det om det någon gång införs. Avsnittet ovan visar hur du får två kontroller per dygn med en enda inställning.
+- **Kontrollen sker en gång per dygn.** Tillägget försöker själv strax efter midnatt och använder Thunderbirds kontroll när anropet finns. I dag är anropet inte implementerat; då gäller `extensions.update.interval` (86400 sekunder). Schemaläggningshjälpen kan köra en tyst kontroll exakt 00:00.
 
 ## Nyheter i 1.0.2
 

@@ -67,7 +67,15 @@ const I18N={
   scopeAccounts:"{n} konton",
   multiAccountsExport:"Regler med flera källkonton kan inte exporteras till en enda Thunderbird-filterfil. Använd SortBros JSON-export för att bevara kontovalet.",
   copyErrorsBtn:"Kopiera alla fel",
-  copyErrorsHelp:"Kopierar hela SortBros sparade fellogg: högst 5 000 fel från de senaste 30 dagarna, med tidsstämplar, felkoder och versionsuppgifter. Inga mejltexter. Granska loggen innan du delar den – detaljer kan innehålla regelnamn och domäner.",
+  copyErrorsHelp:"Kopierar hela SortBros sparade fellogg: högst 5 000 fel från de senaste 7 dagarna, med tidsstämplar, felkoder och versionsuppgifter. Inga mejltexter. Granska loggen innan du delar den – detaljer kan innehålla regelnamn och domäner.",
+  clearErrorsBtn:"Rensa åtgärdade fel",
+  clearErrorsHelp:"Rensar endast fel som redan är åtgärdade. Knappen är avstängd så länge en spärr, ett pågående jobb eller en aktiv felorsak finns kvar. Rensar aldrig regler, kö eller flyttjournal.",
+  clearErrorsConfirm:"Har du åtgärdat felen? Detta tar bort alla felposter ur felloggen men behåller regler, kö och flyttjournal. Fortsätta?",
+  clearErrorsActive:"Kan inte rensas medan en spärr eller ett jobb pågår.",
+  toastErrorsCleared:"Åtgärdade fel rensades",
+  sortBy:"Sortera efter {column}",
+  sortAscending:"stigande",
+  sortDescending:"fallande",
   copyErrorsDone:"Felloggen är kopierad. Klistra in den i chatten med Ctrl+V (Mac: ⌘V).",
   copyErrorsManual:"Automatisk kopiering kunde inte göras. Under Aktivitet finns hela felloggen att markera och kopiera med Ctrl+C (Mac: ⌘C).",
   copyErrorsTitle:"Fellogg att kopiera",
@@ -522,7 +530,7 @@ const I18N={
   verboseLabel:'Visa detaljerad felsökning i Aktivitet',
   fileLogLabel:'Skriv teknisk logg automatiskt till Hämtade filer/Lasfilter/logs/lasfilter-logg.txt',
   storageNote:'Automatiska filer och vanliga exporter hamnar i undermappar till appmappen Hämtade filer/Lasfilter/: logs (loggfilen), Regelbackuper (säkerhetskopiorna), Regler (dina exporter) och Filterfiler (msgFilterRules.dat). Inget hamnar löst i Hämtade filer. Med Spara logg som… under Aktivitet väljer du själv mapp för en manuell kopia.',
-  fileLogNote:'Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 30 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.',
+  fileLogNote:'Skriver även sortbro-fellogg.txt i samma mapp: en samlad fellogg med de senaste 7 dagarnas fel (högst 5 000). Ingen mejltext sparas. Du kan också spara felloggen under Aktivitet.',
   autoBackupLabel:'Backa upp reglerna automatiskt en gång per vecka till Hämtade filer/Lasfilter/Regelbackuper/',
   cacheTitle:'Cache',
   cacheSub:'SortBro minns varje mapps meddelandetal så att ett svep kan hoppa över mappar som inte ändrats. Det gör svepen snabba. Cachen töms automatiskt en gång i dygnet, så att den aldrig kan visa en gammal bild av inkorgen.',
@@ -962,7 +970,15 @@ const I18N={
   scopeAccounts:"{n} accounts",
   multiAccountsExport:"Rules with multiple source accounts cannot be exported to a single Thunderbird filter file. Use SortBro’s JSON export to preserve the account selection.",
   copyErrorsBtn:"Copy all errors",
-  copyErrorsHelp:"Copies the complete saved SortBro error log: up to 5,000 errors from the last 30 days, with timestamps, error codes and version details. No message bodies. Review before sharing – details may contain rule names and domains.",
+  copyErrorsHelp:"Copies the complete saved SortBro error log: up to 5,000 errors from the last 7 days, with timestamps, error codes and version details. No message bodies. Review before sharing – details may contain rule names and domains.",
+  clearErrorsBtn:"Clear resolved errors",
+  clearErrorsHelp:"Removes only errors that are already resolved. The button is disabled while a lock, a running job or an active failure remains. It never clears rules, the queue or the move journal.",
+  clearErrorsConfirm:"Have you resolved the errors? This removes all error entries from the error log but keeps rules, the queue and the move journal. Continue?",
+  clearErrorsActive:"Cannot clear while a lock or a job is active.",
+  toastErrorsCleared:"Resolved errors cleared",
+  sortBy:"Sort by {column}",
+  sortAscending:"ascending",
+  sortDescending:"descending",
   copyErrorsDone:"Error log copied. Paste it into the chat with Ctrl+V (Mac: ⌘V).",
   copyErrorsManual:"Automatic copying was unavailable. The full error log is available under Activity: select it and press Ctrl+C (Mac: ⌘C).",
   copyErrorsTitle:"Error log to copy",
@@ -1417,7 +1433,7 @@ const I18N={
   verboseLabel:'Show detailed diagnostics in Activity Log',
   fileLogLabel:'Automatically write technical log to Downloads/Lasfilter/logs/lasfilter-logg.txt',
   storageNote:'Automatic files and regular exports land in subfolders of the app folder Downloads/Lasfilter/: logs (the log file), Regelbackuper (the backups), Regler (your exports) and Filterfiler (msgFilterRules.dat). Nothing is left loose in Downloads. Save log as… under Activity lets you choose a folder for a manual copy.',
-  fileLogNote:'Also writes sortbro-fellogg.txt in the same folder: a combined error log for the last 30 days (up to 5,000 entries). No message bodies are stored. You can also save it under Activity.',
+  fileLogNote:'Also writes sortbro-fellogg.txt in the same folder: a combined error log for the last 7 days (up to 5,000 entries). No message bodies are stored. You can also save it under Activity.',
   autoBackupLabel:'Back up the rules automatically once a week to Downloads/Lasfilter/Regelbackuper/',
   cacheTitle:'Cache',
   cacheSub:'SortBro remembers each folder\'s message counts so a sweep can skip folders that have not changed. That keeps sweeps fast. The cache is cleared automatically once a day, so it can never show a stale picture of your inbox.',
@@ -2003,15 +2019,8 @@ function applySeason(prefs){
   seasonPainted=signature;
   if($('seasonHeroArt'))$('seasonHeroArt').innerHTML=seasonArt(season);
   if($('seasonGreeting'))$('seasonGreeting').textContent=T(SEASON_KEY_NAMES[season]||'seasonGreetingAutumn');
-  const img=$('brandLogo');
-  if(img){
-   const base='season-'+season;
-   /* 32 px är exakt 1x och 64 px exakt 2x. Då slipper logotypen skalas
-      om från en slumpmässig 64 px-bild till 38 px och bli mjuk. */
-   img.src=base+'-32.png';
-   img.srcset=base+'-32.png 1x, '+base+'-64.png 2x';
-   img.sizes='32px';
-  }
+  /* Applogotypen är alltid samma vektor (icon.svg). Årstiden färgar hero-
+     bilden och verktygsfältets ikon, inte själva märket. */
  }
  if($('season'))$('season').value=value;
  if($('seasonQuick'))$('seasonQuick').value=value;
@@ -3070,6 +3079,36 @@ function loadRule(id='',presetAccount='',{openEditor=true}={}){
  if(openEditor)openRuleEditor();
 }
 const logKey=log=>log.time+'|'+log.event+'|'+(log.data?.count||0)+'|'+(log.data?.detail||'');
+let logSort={key:'time',dir:'desc'};
+function logSortValue(log,key){
+ if(key==='count')return Number(log.data?.count)||0;
+ if(key==='level')return String(log.level||'');
+ if(key==='event')return String(log.event||'');
+ return Date.parse(log.time)||0;
+}
+function sortedLogs(logs){
+ const out=logs.slice();
+ out.sort((a,b)=>{
+  const av=logSortValue(a,logSort.key),bv=logSortValue(b,logSort.key);
+  const cmp=typeof av==='number'?av-bv:String(av).localeCompare(String(bv),locale(),{numeric:true});
+  return cmp||logKey(a).localeCompare(logKey(b),locale(),{numeric:true});
+ });
+ if(logSort.dir==='desc')out.reverse();
+ return out;
+}
+function updateLogSortHeaders(){
+ for(const th of document.querySelectorAll('th[data-sort]')){
+  const key=th.dataset.sort,active=key===logSort.key;
+  th.setAttribute('aria-sort',active?(logSort.dir==='asc'?'ascending':'descending'):'none');
+  const mark=th.querySelector('.log-sort-mark');
+  if(mark)mark.textContent=active?(logSort.dir==='asc'?'▲':'▼'):'↕';
+  const button=th.querySelector('.log-sort');
+  if(button){
+   const name=button.querySelector('[data-i18n]')?.textContent||key;
+   button.setAttribute('aria-label',T('sortBy').replace('{column}',name)+' · '+T(active?(logSort.dir==='asc'?'sortAscending':'sortDescending'):'sortAscending'));
+  }
+ }
+}
 function logRow(log){
  const tr=el('tr');
  tr.append(el('td','numeric-value',new Date(log.time).toLocaleString(locale())));
@@ -3080,12 +3119,23 @@ function logRow(log){
 }
 function renderActivity(){
  const body=$('logRows');if(!body)return;
+ const shownBefore=logShown.length;
+ updateLogSortHeaders();
+ const clear=$('clearErrors');
+ if(clear){
+  const active=!!(state.fault||state.blocked||state.health?.holds?.length||state.inflight||state.queued);
+  clear.disabled=active;clear.title=active?T('clearErrorsActive'):'';
+ }
  const logs=state.logs||[];
- const keys=logs.map(logKey).reverse();
+ const incremental=logSort.key==='time'&&logSort.dir==='desc';
+ const ordered=incremental?logs.slice().reverse():sortedLogs(logs);
+ const keys=ordered.map(logKey);
  /* Kommer det bara nya rader i toppen? Då läggs de till i stället för att hela
-    tabellen byggs om: raderna behåller sin plats och scrollen hoppar inte. */
- const added=keys.length-logShown.length;
- if(logShown.length&&added>0&&keys.slice(added).every((k,i)=>k===logShown[i])){
+    tabellen byggs om: raderna behåller sin plats och scrollen hoppar inte.
+    Det gäller bara standardsorteringen (nyast först) – andra sorteringar
+    byggs om när de ändras. */
+ const added=keys.length-shownBefore;
+ if(incremental&&logShown.length&&added>0&&keys.slice(added).every((k,i)=>k===logShown[i])){
   const height=body.scrollHeight;
   const first=body.firstChild;
   const frag=document.createDocumentFragment();
@@ -3097,7 +3147,7 @@ function renderActivity(){
  }
  body.replaceChildren();
  const frag=document.createDocumentFragment();
- for(let i=logs.length-1;i>=0;i--)frag.append(logRow(logs[i]));
+ for(const log of ordered)frag.append(logRow(log));
  if(!logs.length){const tr=el('tr'),td=el('td','',T('noLogsYet'));td.colSpan=4;tr.append(td);frag.append(tr);}
  body.append(frag);
  logShown.length=0;logShown.push(...keys);
@@ -3997,6 +4047,16 @@ handle('copyErrors','click',async()=>{
    toast(T('copyErrorsManual'));
   }
  }finally{copyingErrors=false;$('copyErrors').disabled=false;}
+});
+handle('clearErrors','click',async()=>{
+ if(!confirm(T('clearErrorsConfirm')))return;
+ try{renderStatus(await rpc('clearErrors',{confirmed:true}));toast(T('toastErrorsCleared'));}catch(e){alertError(e);}
+});
+for(const button of (document.querySelectorAll?.('.log-sort')||[]))button.addEventListener('click',()=>{
+ const key=button.dataset.sort;
+ if(logSort.key===key)logSort.dir=logSort.dir==='asc'?'desc':'asc';
+ else{logSort.key=key;logSort.dir=key==='time'?'desc':'asc';}
+ renderActivity();
 });
 handle('copyErrorsSelect','click',selectErrorText);
 handle('copyErrorsHide','click',()=>{

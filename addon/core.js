@@ -1,7 +1,7 @@
 /* Läsfilter: rena regler, utan filåtkomst eller nätverk. */
 (function(root){
 'use strict';
-const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,yearFolders:12,diagnose:20000,examples:5,trialKeys:500,trialDays:7,learnDays:7,learnCount:3,learnEntries:40});
+const LIMITS=Object.freeze({rules:200,conditions:8,value:256,queue:100,logs:5000,logDays:7,yearFolders:12,diagnose:20000,examples:5,trialKeys:500,trialDays:7,learnDays:7,learnCount:3,learnEntries:40});
 /* Vilka fält och jämförelser som är tillåtna. Textfälten jämförs som text,
    storlek i kB och datum som dagar eller årtal. */
 const FIELD_OPS=Object.freeze({
@@ -540,7 +540,7 @@ function event(name,count=0,now=Date.now(),detail=''){
  return {time:new Date(now).toISOString(),app:'lasfilter',level:['error','queue_full'].includes(name)?'ERROR':'INFO',event:name,data};
 }
 function cleanLogs(rows,now=Date.now()){
- return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-30*86400000&&Date.parse(r.time)<=now+60000)
+ return (Array.isArray(rows)?rows:[]).filter(r=>r&&EVENTS.has(r.event)&&Number.isFinite(Date.parse(r.time))&&Date.parse(r.time)>=now-LIMITS.logDays*86400000&&Date.parse(r.time)<=now+60000)
  .slice(-LIMITS.logs).map(r=>event(r.event,r.data?.count,Date.parse(r.time),r.data?.detail));
 }
 /* Felarkivet gallras separat: normal aktivitet får inte tränga undan fel.
@@ -555,7 +555,7 @@ function errorLogText(rows,info={}){
  const lines=['SORTBRO – SAMLAD FELLOGG','Skapad: '+new Date().toISOString(),
   'Version (aktuell session): '+(info.version||'okand'),'Thunderbird: '+(info.tbVersion||'okand'),'Installation: '+(info.installType||'okand'),
   'Omfattning: SortBros registrerade fel, inte Thunderbird eller andra programs loggar.',
-  'Historik: högst 5000 fel från de senaste 30 dagarna. Senaste felet först.',
+  'Historik: högst 5000 fel från de senaste '+LIMITS.logDays+' dagarna. Senaste felet först.',
   'Antal felposter: '+errors.length,...[...counts].map(([key,n])=>key+': '+n),'',
   'Tid (UTC)\tHändelse\tAntal\tDetalj / felkod'];
  for(const x of errors.slice().reverse())lines.push([x.time,x.event,x.data.count,x.data.detail||'-'].join('\t'));

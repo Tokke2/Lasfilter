@@ -3689,3 +3689,79 @@ h1, h2, h3,
     width: 100%;
   }
 }
+
+/* 1.0.39: sorterbara loggkolumner, tydlig rensning och vektorlogotyp */
+.log-sort {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  border-radius: 5px;
+}
+
+.log-sort:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.log-sort:hover {
+  color: var(--accent);
+}
+
+.log-sort-mark {
+  font-size: 0.72em;
+  line-height: 1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+th[aria-sort="ascending"] .log-sort-mark,
+th[aria-sort="descending"] .log-sort-mark {
+  color: var(--accent);
+}
+
+#clearErrors {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#clearErrors:disabled {
+  opacity: 0.45;
+}
+
+.brand img {
+  object-fit: contain;
+}
+
+@media (max-width: 680px) {
+  .card-title {
+    flex-wrap: wrap;
+  }
+  .log-sort {
+    min-height: 30px;
+  }
+}
+
+/* 1.0.39: skarpare ikoner och en arbetsyta som fyller fönstrets höjd */
+.nav-icon,
+.btn-icon {
+  stroke-width: 2;
+  shape-rendering: geometricPrecision;
+}
+
+.tabbed-workspace .shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#view-activity .table-wrap {
+  max-height: min(64dvh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}

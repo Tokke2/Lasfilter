@@ -1397,6 +1397,30 @@ test('ogiltiga utseendeval ignoreras utan att förstöra giltiga inställningar'
  const p=await app.handle({type:'prefs',prefs:{fontSize:100,density:'tiny',lineSpacing:'huge',introCollapsed:'false'}});
  assert.equal(p.fontSize,24);assert.equal(p.density,'compact');assert.equal(p.lineSpacing,'roomy');assert.equal(p.introCollapsed,true);
 });
+test('åtgärdade fel kan rensas men aldrig medan en spärr är aktiv',async()=>{
+ const {app}=await loadBackground();const engine=fakeEngineWithRules(app);
+ app.logs=[C.event('error',0,Date.now(),'gammalt_fel'),C.event('moved',2),C.event('debug',0,Date.now(),'behall')];
+ app.errorLogs=C.cleanErrorLogs(app.logs);
+ const out=await app.handle({type:'clearErrors',confirmed:true});
+ assert.equal(out.logs.some(x=>x.event==='error'),false,'felposter ska bort');
+ assert.equal(out.logs.some(x=>x.event==='moved'),true,'vanliga flyttar ska vara kvar');
+ assert.equal(out.logs.some(x=>x.data?.detail==='behall'),true,'ofarliga debugrader ska vara kvar');
+ assert.equal(app.errorLogs.length,0,'den separata felloggen ska vara tom');
+ engine.fault='sweep_error';app.logs=[C.event('error',0,Date.now(),'aktivt')];app.errorLogs=C.cleanErrorLogs(app.logs);
+ await assert.rejects(()=>app.handle({type:'clearErrors',confirmed:true}),e=>e.code==='bad_request');
+ assert.equal(app.errorLogs.length,1,'aktiva fel får inte rensas');
+});
+
+test('uppdateringskontrollen körs en gång per dygn',async()=>{
+ const {app}=await loadBackground();
+ app.updateDay='';
+ const first=await app.maybeDailyUpdateCheck(Date.now());
+ const second=await app.maybeDailyUpdateCheck(Date.now());
+ assert.equal(second,'already_checked','samma dag ska bara kontrolleras en gång');
+ assert.equal(typeof first,'string');
+ assert.equal(app.updateDay,app.updateDayOf(Date.now()));
+});
+
 test('äldre och ogiltigt lagrade utseendeval får säkra standardvärden',async()=>{
  const api=stubApi();api.storage.local.get=async()=>({prefs:{fontSize:25,density:'tiny',lineSpacing:99,introCollapsed:'yes'}});
  const {app}=await loadBackground(api);
